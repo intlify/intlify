@@ -18,6 +18,12 @@
 //! reasons and bounds, the Safe Origin Kinds, the semantic groups, the
 //! artifact kinds, and the Snapshot marker reasons.
 //!
+//! Beside the forms, the schema pins the failure precedence as its top-level
+//! `failurePrecedence` (D15:3269): each boundary kind's ordered
+//! `{ check, reason }` rows, and for the construction cases a reference to
+//! the construction-admission body that holds the construction rows. Draft 7
+//! ignores the keyword, so it changes nothing that the schema admits.
+//!
 //! What a manifest names besides itself, its fixtures, keeps the form the
 //! cases that read it will give it: the forms of the input and
 //! expected-outcome fixtures join this schema with those cases, as revision
@@ -35,6 +41,7 @@ use crate::construction::failure::ConstructionFailure;
 use crate::construction::generate::{self, Artifact};
 use crate::construction::profile::MARKER_REASONS;
 use crate::construction::registry::check::{CHECK_ID_PATTERN, RULE_ID_PATTERN};
+use crate::construction::root::RootRole;
 use crate::resolver::dependency::SemanticGroup;
 use crate::resolver::origin::SafeOriginKind;
 use crate::snapshot::SnapshotBound;
@@ -52,7 +59,7 @@ pub(crate) const PATH: &str = "schemas/case-v0.schema.json";
 
 /// The Case Schema's file digest, which the runner pins.
 pub(crate) const DIGEST: &str =
-    "sha256:a8112fdf3d05623126d8e2ec224e79fb7f204886453d042628686347be26bca4";
+    "sha256:50d2a9d4dbd5faa9acb533e7538a82f6b9af577a9d5061b694eeda102281b3f7";
 
 /// A case or Handoff Vector ID: `015-` and lowercase kebab-case.
 pub(crate) const CASE_ID_PATTERN: &str = "^015-[a-z0-9]+(?:-[a-z0-9]+)*$";
@@ -269,6 +276,182 @@ pub(crate) const BOUNDARIES: [(&str, &[&str]); 13] = [
             "missing-construction-identity",
             "malformed-construction-identity",
             "construction-identity-mismatch",
+        ],
+    ),
+];
+
+/// Each boundary kind's failure precedence, in the order of [`BOUNDARIES`]:
+/// its ordered `{ check, reason }` rows, the first failing row deciding
+/// (D15:3160, 3269). Each row places one of the boundary's checks at the
+/// position of the general order that the check takes, in the order the
+/// boundary applies them, so a row lists its reasons in the order of the
+/// first position each occupies. A reason can take several positions, such
+/// as `malformed-input` for syntax, for the closed shape, and for the value
+/// rules. The capability boundary compares its specification before its
+/// inventory and bounds, so its `assertion-comparison` rows come before its
+/// `value-rules` rows.
+pub(crate) const BOUNDARY_PRECEDENCE: [(&str, &[(&str, &str)]); 13] = [
+    (
+        "profile-resolution-specification-input",
+        &[
+            ("missing-input", "missing-input"),
+            ("raw-bounds", "over-bound-member"),
+            ("strict-syntax", "malformed-input"),
+            ("closed-shape", "malformed-input"),
+            ("repeated-member", "duplicate-member"),
+            ("unknown-member", "unknown-member"),
+            ("value-rules", "malformed-input"),
+        ],
+    ),
+    (
+        "intent-surface-class-vocabulary-artifact",
+        &[
+            ("missing-input", "missing-input"),
+            ("raw-bounds", "over-bound-envelope"),
+            ("strict-syntax", "malformed-envelope"),
+            ("count-bounds", "over-bound-envelope"),
+            ("closed-shape", "malformed-envelope"),
+            ("repeated-member", "duplicate-member"),
+            ("unknown-member", "unknown-member"),
+        ],
+    ),
+    (
+        "locale-canonicalization-data-artifact",
+        &[
+            ("missing-input", "missing-input"),
+            ("raw-bounds", "over-bound-envelope"),
+            ("strict-syntax", "malformed-envelope"),
+            ("closed-shape", "malformed-envelope"),
+            ("repeated-member", "duplicate-member"),
+            ("unknown-member", "unknown-member"),
+        ],
+    ),
+    (
+        "submitted-profile-resolution-artifact-collection",
+        &[
+            ("missing-input", "missing-input"),
+            ("unsafe-host-inspection", "unsafe-host-inspection"),
+            ("container-form", "malformed-container"),
+            ("raw-bounds", "formal-envelope-over-bound"),
+            ("strict-syntax", "unrepresentable-member"),
+            ("value-rules", "unrepresentable-member"),
+        ],
+    ),
+    (
+        "resource-limit-policy-verification-input",
+        &[
+            ("missing-input", "missing-input"),
+            ("raw-bounds", "over-bound-input"),
+            ("strict-syntax", "malformed-input"),
+            ("count-bounds", "over-bound-input"),
+            ("closed-shape", "malformed-input"),
+            ("repeated-member", "duplicate-member"),
+            ("unknown-member", "unknown-member"),
+            ("reserved-members", "secret-bearing-input"),
+            ("reserved-members", "ambient-authority"),
+            ("value-rules", "malformed-input"),
+            ("assertion-comparison", "verification-identity-mismatch"),
+            ("assertion-comparison", "verification-revision-mismatch"),
+            ("assertion-comparison", "verification-digest-mismatch"),
+        ],
+    ),
+    (
+        "safe-origin-kind",
+        &[
+            ("missing-input", "missing-safe-origin-kind"),
+            ("closed-shape", "unknown-safe-origin-kind"),
+            ("value-rules", "unknown-safe-origin-kind"),
+            ("value-rules", "non-canonical-safe-origin-kind"),
+            ("assertion-comparison", "evidence-kind-incompatible"),
+        ],
+    ),
+    (
+        "external-profile-selector-binding",
+        &[
+            ("unsafe-host-inspection", "unsafe-host-inspection"),
+            ("closed-shape", "unrepresentable-selector"),
+            ("value-rules", "malformed-normalized-selector"),
+        ],
+    ),
+    (
+        "file-source-identity-revision",
+        &[
+            ("missing-input", "missing-source-identity"),
+            ("missing-input", "missing-source-revision"),
+            ("raw-bounds", "over-bound-source-identity"),
+            ("raw-bounds", "over-bound-source-revision"),
+            ("value-rules", "unstable-source-identity"),
+            ("value-rules", "unbound-source-revision"),
+            ("assertion-comparison", "source-snapshot-mismatch"),
+        ],
+    ),
+    (
+        "programmatic-entry-identity-revision",
+        &[
+            ("missing-input", "missing-entry-identity"),
+            ("missing-input", "missing-entry-revision"),
+            ("raw-bounds", "over-bound-entry-identity"),
+            ("raw-bounds", "over-bound-entry-revision"),
+            ("value-rules", "unstable-entry-identity"),
+            ("value-rules", "unbound-entry-revision"),
+            ("assertion-comparison", "snapshot-identity-mismatch"),
+        ],
+    ),
+    (
+        "programmatic-entry-snapshot",
+        &[
+            ("missing-input", "missing-snapshot"),
+            ("unsafe-host-inspection", "unsafe-host-inspection"),
+            ("raw-bounds", "snapshot-envelope-over-bound"),
+            ("closed-shape", "malformed-snapshot"),
+            ("value-rules", "snapshot-envelope-over-bound"),
+            ("assertion-comparison", "snapshot-content-digest-mismatch"),
+        ],
+    ),
+    (
+        "programmatic-call-site-evidence-input",
+        &[
+            ("unsafe-host-inspection", "unsafe-host-inspection"),
+            ("raw-bounds", "over-bound-input"),
+            ("count-bounds", "over-bound-input"),
+            ("closed-shape", "malformed-input"),
+            ("closed-shape", "invalid-utf8-source"),
+            ("repeated-member", "duplicate-mapping"),
+            ("value-rules", "missing-source-identity"),
+            ("value-rules", "missing-source-revision"),
+            ("value-rules", "unstable-source-identity"),
+            ("value-rules", "unbound-source-revision"),
+            ("assertion-comparison", "source-snapshot-mismatch"),
+        ],
+    ),
+    (
+        "implementation-capability",
+        &[
+            ("missing-input", "missing-capability"),
+            ("closed-shape", "malformed-capability"),
+            (
+                "assertion-comparison",
+                "capability-specification-identity-mismatch",
+            ),
+            (
+                "assertion-comparison",
+                "capability-specification-revision-mismatch",
+            ),
+            ("value-rules", "malformed-capability"),
+            ("value-rules", "incomplete-capability"),
+            ("value-rules", "non-canonical-bound"),
+            ("value-rules", "non-positive-bound"),
+            ("value-rules", "unrepresentable-bound"),
+            ("value-rules", "below-bootstrap-minimum"),
+        ],
+    ),
+    (
+        "resolver-construction-identity-reference",
+        &[
+            ("missing-input", "missing-construction-identity"),
+            ("closed-shape", "malformed-construction-identity"),
+            ("value-rules", "malformed-construction-identity"),
+            ("assertion-comparison", "construction-identity-mismatch"),
         ],
     ),
 ];
@@ -1004,8 +1187,44 @@ fn obligation(definitions: &mut Map<String, Value>) {
     definitions.insert(kind.definition().into(), json!({ "oneOf": rows }));
 }
 
-/// The Case Schema's document.
-pub(crate) fn schema() -> Value {
+/// The top-level `failurePrecedence` (D15:3269): each boundary kind's rows,
+/// and for the construction cases a reference to the construction-admission
+/// body's rows, by the Root Package member that holds the body and the file
+/// digest the Suite Index declares for it, instead of a copy. The two
+/// admission steps' kinds order their failures as the steps do and have none
+/// (D15:3166, 3168).
+fn failure_precedence() -> Result<Value, serde_json::Error> {
+    let role = RootRole::ConstructionAdmissionSpecification;
+    let body = generate::artifacts()?
+        .into_iter()
+        .find(|artifact| artifact.path == role.path())
+        .expect("the construction root writes each member");
+    let mut precedence = Map::new();
+    precedence.insert(
+        ManifestKind::ResolverConstruction.name().into(),
+        json!({
+            "rootPackageMember": role.name(),
+            "digest": file_digest(&body.bytes).as_str(),
+        }),
+    );
+    for (kind, rows) in BOUNDARY_PRECEDENCE {
+        let rows = rows
+            .iter()
+            .map(|(check, reason)| json!({ "check": check, "reason": reason }))
+            .collect();
+        precedence.insert(kind.into(), Value::Array(rows));
+    }
+    Ok(Value::Object(precedence))
+}
+
+/// The Case Schema's document. Draft 7 ignores the unknown keyword
+/// `failurePrecedence`, so it changes nothing that the schema admits.
+///
+/// # Errors
+///
+/// Returns the serialization failure of the construction artifacts, which
+/// their values rule out.
+pub(crate) fn schema() -> Result<Value, serde_json::Error> {
     let mut definitions = Map::new();
     shared(&mut definitions);
     construction(&mut definitions);
@@ -1013,23 +1232,24 @@ pub(crate) fn schema() -> Value {
     resolver(&mut definitions);
     handoff(&mut definitions);
     obligation(&mut definitions);
-    json!({
+    Ok(json!({
         "$schema": DRAFT_7,
         "oneOf": ManifestKind::ALL.map(|kind| definition(kind.definition())),
         "definitions": definitions,
-    })
+        "failurePrecedence": failure_precedence()?,
+    }))
 }
 
 /// The Case Schema, as this crate writes it.
 ///
 /// # Errors
 ///
-/// Returns the serialization failure of the schema, which its value rules
-/// out.
+/// Returns the serialization failure of the schema or of the construction
+/// artifacts it references, which their values rule out.
 pub fn artifact() -> Result<Artifact, serde_json::Error> {
     Ok(Artifact {
         path: PATH,
-        bytes: generate::write(&schema())?,
+        bytes: generate::write(&schema()?)?,
     })
 }
 
@@ -1081,7 +1301,7 @@ mod tests {
 
     impl Validators {
         fn new() -> Self {
-            let schema = schema();
+            let schema = schema().unwrap();
             Self {
                 read: Schema::compile(&schema).unwrap(),
                 oracle: jsonschema::draft7::new(&schema).unwrap(),
@@ -1309,7 +1529,7 @@ mod tests {
 
     #[test]
     fn the_case_schema_is_a_draft_7_schema_both_validators_read() {
-        let schema = schema();
+        let schema = schema().unwrap();
         assert_eq!(schema["$schema"], DRAFT_7);
         assert!(jsonschema::draft7::meta::validator().is_valid(&schema));
         let validators = Validators::new();
@@ -2104,7 +2324,7 @@ mod tests {
     /// and bound, every Safe Origin Kind, and every semantic group.
     #[test]
     fn the_vocabularies_are_this_crate_s() {
-        let schema = schema();
+        let schema = schema().unwrap();
         let reasons = schema["definitions"]["resolverConstructionCase"]["properties"]["expected"]
             ["oneOf"][1]["properties"]["failureReason"]["allOf"][0]["enum"]
             .as_array()
@@ -2148,6 +2368,129 @@ mod tests {
                 .map(|(_, reasons)| reasons.len())
                 .sum::<usize>(),
             78
+        );
+    }
+
+    /// The positions of the general order in which every boundary applies its
+    /// checks, in that order (D15:3160, 3269).
+    const CHECKS: [&str; 12] = [
+        "missing-input",
+        "unsafe-host-inspection",
+        "container-form",
+        "raw-bounds",
+        "strict-syntax",
+        "count-bounds",
+        "closed-shape",
+        "repeated-member",
+        "unknown-member",
+        "reserved-members",
+        "value-rules",
+        "assertion-comparison",
+    ];
+
+    /// The order of the positions a kind's rows take: the general order,
+    /// except that the capability boundary compares its specification before
+    /// its inventory and bounds (D15:3269).
+    fn positions(kind: &str) -> Vec<&'static str> {
+        let mut order = CHECKS.to_vec();
+        if kind == "implementation-capability" {
+            order.swap(10, 11);
+        }
+        order
+    }
+
+    /// Each kind's rows never go back in its order of positions, and list
+    /// exactly the reasons of its row of the boundary table, in that row's
+    /// order: the order of the first position each occupies (D15:3160).
+    #[test]
+    fn each_precedence_follows_the_general_order_and_its_row() {
+        assert_eq!(
+            BOUNDARY_PRECEDENCE.map(|(kind, _)| kind),
+            BOUNDARIES.map(|(kind, _)| kind)
+        );
+        for ((kind, rows), (_, reasons)) in BOUNDARY_PRECEDENCE.iter().zip(BOUNDARIES) {
+            let order = positions(kind);
+            let taken = rows
+                .iter()
+                .map(|(check, _)| order.iter().position(|position| position == check))
+                .collect::<Option<Vec<_>>>()
+                .unwrap_or_else(|| panic!("{kind} names a check outside the order"));
+            assert!(taken.is_sorted(), "{kind} goes back in its order");
+            let mut first = Vec::new();
+            for (_, reason) in *rows {
+                if !first.contains(reason) {
+                    first.push(*reason);
+                }
+            }
+            assert_eq!(first, reasons.to_vec(), "{kind}");
+        }
+        assert_eq!(
+            BOUNDARY_PRECEDENCE
+                .iter()
+                .map(|(_, rows)| rows.len())
+                .sum::<usize>(),
+            92
+        );
+    }
+
+    /// The schema pins every boundary kind's rows as `{ check, reason }`
+    /// objects and the construction cases' reference, and nothing for the
+    /// two admission steps' kinds, which have no precedence of their own.
+    #[test]
+    fn the_schema_pins_the_failure_precedence() {
+        let schema = schema().unwrap();
+        let precedence = schema["failurePrecedence"].as_object().unwrap();
+        let mut kinds = BOUNDARY_PRECEDENCE
+            .map(|(kind, _)| kind)
+            .into_iter()
+            .collect::<BTreeSet<_>>();
+        kinds.insert(ManifestKind::ResolverConstruction.name());
+        assert_eq!(
+            precedence
+                .keys()
+                .map(String::as_str)
+                .collect::<BTreeSet<_>>(),
+            kinds
+        );
+        for (kind, rows) in BOUNDARY_PRECEDENCE {
+            let rows = rows
+                .iter()
+                .map(|(check, reason)| json!({ "check": check, "reason": reason }))
+                .collect::<Vec<_>>();
+            assert_eq!(precedence[kind], json!(rows), "{kind}");
+        }
+        // Draft 7 ignores the keyword: the schema compiles with it.
+        Schema::compile(&schema).unwrap();
+    }
+
+    /// The construction rows are referenced, not copied: by the Root Package
+    /// member that holds them and the file digest the Suite Index declares
+    /// for that member, whose body holds the 43 rows.
+    #[test]
+    fn the_construction_precedence_is_the_member_the_index_pins() {
+        let schema = schema().unwrap();
+        let reference = &schema["failurePrecedence"]["resolver-construction"];
+        let artifacts = super::super::index::artifacts().unwrap();
+        let index = artifacts
+            .iter()
+            .find(|artifact| artifact.path == super::super::index::PATH)
+            .unwrap();
+        let index: Value = serde_json::from_slice(&index.bytes).unwrap();
+        let role = RootRole::ConstructionAdmissionSpecification;
+        let member = &index["resolverConstructionRootPackage"]["members"][role.name()];
+        assert_eq!(
+            reference,
+            &json!({ "rootPackageMember": role.name(), "digest": member["digest"] })
+        );
+        let body = generate::artifacts()
+            .unwrap()
+            .into_iter()
+            .find(|artifact| artifact.path == role.path())
+            .unwrap();
+        let body: Value = serde_json::from_slice(&body.bytes).unwrap();
+        assert_eq!(
+            body["failurePrecedence"],
+            serde_json::to_value(PRECEDENCE.as_slice()).unwrap()
         );
     }
 }

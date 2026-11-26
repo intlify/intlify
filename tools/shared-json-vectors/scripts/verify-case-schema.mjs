@@ -13,7 +13,12 @@
  * construction-admission body, the Safe Origin Kinds from the committed Safe
  * Origin Kind Registry, and the semantic groups and Snapshot marker reasons
  * from the committed Profile Specification, and reads the pinned digest out
- * of the crate's source. It does not read the design document.
+ * of the crate's source. It also checks the schema's top-level
+ * `failurePrecedence`: each boundary kind's rows take the positions of the
+ * general order without going back and list the reasons of its row in that
+ * row's order, and the construction rows are referenced by the Root Package
+ * member and the file digest the committed Suite Index declares for it. It
+ * does not read the design document.
  */
 
 import { createHash } from 'node:crypto'
@@ -29,6 +34,22 @@ const crate = resolve(here, '../../../crates/intlify_config')
 const root = resolve(crate, 'conformance')
 
 const DRAFT_7 = 'http://json-schema.org/draft-07/schema#'
+// The positions of the general order in which every boundary applies its
+// checks, in that order.
+const CHECKS = [
+  'missing-input',
+  'unsafe-host-inspection',
+  'container-form',
+  'raw-bounds',
+  'strict-syntax',
+  'count-bounds',
+  'closed-shape',
+  'repeated-member',
+  'unknown-member',
+  'reserved-members',
+  'value-rules',
+  'assertion-comparison'
+]
 const SCHEMA_PATH = 'schemas/case-v0.schema.json'
 
 /** The five manifest kinds and their definitions, in the index's order. */
@@ -371,7 +392,12 @@ if (source.match(/pub\(crate\) const DIGEST: &str =\s*"(sha256:[\da-f]{64})";/)?
 // The root admits exactly the five kinds.
 const definitions = schema.definitions ?? {}
 if (
-  !isDeepStrictEqual(Object.keys(schema), ['$schema', 'oneOf', 'definitions']) ||
+  !isDeepStrictEqual(Object.keys(schema), [
+    '$schema',
+    'oneOf',
+    'definitions',
+    'failurePrecedence'
+  ]) ||
   schema.$schema !== DRAFT_7 ||
   !isDeepStrictEqual(
     schema.oneOf,
@@ -458,6 +484,54 @@ for (const [kind, ownReasons] of BOUNDARIES) {
   }
 }
 const own = Object.fromEntries(BOUNDARIES)
+
+// The failure precedence: every boundary kind's rows and the construction
+// reference, and nothing for the two admission steps' kinds. A kind's rows
+// take the positions of the general order without going back, except that
+// the capability compares its specification before its value rules, and list
+// its row's reasons in the order of the first position each occupies.
+const precedence = schema.failurePrecedence ?? {}
+const pinnedRoot = read('suite-index-v0.json').value.resolverConstructionRootPackage
+const pinnedBody = pinnedRoot?.members?.['construction-admission-specification']
+if (
+  !isDeepStrictEqual(
+    Object.keys(precedence).sort(),
+    ['resolver-construction', ...BOUNDARIES.map(([kind]) => kind)].sort()
+  )
+) {
+  fail('schema: failurePrecedence does not hold exactly the boundary kinds and the construction')
+}
+if (
+  !isDeepStrictEqual(precedence['resolver-construction'], {
+    rootPackageMember: 'construction-admission-specification',
+    digest: pinnedBody?.digest
+  }) ||
+  `sha256:${createHash('sha256')
+    .update(read(pinnedBody?.path ?? '').bytes)
+    .digest('hex')}` !== pinnedBody?.digest
+) {
+  fail('schema: the construction precedence is not the body the Suite Index pins')
+}
+let precedenceRows = 0
+for (const [kind, reasons] of BOUNDARIES) {
+  const rows = precedence[kind]
+  const order =
+    kind === 'implementation-capability' ? [...CHECKS.slice(0, 10), CHECKS[11], CHECKS[10]] : CHECKS
+  const positions = Array.isArray(rows) ? rows.map(row => order.indexOf(row?.check)) : []
+  if (
+    !Array.isArray(rows) ||
+    !rows.every(
+      row =>
+        isDeepStrictEqual(Object.keys(row ?? {}), ['check', 'reason']) &&
+        typeof row.reason === 'string'
+    ) ||
+    positions.some((position, at) => position < 0 || (at > 0 && position < positions[at - 1])) ||
+    !isDeepStrictEqual([...new Set(rows.map(row => row.reason))], reasons)
+  ) {
+    fail(`schema: ${String(kind)}'s failurePrecedence is not its row in the general order`)
+  }
+  precedenceRows += Array.isArray(rows) ? rows.length : 0
+}
 const lists = []
 const commonList = branch('common-invocation-input-set')?.properties?.expected?.oneOf?.[1]
 lists.push(['common-invocation-input-set', COMMON_SLOTS, commonList?.properties?.failures])
@@ -713,5 +787,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `case schema agrees: ${KINDS.length} manifest kinds, ${BOUNDARIES.length} boundary kinds with ${BOUNDARIES.reduce((sum, [, row]) => sum + row.length, 0)} reasons, ${reasons.length} construction reasons, ${OBLIGATIONS.length} obligations`
+  `case schema agrees: ${KINDS.length} manifest kinds, ${BOUNDARIES.length} boundary kinds with ${BOUNDARIES.reduce((sum, [, row]) => sum + row.length, 0)} reasons in ${precedenceRows} precedence rows, ${reasons.length} construction reasons, ${OBLIGATIONS.length} obligations`
 )

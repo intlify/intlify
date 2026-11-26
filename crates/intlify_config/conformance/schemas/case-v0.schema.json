@@ -3438,5 +3438,405 @@
         }
       ]
     }
+  },
+  "failurePrecedence": {
+    "resolver-construction": {
+      "rootPackageMember": "construction-admission-specification",
+      "digest": "sha256:2e009fdce1be86b82a48c2aa78a6946ee084f9643dd307160e4b23f2d5bae1dc"
+    },
+    "profile-resolution-specification-input": [
+      {
+        "check": "missing-input",
+        "reason": "missing-input"
+      },
+      {
+        "check": "raw-bounds",
+        "reason": "over-bound-member"
+      },
+      {
+        "check": "strict-syntax",
+        "reason": "malformed-input"
+      },
+      {
+        "check": "closed-shape",
+        "reason": "malformed-input"
+      },
+      {
+        "check": "repeated-member",
+        "reason": "duplicate-member"
+      },
+      {
+        "check": "unknown-member",
+        "reason": "unknown-member"
+      },
+      {
+        "check": "value-rules",
+        "reason": "malformed-input"
+      }
+    ],
+    "intent-surface-class-vocabulary-artifact": [
+      {
+        "check": "missing-input",
+        "reason": "missing-input"
+      },
+      {
+        "check": "raw-bounds",
+        "reason": "over-bound-envelope"
+      },
+      {
+        "check": "strict-syntax",
+        "reason": "malformed-envelope"
+      },
+      {
+        "check": "count-bounds",
+        "reason": "over-bound-envelope"
+      },
+      {
+        "check": "closed-shape",
+        "reason": "malformed-envelope"
+      },
+      {
+        "check": "repeated-member",
+        "reason": "duplicate-member"
+      },
+      {
+        "check": "unknown-member",
+        "reason": "unknown-member"
+      }
+    ],
+    "locale-canonicalization-data-artifact": [
+      {
+        "check": "missing-input",
+        "reason": "missing-input"
+      },
+      {
+        "check": "raw-bounds",
+        "reason": "over-bound-envelope"
+      },
+      {
+        "check": "strict-syntax",
+        "reason": "malformed-envelope"
+      },
+      {
+        "check": "closed-shape",
+        "reason": "malformed-envelope"
+      },
+      {
+        "check": "repeated-member",
+        "reason": "duplicate-member"
+      },
+      {
+        "check": "unknown-member",
+        "reason": "unknown-member"
+      }
+    ],
+    "submitted-profile-resolution-artifact-collection": [
+      {
+        "check": "missing-input",
+        "reason": "missing-input"
+      },
+      {
+        "check": "unsafe-host-inspection",
+        "reason": "unsafe-host-inspection"
+      },
+      {
+        "check": "container-form",
+        "reason": "malformed-container"
+      },
+      {
+        "check": "raw-bounds",
+        "reason": "formal-envelope-over-bound"
+      },
+      {
+        "check": "strict-syntax",
+        "reason": "unrepresentable-member"
+      },
+      {
+        "check": "value-rules",
+        "reason": "unrepresentable-member"
+      }
+    ],
+    "resource-limit-policy-verification-input": [
+      {
+        "check": "missing-input",
+        "reason": "missing-input"
+      },
+      {
+        "check": "raw-bounds",
+        "reason": "over-bound-input"
+      },
+      {
+        "check": "strict-syntax",
+        "reason": "malformed-input"
+      },
+      {
+        "check": "count-bounds",
+        "reason": "over-bound-input"
+      },
+      {
+        "check": "closed-shape",
+        "reason": "malformed-input"
+      },
+      {
+        "check": "repeated-member",
+        "reason": "duplicate-member"
+      },
+      {
+        "check": "unknown-member",
+        "reason": "unknown-member"
+      },
+      {
+        "check": "reserved-members",
+        "reason": "secret-bearing-input"
+      },
+      {
+        "check": "reserved-members",
+        "reason": "ambient-authority"
+      },
+      {
+        "check": "value-rules",
+        "reason": "malformed-input"
+      },
+      {
+        "check": "assertion-comparison",
+        "reason": "verification-identity-mismatch"
+      },
+      {
+        "check": "assertion-comparison",
+        "reason": "verification-revision-mismatch"
+      },
+      {
+        "check": "assertion-comparison",
+        "reason": "verification-digest-mismatch"
+      }
+    ],
+    "safe-origin-kind": [
+      {
+        "check": "missing-input",
+        "reason": "missing-safe-origin-kind"
+      },
+      {
+        "check": "closed-shape",
+        "reason": "unknown-safe-origin-kind"
+      },
+      {
+        "check": "value-rules",
+        "reason": "unknown-safe-origin-kind"
+      },
+      {
+        "check": "value-rules",
+        "reason": "non-canonical-safe-origin-kind"
+      },
+      {
+        "check": "assertion-comparison",
+        "reason": "evidence-kind-incompatible"
+      }
+    ],
+    "external-profile-selector-binding": [
+      {
+        "check": "unsafe-host-inspection",
+        "reason": "unsafe-host-inspection"
+      },
+      {
+        "check": "closed-shape",
+        "reason": "unrepresentable-selector"
+      },
+      {
+        "check": "value-rules",
+        "reason": "malformed-normalized-selector"
+      }
+    ],
+    "file-source-identity-revision": [
+      {
+        "check": "missing-input",
+        "reason": "missing-source-identity"
+      },
+      {
+        "check": "missing-input",
+        "reason": "missing-source-revision"
+      },
+      {
+        "check": "raw-bounds",
+        "reason": "over-bound-source-identity"
+      },
+      {
+        "check": "raw-bounds",
+        "reason": "over-bound-source-revision"
+      },
+      {
+        "check": "value-rules",
+        "reason": "unstable-source-identity"
+      },
+      {
+        "check": "value-rules",
+        "reason": "unbound-source-revision"
+      },
+      {
+        "check": "assertion-comparison",
+        "reason": "source-snapshot-mismatch"
+      }
+    ],
+    "programmatic-entry-identity-revision": [
+      {
+        "check": "missing-input",
+        "reason": "missing-entry-identity"
+      },
+      {
+        "check": "missing-input",
+        "reason": "missing-entry-revision"
+      },
+      {
+        "check": "raw-bounds",
+        "reason": "over-bound-entry-identity"
+      },
+      {
+        "check": "raw-bounds",
+        "reason": "over-bound-entry-revision"
+      },
+      {
+        "check": "value-rules",
+        "reason": "unstable-entry-identity"
+      },
+      {
+        "check": "value-rules",
+        "reason": "unbound-entry-revision"
+      },
+      {
+        "check": "assertion-comparison",
+        "reason": "snapshot-identity-mismatch"
+      }
+    ],
+    "programmatic-entry-snapshot": [
+      {
+        "check": "missing-input",
+        "reason": "missing-snapshot"
+      },
+      {
+        "check": "unsafe-host-inspection",
+        "reason": "unsafe-host-inspection"
+      },
+      {
+        "check": "raw-bounds",
+        "reason": "snapshot-envelope-over-bound"
+      },
+      {
+        "check": "closed-shape",
+        "reason": "malformed-snapshot"
+      },
+      {
+        "check": "value-rules",
+        "reason": "snapshot-envelope-over-bound"
+      },
+      {
+        "check": "assertion-comparison",
+        "reason": "snapshot-content-digest-mismatch"
+      }
+    ],
+    "programmatic-call-site-evidence-input": [
+      {
+        "check": "unsafe-host-inspection",
+        "reason": "unsafe-host-inspection"
+      },
+      {
+        "check": "raw-bounds",
+        "reason": "over-bound-input"
+      },
+      {
+        "check": "count-bounds",
+        "reason": "over-bound-input"
+      },
+      {
+        "check": "closed-shape",
+        "reason": "malformed-input"
+      },
+      {
+        "check": "closed-shape",
+        "reason": "invalid-utf8-source"
+      },
+      {
+        "check": "repeated-member",
+        "reason": "duplicate-mapping"
+      },
+      {
+        "check": "value-rules",
+        "reason": "missing-source-identity"
+      },
+      {
+        "check": "value-rules",
+        "reason": "missing-source-revision"
+      },
+      {
+        "check": "value-rules",
+        "reason": "unstable-source-identity"
+      },
+      {
+        "check": "value-rules",
+        "reason": "unbound-source-revision"
+      },
+      {
+        "check": "assertion-comparison",
+        "reason": "source-snapshot-mismatch"
+      }
+    ],
+    "implementation-capability": [
+      {
+        "check": "missing-input",
+        "reason": "missing-capability"
+      },
+      {
+        "check": "closed-shape",
+        "reason": "malformed-capability"
+      },
+      {
+        "check": "assertion-comparison",
+        "reason": "capability-specification-identity-mismatch"
+      },
+      {
+        "check": "assertion-comparison",
+        "reason": "capability-specification-revision-mismatch"
+      },
+      {
+        "check": "value-rules",
+        "reason": "malformed-capability"
+      },
+      {
+        "check": "value-rules",
+        "reason": "incomplete-capability"
+      },
+      {
+        "check": "value-rules",
+        "reason": "non-canonical-bound"
+      },
+      {
+        "check": "value-rules",
+        "reason": "non-positive-bound"
+      },
+      {
+        "check": "value-rules",
+        "reason": "unrepresentable-bound"
+      },
+      {
+        "check": "value-rules",
+        "reason": "below-bootstrap-minimum"
+      }
+    ],
+    "resolver-construction-identity-reference": [
+      {
+        "check": "missing-input",
+        "reason": "missing-construction-identity"
+      },
+      {
+        "check": "closed-shape",
+        "reason": "malformed-construction-identity"
+      },
+      {
+        "check": "value-rules",
+        "reason": "malformed-construction-identity"
+      },
+      {
+        "check": "assertion-comparison",
+        "reason": "construction-identity-mismatch"
+      }
+    ]
   }
 }

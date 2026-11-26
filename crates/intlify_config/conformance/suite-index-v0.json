@@ -78,7 +78,7 @@
     "identity": "intlify-project-profile-conformance-case",
     "revision": "0",
     "path": "schemas/case-v0.schema.json",
-    "digest": "sha256:a8112fdf3d05623126d8e2ec224e79fb7f204886453d042628686347be26bca4"
+    "digest": "sha256:50d2a9d4dbd5faa9acb533e7538a82f6b9af577a9d5061b694eeda102281b3f7"
   },
   "registryPackage": {
     "identity": "intlify-project-profile-resolver-registry-package",
