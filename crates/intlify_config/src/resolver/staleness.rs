@@ -3,18 +3,18 @@
 
 //! 015's invocation staleness: how a later retained invocation compares with
 //! an earlier one, each the construction its resolver was built from and the
-//! Resolver Invocation Input Set admitted on it (D15:193, 2528; Decision
+//! Resolver Invocation Input Set admitted on it (D15:194, 2529; Decision
 //! 015-129).
 //!
 //! It is one function of the two retained sets, never of a stored key, and
-//! compares the constructions first (D15:2581, 2589): another Resolver
+//! compares the constructions first (D15:2582, 2590): another Resolver
 //! Construction Identity is `construction-stale`, and an equal one over
 //! authorities that differ in what it commits is `corrupt`
 //! ([`construction::compare`]). Under one construction, another Resolver
-//! Construction Identity reference is construction staleness too (D15:2585).
+//! Construction Identity reference is construction staleness too (D15:2586).
 //!
 //! Then the two sets are compared by value, every logical field and
-//! occurrence, whether or not entry materialization succeeded (D15:2583): the
+//! occurrence, whether or not entry materialization succeeded (D15:2584): the
 //! sets' own equality, whose patterns name every field, the collection as the
 //! multiset of its members' `C(member)` bytes and a sidecar's span candidates
 //! as numbers. The sets retain no Safe Origin Kind, since every admitted
@@ -22,13 +22,13 @@
 //! equal origins and a file and a programmatic entry differ. A value
 //! represented otherwise, such as a collection, Specification Input members,
 //! or sidecar mappings in another order, or a manifest written with other
-//! bytes, is the same value, while another multiplicity is not (D15:2585).
+//! bytes, is the same value, while another multiplicity is not (D15:2586).
 //!
 //! Equal sets are `fresh`. A difference is `corrupt`, which forbids reuse,
 //! when one exact identity names two contents or carries two marks: an equal
 //! identity/revision pair over unequal raw bytes, Snapshot, or call-site
 //! source, or one exact identity, compared as its string in whichever role
-//! either set supplies it, with unequal non-secret marks (D15:734, 2585,
+//! either set supplies it, with unequal non-secret marks (D15:735, 2586,
 //! 2589). Any other difference is `invocation-stale`. A difference within one
 //! set, such as an entry and its sidecar marking one identity unequally, is
 //! the boundary's to judge, so a set is always `fresh` against an equal one.
@@ -41,7 +41,7 @@ use crate::construction::staleness::{
 };
 
 /// How a later invocation compares with an earlier one, by 015's names
-/// (D15:2589; plan 025 decision #124).
+/// (D15:2590; plan 025 decision #124).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Staleness {
     /// One construction, and every logical field and occurrence equal.
@@ -109,7 +109,7 @@ fn corrupt(earlier: &EntryInputs, later: &EntryInputs) -> bool {
 /// source's raw bytes, a Programmatic Entry's Snapshot, or a call-site
 /// source's UTF-8 bytes. Each revision is derived from its own content under
 /// its own domain, so a pair is compared with the other set's pair of the
-/// same role (D15:2585).
+/// same role (D15:2586).
 fn other_content(earlier: &EntryInputs, later: &EntryInputs) -> bool {
     match (earlier, later) {
         (EntryInputs::File(left), EntryInputs::File(right)) => {
@@ -277,7 +277,7 @@ mod tests {
         inputs
     }
 
-    /// D15:2585, 2589: two admissions of one invocation are `fresh`, and so
+    /// D15:2586, 2590: two admissions of one invocation are `fresh`, and so
     /// is one represented otherwise: its collection in another order, a
     /// member, the vocabulary, or the Verification Input written with other
     /// bytes, the Specification Input's members in another order, or a
@@ -319,7 +319,7 @@ mod tests {
         );
     }
 
-    /// D15:1146, 1663, 1669, 2583: another value of any common component,
+    /// D15:1147, 1664, 1670, 2584: another value of any common component,
     /// the collection's multiplicity included, or another configuration
     /// value or selector makes either entry's invocation stale.
     #[test]
@@ -354,7 +354,7 @@ mod tests {
         }
     }
 
-    /// D15:2583: a file entry's identity, alone or with its mark, and its
+    /// D15:2584: a file entry's identity, alone or with its mark, and its
     /// locator are compared, and a file and a Snapshot of its value differ,
     /// at least in their fixed Safe Origin Kinds.
     #[test]
@@ -381,7 +381,7 @@ mod tests {
         assert_eq!(staleness(&snapshot, &earlier), InvocationStale);
     }
 
-    /// D15:2583, 3438: a Programmatic Entry's identity, alone or with its
+    /// D15:2584, 3563: a Programmatic Entry's identity, alone or with its
     /// mark, and its locator are compared, and so are its sidecar's presence,
     /// identity alone or with its mark, locator, source, mappings, and
     /// candidates.
@@ -457,7 +457,7 @@ mod tests {
         assert_eq!(staleness(&nan, &with(0.0, f64::NAN)), InvocationStale);
     }
 
-    /// D15:2581, 2585, 2589: the constructions are compared before the
+    /// D15:2582, 2586, 2590: the constructions are compared before the
     /// invocations, whether those are equal, differ, or are corrupt: another
     /// Resolver Construction Identity is `construction-stale`, and other
     /// committed bytes under one identity are `corrupt`. Another reference
@@ -497,7 +497,7 @@ mod tests {
         assert_eq!(staleness(&earlier, &referenced), ConstructionStale);
     }
 
-    /// D15:2585, 2589: an equal pair over other raw bytes, another Snapshot,
+    /// D15:2586, 2590: an equal pair over other raw bytes, another Snapshot,
     /// or another call-site source is `corrupt`. Each boundary derives its
     /// revision from that content, so only a revision collision gives such a
     /// set, and these are built directly.
@@ -523,7 +523,7 @@ mod tests {
         assert_eq!(staleness(&earlier, &later), Corrupt);
     }
 
-    /// D15:734, 2585, 2589: one exact identity marked otherwise is
+    /// D15:735, 2586, 2590: one exact identity marked otherwise is
     /// `corrupt`, as a file source, a Programmatic Entry, or a call-site
     /// source, and across those roles, before any other difference.
     #[test]
@@ -556,7 +556,7 @@ mod tests {
         assert_eq!(staleness(&snapshot, &later), Corrupt);
     }
 
-    /// D15:2583, 3438: a set whose Phase 1 blocked before a value existed
+    /// D15:2584, 3563: a set whose Phase 1 blocked before a value existed
     /// compares as any other, its sidecar's presence included.
     #[test]
     fn a_set_whose_phase_1_blocked_still_compares() {
@@ -590,7 +590,7 @@ mod tests {
         assert_eq!(staleness(&earlier, &later), InvocationStale);
     }
 
-    /// D15:2587, 3433: editing a declaration the selector does not select
+    /// D15:2588, 3558: editing a declaration the selector does not select
     /// makes the file invocation stale, though the checked profile stays
     /// equal.
     #[test]
@@ -620,7 +620,7 @@ mod tests {
         );
     }
 
-    /// D15:2585: canonicalization data whose manifest is written with other
+    /// D15:2586: canonicalization data whose manifest is written with other
     /// bytes is the same value, and another manifest value is not.
     #[cfg(feature = "icu4x")]
     #[test]

@@ -2,7 +2,7 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! 015's admission of the Common Invocation Input Set in one step (015-168,
-//! D15:3159).
+//! D15:3164).
 //!
 //! The set has six components: the Profile Resolution Specification Input,
 //! the Intent Surface-Class Vocabulary Artifact, the Locale Canonicalization
@@ -10,10 +10,10 @@
 //! Resource Limit Policy Verification Input, and the Admitted Implementation
 //! Capability. A binding submits each in its typed input slot, which fixes one
 //! Safe Origin Kind, with its candidate for that kind beside the value
-//! (D15:200, 3157).
+//! (D15:201, 3162).
 //!
 //! The capability is admitted first, because every other value's boundary
-//! reads its `inputBoundary` bounds (D15:1106). When it is refused, those
+//! reads its `inputBoundary` bounds (D15:1107). When it is refused, those
 //! boundaries are not evaluated, and their values yield no result. Every
 //! origin is admitted whatever happens to the values, since its boundary reads
 //! no bound, and every value is admitted whatever happens to its origin. The
@@ -22,7 +22,7 @@
 //! and within one slot an origin failure before a value failure. A refused
 //! set still yields the capability when its own boundary admitted it, since
 //! the entry step's bound-reading boundaries go unevaluated only when the
-//! capability is refused (D15:3159, plan 025 decision #304). The
+//! capability is refused (D15:3164, plan 025 decision #304). The
 //! construction-identity reference and the Entry Admission Input Set are
 //! admitted outside this step, and the Verification Input assertion is the
 //! trusted setup path's parameter beside the set, not one of its components.
@@ -72,7 +72,7 @@ pub(crate) struct CommonInputs<D> {
 }
 
 /// Two sets are equal by value, as invocation staleness and the Materialized
-/// Resolution Input Set compare them (D15:2583, 2589): the collection as the
+/// Resolution Input Set compare them (D15:2584, 2590): the collection as the
 /// multiset of its members' `C(member)` bytes, and every other component by
 /// its admitted value. The origins need no comparison, since every admitted
 /// origin is the one Safe Origin Kind its slot fixes. The pattern names every
@@ -212,7 +212,7 @@ where
 }
 
 /// The vocabulary's limits: the capability's `inputBoundary` bounds on it
-/// (D15:1805, 1807-1810).
+/// (D15:1806, 1808-1811).
 const fn vocabulary_limits(bounds: &InputBoundaryLimits) -> VocabularyLimits {
     VocabularyLimits {
         artifact_bytes: bounds.max_vocabulary_bytes.get(),
@@ -224,7 +224,7 @@ const fn vocabulary_limits(bounds: &InputBoundaryLimits) -> VocabularyLimits {
 }
 
 /// The collection's limits: the capability's `inputBoundary` bounds on its
-/// raw bytes (D15:1805, 1812-1813).
+/// raw bytes (D15:1806, 1813-1814).
 const fn collection_limits(bounds: &InputBoundaryLimits) -> CollectionLimits {
     CollectionLimits {
         member_bytes: bounds.max_collection_member_bytes.get(),
@@ -529,7 +529,7 @@ pub(crate) mod tests {
         );
     }
 
-    /// D15:3142, 3157, 3159: a collection adapter's report without a formal
+    /// D15:3147, 3162, 3164: a collection adapter's report without a formal
     /// container is that slot's one failure under its boundary and reason,
     /// after the slot's origin failure, and a refused capability leaves it
     /// without a result, as every value that reads its bounds.

@@ -13,7 +13,7 @@
     "finding-registry-schema": {
       "identity": "intlify-project-profile-finding-registry-schema",
       "revision": "0",
-      "digest": "sha256:42bc288412afc35c849bd1af7a85179740bbe8f91147f8993c7fa7bf0d1c43ec"
+      "digest": "sha256:bc8c5e812b72c58df25d2b8cbe2593ae719dd1bdbe1b275f5d83685b6b1a8ce8"
     },
     "safe-origin-kind-registry": {
       "identity": "intlify-project-profile-safe-origin-kind-registry",

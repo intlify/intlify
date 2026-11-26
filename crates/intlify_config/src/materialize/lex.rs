@@ -3,7 +3,7 @@
 
 //! Bounded strict-JSON tokenization over raw bytes. UTF-8 is validated as the
 //! bytes are reached, so the first byte that is not UTF-8 or not strict JSON
-//! stops tokenization where it is (D15:802). A string token carries its
+//! stops tokenization where it is (D15:803). A string token carries its
 //! decoded byte length and whether its value stays in the Unicode scalar
 //! domain, and a number token whether it is a Portable JSON Number, not an
 //! allocated value: a value outside the JSON-compatible domain is a fact the

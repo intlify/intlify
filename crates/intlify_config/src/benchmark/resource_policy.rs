@@ -83,7 +83,7 @@ impl PreparedPolicy {
     }
 
     /// Where Phase 4's checks observe the selected declaration: in `entry`,
-    /// as profile selection hands it on (D15:790), built before the interval.
+    /// as profile selection hands it on (D15:791), built before the interval.
     /// None when the configuration does not hold the declaration.
     pub(super) fn observer<'a>(
         &'a self,

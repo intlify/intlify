@@ -22,14 +22,14 @@ fn records(projection: Option<&RetainedProjection>) -> Result<(u64, u64), WorkFa
 
 impl LogicalWork {
     /// The workload of one entry's complete invocation in the units of the
-    /// bounds that count it (D15:2796): what strict file entry counts of the
+    /// bounds that count it (D15:2801): what strict file entry counts of the
     /// file and its value, a value's counts unavailable when none is
     /// complete, or the Snapshot's envelope bytes and traversal units and its
     /// value's counts, unavailable when it holds a marker, and the submitted
     /// collection's members and their `C(member)` bytes, counted over what the
     /// interval admitted; then the records of each projection with their
     /// accounting bytes and the mandatory reserve, counted over the outcome
-    /// (D15:1847, 1889, 2129).
+    /// (D15:1848, 1890, 2130).
     pub(super) fn workflow(&mut self, resolved: &Resolved) -> Result<(), WorkFailure> {
         let retained =
             require_observable(resolved).map_err(|_| WorkFailure::InvalidOrdinaryResult)?;
@@ -86,7 +86,7 @@ impl LogicalWork {
     }
 
     /// The workload of one replay in the units of the bounds that count it
-    /// (D15:2796): what [`ReplayCounts`] counts, the set's value and members
+    /// (D15:2801): what [`ReplayCounts`] counts, the set's value and members
     /// as the prepared input, admitted when the set was created, and the
     /// result's Shared records with their bytes and its bindings as the
     /// operation's result.
@@ -139,7 +139,7 @@ mod tests {
     use crate::benchmark::operation::{Output, Prepared};
     use crate::benchmark::workflow::tests::candidate;
 
-    /// D15:2796: the file's bytes and the submitted members are counted over
+    /// D15:2801: the file's bytes and the submitted members are counted over
     /// what the interval admitted, a value's counts only when its raw parse
     /// completed, and the records and the reserve over the outcome, at the
     /// stage each is counted at.
@@ -196,7 +196,7 @@ mod tests {
         }
     }
 
-    /// D15:1802, 1804, 1889, 2796: a programmatic entry's invocation counts
+    /// D15:1803, 1805, 1890, 2801: a programmatic entry's invocation counts
     /// the admitted Snapshot's envelope bytes and traversal units in place of
     /// the file's bytes and parser tokens, and the rest as its file's case
     /// counts it in the same state, but a Snapshot holding a marker has no
@@ -250,7 +250,7 @@ mod tests {
         }
     }
 
-    /// D15:1889, 2796: a replay counts its set's value as the file entry's
+    /// D15:1890, 2801: a replay counts its set's value as the file entry's
     /// invocation of that value counts it, the members that invocation
     /// admitted, and its result's Shared records and the bindings beside its
     /// profile, none without one. A failed replay has no work, and a count

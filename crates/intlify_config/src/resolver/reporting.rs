@@ -2,37 +2,37 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! Design 015's reporting slices: the records each evaluation unit reports
-//! into the two diagnostic domains, before their bounds (D15:1940,
+//! into the two diagnostic domains, before their bounds (D15:1941,
 //! 2205-2211).
 //!
 //! Phases 0 and 1 report their Findings and statuses into the Entry domain,
 //! and every later phase into the Shared one, while the occurrences of every
 //! Finding, with the Evidence they refer to, are Entry records whatever the
-//! phase (D15:1942, 2145, 2369; plan 025 interpretation #222). A unit's Entry
+//! phase (D15:1943, 2146, 2370; plan 025 interpretation #222). A unit's Entry
 //! slice therefore holds its Entry Findings and status, the occurrences of all
 //! its Findings, the Coverage Decision Evidence it owns, the
 //! source-evidence-index records it is the first to refer to, and the
 //! Shared-unavailability causes that name its Findings; its Shared slice holds
 //! its Shared Findings and status and the Coverage Decision Basis it owns
-//! (D15:1607-1609, 2207). The unit owns every record of its slices, and units
+//! (D15:1608-1610, 2208). The unit owns every record of its slices, and units
 //! report in canonical unit order, so the earliest unit that refers to an
-//! Evidence owns its index record (D15:1972, 2205). The owner of an
+//! Evidence owns its index record (D15:1973, 2206). The owner of an
 //! established group's semantic dependency reports it into its Shared slice,
 //! the materialized dependencies' owner reports one for every slot into its
 //! Shared slice, and the entry dependencies' owner reports the entry's, which
 //! the caller supplies, into its Entry slice after the index records
-//! (D15:2516, 2518).
+//! (D15:2517, 2519).
 //!
-//! A slice has two stages (D15:2209). Its candidates are what the candidate
+//! A slice has two stages (D15:2210). Its candidates are what the candidate
 //! stage counts before any ordinal or record exists: each Finding candidate,
 //! as an occurrence candidate in the Entry domain and before key
-//! deduplication in the Shared one (D15:1946, 1962, 1970); in the Entry domain
+//! deduplication in the Shared one (D15:1947, 1963, 1971); in the Entry domain
 //! each related-Evidence occurrence and `C` of each primary and related
-//! Evidence occurrence (D15:1949-1951, 2518); and each causal Finding Key of
+//! Evidence occurrence (D15:1950-1952, 2519); and each causal Finding Key of
 //! the slice's not-evaluated status, each value's before they merge into one
-//! duplicate-free set (D15:1954, 1966, 2184, 2369; plan 025
+//! duplicate-free set (D15:1955, 1967, 2185, 2370; plan 025
 //! interpretation #223). Its records are what the record stage builds: each
-//! retained record with `C` of its accounting view (D15:2518). The bounds of
+//! retained record with `C` of its accounting view (D15:2519). The bounds of
 //! each stage come with their own stage.
 //!
 //! The resolver's own Evidence metadata work is checked against the
@@ -40,7 +40,7 @@
 //! domain plans any slice: the Shared projection stage checks the Shared
 //! scope's, and the Entry projection stage then passes the Evidence of every
 //! candidate through path admission and checks the complete invocation's
-//! (D15:1851, 2775; plan 025 decision #253). A domain whose scope exceeds one
+//! (D15:1852, 2776; plan 025 decision #253). A domain whose scope exceeds one
 //! of them plans no slice, and only the subject tokens of the Shared scope,
 //! when it fits, and those the reserved terminal records name are assigned
 //! (plan 025 decisions #229, #236, and #247, interpretation #237).
@@ -73,7 +73,7 @@ use super::structural_admission::OWNER as MATERIALIZED_OWNER;
 use super::subject::SubjectKind;
 use super::token::{rule_domain, Digest, Specification, Tokens};
 
-/// One of 015's two diagnostic domains (D15:1940).
+/// One of 015's two diagnostic domains (D15:1941).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum ReportingDomain {
     Entry,
@@ -83,7 +83,7 @@ pub(crate) enum ReportingDomain {
 impl ReportingDomain {
     /// The domain of the Findings and status of a unit of `phase`: Phases 0
     /// and 1 report into the Entry domain, every later phase into the Shared
-    /// one (D15:2145, 2369).
+    /// one (D15:2146, 2370).
     pub(crate) const fn of(phase: Phase) -> Self {
         match phase {
             Phase::ResolverBootstrapAdmission | Phase::EntryAdmission => Self::Entry,
@@ -93,7 +93,7 @@ impl ReportingDomain {
 
     /// The domain whose projection holds the records of `kind`: the first
     /// seven of 015's record kinds are Entry-owned, the other five
-    /// Shared-owned (D15:2518).
+    /// Shared-owned (D15:2519).
     pub(crate) const fn holding(kind: RecordKind) -> Self {
         match kind {
             RecordKind::EntryFinding
@@ -111,7 +111,7 @@ impl ReportingDomain {
         }
     }
 
-    /// The domain's ID, as its terminal state names it (D15:2489).
+    /// The domain's ID, as its terminal state names it (D15:2490).
     pub(crate) const fn id(self) -> &'static str {
         match self {
             Self::Entry => "entry",
@@ -121,7 +121,7 @@ impl ReportingDomain {
 
     /// The stable reason of the domain's terminal reporting-limit Finding,
     /// which equals the domain, so the two domains' Findings have two keys
-    /// (D15:2408).
+    /// (D15:2409).
     pub(crate) const fn reason(self) -> Reason {
         match self {
             Self::Entry => Reason::Entry,
@@ -130,22 +130,22 @@ impl ReportingDomain {
     }
 }
 
-/// What a slice's candidate stage counts (D15:2209).
+/// What a slice's candidate stage counts (D15:2210).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct Candidates {
-    /// Each Finding candidate (D15:1946, 1962, 1970).
+    /// Each Finding candidate (D15:1947, 1963, 1971).
     pub(crate) findings: u64,
-    /// In the Entry domain, each related-Evidence occurrence (D15:1949).
+    /// In the Entry domain, each related-Evidence occurrence (D15:1950).
     pub(crate) related: u64,
     /// In the Entry domain, `C` of each primary and related Evidence
-    /// occurrence, each candidate's primary first (D15:1950, 1951, 2518).
+    /// occurrence, each candidate's primary first (D15:1951, 1952, 2519).
     pub(crate) evidence: Vec<u64>,
     /// Each causal Finding Key of the slice's not-evaluated status, each
-    /// value's before they merge (D15:1954, 1966, 2184).
+    /// value's before they merge (D15:1955, 1967, 2185).
     pub(crate) causes: u64,
 }
 
-/// One retained ordinary record of a slice (D15:2207).
+/// One retained ordinary record of a slice (D15:2208).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Record<'e> {
     Finding(Finding<'e>),
@@ -158,17 +158,17 @@ pub(crate) enum Record<'e> {
     /// key.
     UnavailabilityCause(&'e IssueKey),
     DecisionBasis(&'e (CanonicalLocale, Token), &'e Basis),
-    /// The semantic dependency of an established group (D15:2510, 2516).
+    /// The semantic dependency of an established group (D15:2511, 2517).
     SemanticDependency(SemanticGroup),
-    /// The materialized dependency of an established slot (D15:2511, 2516).
+    /// The materialized dependency of an established slot (D15:2512, 2517).
     MaterializedDependency(MaterializedSlot),
-    /// An entry dependency (D15:2512-2513, 2516).
+    /// An entry dependency (D15:2513-2514, 2517).
     EntryDependency(EntryDependency),
 }
 
 /// A retained record, of its record kind, with its view and the length of
 /// `C` of its accounting view, `{ owner, record: { <record kind>: view } }`
-/// (D15:2518).
+/// (D15:2519).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Retained<'e> {
     pub(crate) kind: RecordKind,
@@ -226,15 +226,15 @@ pub(crate) struct Reporting<'e, 's> {
     specification: Specification<'s>,
     views: RecordViews<'s>,
     tokens: EvidenceTokens,
-    /// Why the Shared projection is unavailable, when it is (D15:2369).
+    /// Why the Shared projection is unavailable, when it is (D15:2370).
     unavailable: Option<&'e Causes>,
     /// What the entry dependency records name, which only the Entry
     /// projection stage supplies.
     entry: Option<&'e EntryInputs>,
-    /// The statuses of each unit's raw candidates (D15:2203).
+    /// The statuses of each unit's raw candidates (D15:2204).
     statuses: BTreeMap<Unit, Vec<&'e Status>>,
     /// How many occurrence candidates each unit that found something has: a
-    /// unit that found something reports into the Entry domain (D15:2207).
+    /// unit that found something reports into the Entry domain (D15:2208).
     found: BTreeMap<&'e Unit, u64>,
     /// The occurrence candidates of each unit's Findings as path admission
     /// left them, in the order the units found them; none when the
@@ -246,7 +246,7 @@ pub(crate) struct Reporting<'e, 's> {
     /// Each unit's Findings, in Finding order.
     findings: BTreeMap<&'e Unit, Vec<Finding<'e>>>,
     /// The `evidenceMetadata` bound each domain's scope exceeds, if one does
-    /// (D15:1851).
+    /// (D15:1852).
     exceeded: Exceeded,
 }
 
@@ -255,10 +255,10 @@ impl<'e, 's> Reporting<'e, 's> {
     /// projection stage plans: its records' views are built under the subject
     /// tokens of the Shared scope, `scope`, when the scope is within every
     /// `evidenceMetadata` bound, and a domain whose scope exceeds one plans
-    /// no slice (D15:1851, 2775; plan 025 decisions #229 and #253). Besides
+    /// no slice (D15:1852, 2776; plan 025 decisions #229 and #253). Besides
     /// the subjects of its own scope, a Shared record names only the Phase 0
     /// Finding that leaves a group unestablished, as the cause in its
-    /// owner's status (D15:2145, 2516), and Phase 0's unit is the Entry
+    /// owner's status (D15:2146, 2517), and Phase 0's unit is the Entry
     /// domain's first, so the views also hold the tokens that the Entry
     /// domain's reserved terminal records name, which every outcome assigns
     /// (plan 025 interpretations #237 and #257). The Entry projection stage
@@ -324,10 +324,10 @@ impl<'e, 's> Reporting<'e, 's> {
     /// completes from the Shared projection stage's, `self`, with `entry`,
     /// what the entry dependency records name, and `admission`, what path
     /// admission and the Evidence metadata work of the complete invocation
-    /// leave (D15:1851, 2775). Within every bound,
+    /// leave (D15:1852, 2776). Within every bound,
     /// `digest` assigned the subject tokens of every unit the evaluation
     /// recorded and the evidence tokens of every Evidence its records may
-    /// carry (D15:2194). When only the complete invocation exceeds a bound,
+    /// carry (D15:2195). When only the complete invocation exceeds a bound,
     /// the Shared domain reports with its own subject tokens, as within every
     /// bound (plan 025 decision #247). The reserved terminal records of a
     /// domain whose scope exceeds a bound name the subject token of its first
@@ -379,7 +379,7 @@ impl<'e, 's> Reporting<'e, 's> {
 
     /// The reporting of the Shared domain alone, which a replay finalizes
     /// from the Shared projection stage's, `self`, with no Entry projection
-    /// stage, since it has no entry (D15:2659). Within the Shared scope's
+    /// stage, since it has no entry (D15:2660). Within the Shared scope's
     /// bounds its views already name what the Shared domain retains. Past
     /// one, the domain retains only its reserved terminal records, which name
     /// its first unit's subject, so `digest` assigns that subject kind's
@@ -401,7 +401,7 @@ impl<'e, 's> Reporting<'e, 's> {
     }
 
     /// The `evidenceMetadata` bound `domain`'s scope exceeds, if one does:
-    /// then the domain plans no ordinary slice (D15:1851; plan 025 decisions
+    /// then the domain plans no ordinary slice (D15:1852; plan 025 decisions
     /// #229 and #247).
     pub(crate) const fn exceeded(&self, domain: ReportingDomain) -> Option<MetadataBound> {
         self.exceeded.of(domain)
@@ -418,7 +418,7 @@ impl<'e, 's> Reporting<'e, 's> {
     }
 
     /// Every unit the evaluation recorded, in canonical unit order: the
-    /// order in which their slices report (D15:2211).
+    /// order in which their slices report (D15:2212).
     pub(crate) fn units(&self) -> impl Iterator<Item = &'e Unit> {
         self.evaluation.statuses().map(|(unit, _)| unit)
     }
@@ -446,7 +446,7 @@ impl<'e, 's> Reporting<'e, 's> {
             ..Candidates::default()
         };
         // A unit is not evaluated only when its prerequisites exclude every
-        // value, each with the keys of the checks that exclude it (D15:2184;
+        // value, each with the keys of the checks that exclude it (D15:2185;
         // plan 025 interpretation #223).
         if let Some(Status::NotEvaluated(_)) = self.evaluation.status(unit) {
             for status in self.statuses.get(unit).into_iter().flatten() {
@@ -472,10 +472,10 @@ impl<'e, 's> Reporting<'e, 's> {
     }
 
     /// The records the record stage of `unit`'s slice in `domain` builds, in
-    /// the order of their record kinds (D15:2518). `indexed` is the Evidence
+    /// the order of their record kinds (D15:2519). `indexed` is the Evidence
     /// that the index records of earlier slices hold: the slice holds an
     /// index record for every other Evidence its records refer to
-    /// (D15:1972).
+    /// (D15:1973).
     ///
     /// # Errors
     ///
@@ -520,7 +520,7 @@ impl<'e, 's> Reporting<'e, 's> {
                     }
                 }
                 // The owner of a group's semantic dependency is evaluated
-                // exactly when the group is established (D15:2516).
+                // exactly when the group is established (D15:2517).
                 if let Some(group) = dependency::owned(unit) {
                     if let Some(Status::Evaluated) = self.evaluation.status(unit) {
                         records.push(self.retained(
@@ -533,7 +533,7 @@ impl<'e, 's> Reporting<'e, 's> {
                 }
                 // The owner requires no check, so it is evaluated whenever
                 // `structural-admission` runs, and every slot is established
-                // then (D15:1174, 2516, 3159; plan 025 interpretation #246).
+                // then (D15:1175, 2517, 3164; plan 025 interpretation #246).
                 if *unit == MATERIALIZED_OWNER {
                     for slot in MaterializedSlot::ALL {
                         records.push(self.retained(
@@ -583,7 +583,7 @@ impl<'e, 's> Reporting<'e, 's> {
     /// The views of `domain`'s terminal reporting-limit Finding, which names
     /// `bound`, and of its terminal state, whose omitted slices start at
     /// `cursor`'s. Both occupy the domain's reserved slots, so they are not
-    /// records of any slice (D15:1972, 2359, 2408, 2489).
+    /// records of any slice (D15:1973, 2360, 2409, 2490).
     ///
     /// # Errors
     ///
@@ -608,9 +608,9 @@ impl<'e, 's> Reporting<'e, 's> {
     /// The view of the Shared-unavailability cause that the reserve of an
     /// exhausted domain holds: without a Shared projection, the Entry reserve
     /// holds one naming the Entry terminal Finding, so that an Entry overrun
-    /// before materialization still explains `shared: null` (D15:2014, 2408).
+    /// before materialization still explains `shared: null` (D15:2015, 2409).
     /// Without a Shared projection no unit reports into the Shared domain, so
-    /// only the Entry domain can be exhausted then (D15:2369).
+    /// only the Entry domain can be exhausted then (D15:2370).
     ///
     /// # Errors
     ///
@@ -627,7 +627,7 @@ impl<'e, 's> Reporting<'e, 's> {
     /// the occurrences of its Findings, the Coverage Decision Evidence of
     /// the decision table, an index record for each Evidence they refer to
     /// that `indexed` does not hold, the entry dependencies of their owner,
-    /// and the Shared-unavailability causes that name its Findings (D15:2207,
+    /// and the Shared-unavailability causes that name its Findings (D15:2208,
     /// 2516).
     fn entry(
         &self,
@@ -679,7 +679,7 @@ impl<'e, 's> Reporting<'e, 's> {
         }
         // The owner requires no check, so it is evaluated whenever
         // `entry-admission` runs, and an entry's slots are established then,
-        // three or, beside a sidecar, four (D15:2516, 3159; plan 025
+        // three or, beside a sidecar, four (D15:2517, 3164; plan 025
         // interpretation #246).
         if *unit == ENTRY_OWNER {
             let dependencies = self
@@ -772,7 +772,7 @@ fn first<'e>(
 
 /// Whether `unit` reports into `domain`: a unit reports into the domain of
 /// its own Findings and status, and into the Entry domain whenever it found
-/// something or owns Coverage Decision Evidence (D15:2207).
+/// something or owns Coverage Decision Evidence (D15:2208).
 fn reports_into(
     evaluation: &Evaluation,
     found: &BTreeMap<&Unit, u64>,
@@ -785,14 +785,14 @@ fn reports_into(
 }
 
 /// The decision table's unit, which owns every Coverage Decision Basis and
-/// Evidence record (D15:1609).
+/// Evidence record (D15:1610).
 fn table() -> Unit {
     coverage::unit(CoverageSubject::Table, Check::CompleteTable)
 }
 
 /// `{ cell: { locale, surfaceClass }, mode, decision, domains }`: a cell's
 /// Coverage Decision Basis, decided by the `default` with no domain or by the
-/// `rule` of its matched domains in their order (D15:1607, 2483, 2487).
+/// `rule` of its matched domains in their order (D15:1608, 2484, 2488).
 fn basis_view((locale, surface): &(CanonicalLocale, Token), basis: &Basis) -> Value {
     let (decision, domains) = match &basis.decision {
         Decision::Default => ("default", Vec::new()),
@@ -807,7 +807,7 @@ fn basis_view((locale, surface): &(CanonicalLocale, Token), basis: &Basis) -> Va
 }
 
 /// The length of `C` of `view`, past the encoder's reader capacity
-/// (D15:2518; plan 025 decision #224).
+/// (D15:2519; plan 025 decision #224).
 fn bytes(view: &Value) -> u64 {
     encoded_length(view).expect("a record view is a shallow number-free value")
 }
@@ -879,7 +879,7 @@ mod tests {
     /// Of the units that report into the Entry domain, only Phase 0's can be
     /// the cause in the status of a unit that reports into the Shared one:
     /// the only later row that waits on a Phase 0 or Phase 1 row is the
-    /// profile specification group's owner, waiting on Phase 0's (D15:2145,
+    /// profile specification group's owner, waiting on Phase 0's (D15:2146,
     /// 2516; plan 025 interpretation #257).
     /// Phase 0's unit is the Entry domain's first, so the Shared projection
     /// stage's views need no other Entry subject's token than those the
@@ -963,7 +963,7 @@ mod tests {
     /// decision table also reports a Coverage Decision Basis for each cell
     /// into the Shared domain, and into the Entry domain the Coverage
     /// Decision Evidence with an index record for each Evidence it refers to
-    /// (D15:1607, 1609, 2207, 2518).
+    /// (D15:1608, 1610, 2208, 2519).
     #[test]
     fn a_complete_invocation_reports_each_status_into_its_own_domain() {
         Inputs::complete().resolve(|evaluation, _| {
@@ -1077,7 +1077,7 @@ mod tests {
     /// occurrence into the Entry domain, which counts the occurrence, its
     /// related Evidence, and `C` of each Evidence it carries. Both targets
     /// relate the project's locales, and the first in canonical unit order
-    /// holds that Evidence's index record (D15:1949-1951, 1972, 2207).
+    /// holds that Evidence's index record (D15:1950-1952, 1973, 2208).
     #[test]
     fn the_first_unit_to_refer_to_an_evidence_holds_its_index_record() {
         let mut inputs = Inputs::complete();
@@ -1165,7 +1165,7 @@ mod tests {
     /// Without a materialized value there is no Shared projection, so every
     /// slice is an Entry slice, and the unit of each blocking Finding the
     /// projection is unavailable for holds the cause that names it, after
-    /// its Finding, status, occurrence, and index record (D15:2207, 2369).
+    /// its Finding, status, occurrence, and index record (D15:2208, 2370).
     #[test]
     fn without_a_value_the_entry_findings_hold_the_unavailability_causes() {
         let fixture = FileFixture::new(&fixture_limits(100));
@@ -1229,7 +1229,7 @@ mod tests {
     /// A unit over several values is not evaluated only when its
     /// prerequisites exclude every value, and then each value's causes count
     /// before they merge into its one duplicate-free set; a unit that
-    /// evaluated a value counts none (D15:1966, 2184, 2369).
+    /// evaluated a value counts none (D15:1967, 2185, 2370).
     #[test]
     fn a_unit_counts_each_values_causes_only_when_it_waits_on_every_value() {
         let rejected = |raw: &str| {
@@ -1293,7 +1293,7 @@ mod tests {
     /// A decision table that waits, here on a rule naming a surface class
     /// outside the vocabulary, owns no Coverage Decision Basis or Evidence,
     /// so it reports only its status, into the Shared domain, with its causes
-    /// counted (D15:1609).
+    /// counted (D15:1610).
     #[test]
     fn a_table_that_waits_reports_only_its_status() {
         let mut inputs = Inputs::complete();
@@ -1328,7 +1328,7 @@ mod tests {
     }
 
     /// Every group, in the canonical order of its owner's unit, which is the
-    /// order its slice reports in (D15:2211).
+    /// order its slice reports in (D15:2212).
     fn by_owner() -> Vec<SemanticGroup> {
         let mut groups = SemanticGroup::ALL.to_vec();
         groups.sort_by_key(|group| dependency::unit(*group));
@@ -1358,7 +1358,7 @@ mod tests {
 
     /// A complete invocation establishes every group, so each group's owner
     /// reports its semantic dependency into its Shared slice, after its
-    /// status (D15:2510, 2516, 2518).
+    /// status (D15:2511, 2517, 2519).
     #[test]
     fn each_established_group_reports_its_semantic_dependency() {
         Inputs::complete().resolve(|evaluation, _| {
@@ -1376,7 +1376,7 @@ mod tests {
     }
 
     /// A group that is not established has no semantic dependency, while the
-    /// groups established beside it keep theirs (D15:1173, 2516).
+    /// groups established beside it keep theirs (D15:1174, 2517).
     #[test]
     fn a_group_that_is_not_established_has_no_semantic_dependency() {
         let mut inputs = Inputs::complete();
@@ -1406,7 +1406,7 @@ mod tests {
 
     /// The owner of the materialized dependencies reports one for every
     /// slot, in the slots' order, and the owner of the entry dependencies
-    /// reports the entry's, after their statuses (D15:2507, 2516, 2518).
+    /// reports the entry's, after their statuses (D15:2508, 2517, 2519).
     #[test]
     fn each_dependency_owner_reports_every_slot_it_names() {
         let entry = redacted_entry();

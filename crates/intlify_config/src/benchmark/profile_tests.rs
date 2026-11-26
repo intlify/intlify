@@ -259,7 +259,7 @@ fn the_memory_profile_measures_each_construction_and_invocation_case_at_its_peak
     let document = profile.document();
     // The construction cases and each entry's complete invocations, in
     // registry order; the identity cases' interval is not the construction's,
-    // and a replay's is no complete invocation (D15:2773, 2775).
+    // and a replay's is no complete invocation (D15:2774, 2776).
     let measured = registry
         .declarations()
         .filter(|declaration| [CONSTRUCTION, FILE, PROGRAMMATIC].contains(&declaration.operation))

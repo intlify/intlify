@@ -8,7 +8,7 @@
 //! any other check, so each total is known before the validation it bounds,
 //! and refuses with the first bound, in the canonical order, whose total
 //! exceeds the value the construction-admission body gives it; an exact total
-//! is admitted (D15:955). The `input` bounds cover every submitted artifact,
+//! is admitted (D15:956). The `input` bounds cover every submitted artifact,
 //! the `schema` bounds every schema artifact and every validation but a
 //! registry's, and the `registry` bounds the three registries and their
 //! validations. An artifact that is not strict UTF-8 JSON counts only its
@@ -22,7 +22,7 @@
 //! submitted schema artifact, which no validation reads; and one
 //! cross-authority check is one rule applied to one item it compares.
 //! Totals use checked unsigned arithmetic: a total past `u64` exceeds every
-//! bound (D15:1997).
+//! bound (D15:1998).
 
 use serde_json::Value;
 

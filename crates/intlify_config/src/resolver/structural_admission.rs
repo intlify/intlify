@@ -3,18 +3,18 @@
 
 //! Design 015's Phase 2, `structural-admission`, over the value Phase 1
 //! admitted. The phase's first kind owns the materialized dependency records
-//! and waits on nothing (D15:2516). The Configuration Schema Selection is one
-//! singleton subject, ranked before the scope levels (D15:2173), whose four
+//! and waits on nothing (D15:2517). The Configuration Schema Selection is one
+//! singleton subject, ranked before the scope levels (D15:2174), whose four
 //! checks find an object root, its `schemaVersion` member, the member's
 //! string, and a schema the construction admitted for that string, each
-//! waiting on the one before (D15:2130, 2149). The schema-guided analysis is
+//! waiting on the one before (D15:2131, 2150). The schema-guided analysis is
 //! then measured under that schema against the capability's
-//! `maxStructuralAnalysisUnits` (D15:1887, 2008), and the
+//! `maxStructuralAnalysisUnits` (D15:1888, 2009), and the
 //! `profileSpecification` group's owner, the phase's last kind, waits on
-//! Phase 0 alone (D15:2516).
+//! Phase 0 alone (D15:2517).
 //!
 //! Each evaluation of a structural check the analysis found is a candidate
-//! of a unit of its scope level (D15:2173): a required member, a value's
+//! of a unit of its scope level (D15:2174): a required member, a value's
 //! type, a value's closed constraints, or an object's undeclared members, at
 //! a field of the root, of a profile entry, of a Target ID entry, or of a
 //! Group ID entry, by the field's logical path from its entry, and the key
@@ -22,21 +22,21 @@
 //! entry's admitted key scopes the subjects under it by its identity, and a
 //! key without the identifier syntax by its Subject content projection, so
 //! such entries of one map join one unit while each stays a candidate of its
-//! own (D15:2184, 2190). A candidate waits on the type check of the value
+//! own (D15:2185, 2191). A candidate waits on the type check of the value
 //! that holds it, or of its own value, a key on its map's type check, and
-//! the root's own type check on the analysis's measure (D15:2149, Decision
+//! the root's own type check on the analysis's measure (D15:2150, Decision
 //! 015-195). A value whose type check failed is that check's to report, so
-//! its other checks are not evaluated (D15:2184).
+//! its other checks are not evaluated (D15:2185).
 //!
 //! Each Finding Occurrence of Phase 2 is observed through Materialized Value
-//! Evidence in the configuration entry Phase 1 read (D15:790): a value at its
+//! Evidence in the configuration entry Phase 1 read (D15:791): a value at its
 //! token, a missing member at the object that lacks it followed by the
 //! member's schema-defined name, an undeclared member or an entry's key at
 //! the key's token, the schema selection at the root or its `schemaVersion`
 //! member, and the analysis's measure at the root beside the capability's
 //! bound. A locator classifies each member of its path, so a key without the
 //! identifier syntax is redacted while the names its entry's schema defines
-//! are kept (D15:776, 2184).
+//! are kept (D15:777, 2185).
 //!
 //! Later phases read the analysis these checks admit. Profile selection
 //! counts the declarations once the checks admitted the `profiles` object
@@ -46,11 +46,11 @@
 //! the checks admitted its boundary and its `resourceLimits` reference
 //! ([`selectable`]), the only one when its key is admitted
 //! ([`profile_keys`]), whatever else of it or of the root they rejected
-//! (D15:2131, 2184, 2363; plan 025 interpretation #218). Profile projection
-//! needs a complete `IntlifyConfig`, the whole root ([`whole`]) (D15:2142,
+//! (D15:2132, 2185, 2364; plan 025 interpretation #218). Profile projection
+//! needs a complete `IntlifyConfig`, the whole root ([`whole`]) (D15:2143,
 //! 2367). The semantic phases read the selected declaration from what each
 //! candidate left at its value ([`ValueAdmissions`]), since a unit keyed by a
-//! path with `*` cannot tell its elements apart (D15:2184, 2367, 3340).
+//! path with `*` cannot tell its elements apart (D15:2185, 2368, 3465).
 
 use std::cell::OnceCell;
 use std::collections::BTreeMap;
@@ -100,11 +100,11 @@ pub(crate) const CAPABILITY: Unit = Unit {
     check: Check::WithinCapability,
 };
 
-/// A subject of structural admission's scope levels (D15:2173, 2180): a
+/// A subject of structural admission's scope levels (D15:2174, 2181): a
 /// field of the root or of an identity map's entry, by its logical path from
 /// the entry, or the key of an entry of `profiles`, of a profile's
 /// `targetProfiles`, or of its `deploymentGroups`. The keys of the entries
-/// that hold a subject scope it, the outermost first (D15:2190).
+/// that hold a subject scope it, the outermost first (D15:2191).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum StructuralSubject {
     /// A field of the root.
@@ -148,7 +148,7 @@ impl StructuralSubject {
 
     /// The logical subject, which every raw candidate of the unit joins: the
     /// subject without where a candidate looked, and each key without an
-    /// identity as its content projection alone (D15:2184, 2190).
+    /// identity as its content projection alone (D15:2185, 2191).
     pub(crate) fn logical(&self) -> Self {
         match self {
             Self::RootField(field) => Self::RootField(field.logical()),
@@ -172,7 +172,7 @@ impl StructuralSubject {
     }
 }
 
-/// The key of an identity map's entry (D15:2181, 2184): its admitted
+/// The key of an identity map's entry (D15:2182, 2185): its admitted
 /// canonical identity, or, for a key without the identifier syntax, its
 /// Subject content projection, a string, with where one raw entry's key is.
 /// Identities order before content, and by their bytes.
@@ -194,7 +194,7 @@ impl EntryKey {
 
 /// A field: its logical path from its entry, in the schema's member names
 /// and `*` for an array element or an entry of a map whose keys are not
-/// identities, and where one raw candidate of its unit looked (D15:2180,
+/// identities, and where one raw candidate of its unit looked (D15:2181,
 /// 2184). Paths order segment by segment by their bytes, a shorter exact
 /// prefix first.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -214,15 +214,15 @@ impl Field {
 }
 
 /// Whether structural admission admitted what selecting the declaration `id`
-/// needs besides its key (D15:2131): the rest of its boundary, its value an
+/// needs besides its key (D15:2132): the rest of its boundary, its value an
 /// object under the key (plan 025 interpretation #218), and its
 /// `resourceLimits` reference fragment, with the `policies` object present
 /// and typed to hold it. The key, which alone names the declaration's
-/// Profile ID, holds the selection back through that ID's check (D15:2184).
+/// Profile ID, holds the selection back through that ID's check (D15:2185).
 /// Otherwise the causes: each such unit's blocking results, and the causes
 /// of each not evaluated. A missing required member, an undeclared member,
 /// or a failure elsewhere in the declaration suppresses only what reads it
-/// (D15:2367, 3341).
+/// (D15:2368, 3466).
 pub(crate) fn selectable(evaluation: &Evaluation, id: &str) -> Admitted<()> {
     evaluation.admitted_within(|unit| match &unit.subject {
         Subject::Structural(subject @ StructuralSubject::ProfileField(_, field))
@@ -244,7 +244,7 @@ pub(crate) fn selectable(evaluation: &Evaluation, id: &str) -> Admitted<()> {
 /// Whether structural admission admitted the whole root, which a complete
 /// `IntlifyConfig` and so a profile projection need: every structural check
 /// evaluated without a blocking result. Otherwise the causes: every blocking
-/// result of those checks, and the causes of each not evaluated (D15:2142,
+/// result of those checks, and the causes of each not evaluated (D15:2143,
 /// 2367).
 pub(crate) fn whole(evaluation: &Evaluation) -> Admitted<()> {
     evaluation.admitted_within(|unit| {
@@ -258,7 +258,7 @@ pub(crate) fn whole(evaluation: &Evaluation) -> Admitted<()> {
 /// Whether structural admission admitted the root's `profiles` object,
 /// which profile selection reads: the root's schema selected, its analysis
 /// within the capability, and the member present with its type. Otherwise
-/// the causes (D15:2131, 2367).
+/// the causes (D15:2132, 2368).
 pub(crate) fn profiles(evaluation: &Evaluation) -> Admitted<()> {
     evaluation.admitted_within(|unit| match &unit.subject {
         Subject::SchemaSelection | Subject::StructuralCapability => true,
@@ -272,7 +272,7 @@ pub(crate) fn profiles(evaluation: &Evaluation) -> Admitted<()> {
 
 /// Whether structural admission admitted the closed constraints of the
 /// root's `profiles` object, so that it holds a declaration, which profile
-/// selection's checks of the selector assume (D15:450, 2363). Otherwise the
+/// selection's checks of the selector assume (D15:451, 2364). Otherwise the
 /// causes.
 pub(crate) fn nonempty_profiles(evaluation: &Evaluation) -> Admitted<()> {
     evaluation.admitted_within(|unit| match &unit.subject {
@@ -287,7 +287,7 @@ pub(crate) fn nonempty_profiles(evaluation: &Evaluation) -> Admitted<()> {
 /// Whether structural admission admitted every key of the root's `profiles`
 /// object as an identity. Otherwise the causes: the Findings of the keys
 /// without the identifier syntax, and the causes of each not evaluated
-/// (D15:2184).
+/// (D15:2185).
 pub(crate) fn profile_keys(evaluation: &Evaluation) -> Admitted<()> {
     evaluation.admitted_within(|unit| {
         matches!(
@@ -436,7 +436,7 @@ pub(crate) fn admit_structure<Policy, Target>(
 /// Records each candidate the analysis found as one candidate of the unit
 /// over its subject at its scope level. A candidate waits on the result of
 /// the type check it needs, and the root's own type check on `measured`, the
-/// analysis's measure (D15:2149, 2184). Returns what each candidate that did
+/// analysis's measure (D15:2150, 2185). Returns what each candidate that did
 /// not pass left at its value.
 fn scope_levels<Policy, Target>(
     evaluation: &mut Evaluation,
@@ -598,7 +598,7 @@ fn found(observed: Option<Observation>, code: Code) -> Result<(), Found> {
 
 /// Where Phase 2 observes what it finds: Materialized Value Evidence in the
 /// configuration entry Phase 1 read, at the Portable Value Locator of what a
-/// check looked at and the span the entry has for its locus (D15:790, 800).
+/// check looked at and the span the entry has for its locus (D15:791, 801).
 /// A value's locator is its internal path from the root, each member
 /// classified, so an unsafe name is never retained. The document is indexed
 /// once, when a Finding first needs it.
@@ -702,7 +702,7 @@ impl<'f, 'd> Observer<'f, 'd> {
     }
 
     /// The root's `schemaVersion` member: at its value's token, or at the
-    /// root's when it is missing (D15:790).
+    /// root's when it is missing (D15:791).
     fn version(&self) -> Result<Observation, StructuralInvariant> {
         let root = self.document.root();
         let locus = match self.document.node(root).kind() {
@@ -716,7 +716,7 @@ impl<'f, 'd> Observer<'f, 'd> {
     }
 
     /// The analysis's measure at the root, beside the capability's bound
-    /// (D15:836, 1887).
+    /// (D15:837, 1888).
     fn capability(&self) -> Result<Observation, StructuralInvariant> {
         let bound = ComponentPath::capability(CapabilityBound::PolicyComparable(UNITS))
             .map_err(StructuralInvariant::Component)?;
@@ -730,7 +730,7 @@ impl<'f, 'd> Observer<'f, 'd> {
     /// What `candidate` looked at: its value at the value's token; a missing
     /// member at the object that lacks it, followed by the member's
     /// schema-defined name; an undeclared member, or an entry's key, at the
-    /// key's token (D15:790).
+    /// key's token (D15:791).
     fn candidate(
         &self,
         facts: &Facts,
@@ -764,7 +764,7 @@ impl<'f, 'd> Observer<'f, 'd> {
 }
 
 /// The capability's bound and the analysis's complete exact count, when the
-/// count is past the bound (D15:1887, 2006).
+/// count is past the bound (D15:1888, 2007).
 fn exceeded<Policy, Target>(analysis: &StructuralAnalysis<Policy, Target>) -> Option<Blocking> {
     analysis
         .issues()
@@ -1019,7 +1019,7 @@ mod tests {
 
     /// Each check of the root's fields reports what it finds under the unit
     /// over the field's path: the missing member's, the value's, or that of
-    /// the object an undeclared member is in (D15:2184, 2291-2294).
+    /// the object an undeclared member is in (D15:2185, 2292-2295).
     #[test]
     fn each_root_check_reports_under_its_fields_path() {
         let edit = |change: fn(&mut Value)| {
@@ -1059,7 +1059,7 @@ mod tests {
     }
 
     /// A value whose type check failed is that check's to report: its closed
-    /// value is not evaluated, and waits on the type check (D15:2184).
+    /// value is not evaluated, and waits on the type check (D15:2185).
     #[test]
     fn a_value_of_another_type_leaves_its_closed_value_to_its_type_check() {
         let mut value = minimal_config();
@@ -1086,7 +1086,7 @@ mod tests {
     /// check of a field on the type check of the value that holds the field,
     /// or of its own value, an entry's value's type check and its key on the
     /// map's type check, and so every check under an entry on what its entry
-    /// waits on (D15:2149, Decision 015-195).
+    /// waits on (D15:2150, Decision 015-195).
     #[test]
     fn each_check_of_the_scope_levels_waits_on_the_type_checks_it_needs() {
         let structural = |unit: &Unit| matches!(unit.subject, Subject::Structural(_));
@@ -1122,7 +1122,7 @@ mod tests {
 
     /// Each identity map's entry scopes the subjects under it by its key, and
     /// its key is a unit of its own: a profile's, and a target's or a group's
-    /// under it (D15:2173, 2190).
+    /// under it (D15:2174, 2191).
     #[test]
     fn each_entry_scopes_its_fields_and_has_a_key_of_its_own() {
         let (evaluation, _) = admitted(&minimal_config(), 1_000_000);
@@ -1157,7 +1157,7 @@ mod tests {
     /// Keys without the identifier syntax share one unit, of their content
     /// projection, while each entry stays a candidate of its own, and so do
     /// the fields under them; an admitted key keeps its fields apart
-    /// (D15:2184, 2190).
+    /// (D15:2185, 2191).
     #[test]
     fn entries_whose_keys_fail_join_one_unit_with_a_candidate_each() {
         let mut value = minimal_config();
@@ -1192,7 +1192,7 @@ mod tests {
     }
 
     /// So do the keys of a profile's targets and groups that fail, each under
-    /// the profile's key, and the fields under them (D15:2190).
+    /// the profile's key, and the fields under them (D15:2191).
     #[test]
     fn target_and_group_entries_whose_keys_fail_join_one_unit_each() {
         let mut value = minimal_config();
@@ -1232,7 +1232,7 @@ mod tests {
     }
 
     /// A field of another type under an entry leaves its closed value to its
-    /// type check, and its elements form no unit (D15:2184).
+    /// type check, and its elements form no unit (D15:2185).
     #[test]
     fn a_field_of_another_type_under_an_entry_has_no_units_below_it() {
         let mut value = minimal_config();
@@ -1254,7 +1254,7 @@ mod tests {
     }
 
     /// Every element of an array is a candidate of the one unit over the
-    /// path with `*`, which reports one Finding when any fails (D15:2184).
+    /// path with `*`, which reports one Finding when any fails (D15:2185).
     #[test]
     fn the_elements_of_an_array_join_one_unit() {
         let mut value = minimal_config();
@@ -1292,7 +1292,7 @@ mod tests {
     /// reference, `anyOf`, and its branches' three), and an alias is one. Each
     /// failing entry is a separate occurrence of one Finding, each at its own
     /// value, and the entry that passes beside them is a candidate with no
-    /// occurrence (D15:1887, 2184, 3354).
+    /// occurrence (D15:1888, 2185, 3479).
     #[test]
     fn the_entries_of_a_map_without_identity_keys_count_and_join_one_finding() {
         for (fallback, path, valid, each, safe) in [
@@ -1377,7 +1377,7 @@ mod tests {
     }
 
     /// Every undeclared member of the root is a candidate of the one unit of
-    /// the root's known members, which reports one Finding (D15:2184).
+    /// the root's known members, which reports one Finding (D15:2185).
     #[test]
     fn the_undeclared_members_of_the_root_join_one_unit() {
         let mut value = minimal_config();
@@ -1396,7 +1396,7 @@ mod tests {
     }
 
     /// Each failure of the selection holds back the checks after it, through
-    /// the chain of prerequisites, and the analysis's measure (D15:2130).
+    /// the chain of prerequisites, and the analysis's measure (D15:2131).
     #[test]
     fn each_selection_check_holds_back_the_checks_after_it() {
         let mut missing = minimal_config();
@@ -1446,7 +1446,7 @@ mod tests {
     }
 
     /// The analysis's exact count is within the capability's bound at the
-    /// bound and past it one unit later (D15:1887, 2006).
+    /// bound and past it one unit later (D15:1888, 2007).
     #[test]
     fn the_analysis_is_measured_exactly_against_the_capability() {
         let (_, count) = admitted(&minimal_config(), 1_000_000);
@@ -1568,7 +1568,7 @@ mod tests {
     /// Each structural Finding is observed where its check looked: a value at
     /// its token, a missing member at the object that lacks it followed by
     /// the member's name, an undeclared member and a malformed key at the
-    /// key's token, redacted (D15:790).
+    /// key's token, redacted (D15:791).
     #[test]
     fn each_structural_finding_is_observed_where_its_check_looked() {
         let mut typed = minimal_config();
@@ -1630,7 +1630,7 @@ mod tests {
 
     /// A key without the identifier syntax is observed redacted at its token,
     /// and the fields of its entry under their schema-defined names, which
-    /// structural admission evaluates there (D15:790, 2184).
+    /// structural admission evaluates there (D15:791, 2185).
     #[test]
     fn a_malformed_key_is_redacted_and_the_names_under_it_are_kept() {
         let mut value = minimal_config();
@@ -1662,7 +1662,7 @@ mod tests {
     }
 
     /// Several undeclared members of one object, and several malformed keys
-    /// of one map, are each observed at its own key, redacted (D15:790).
+    /// of one map, are each observed at its own key, redacted (D15:791).
     #[test]
     fn each_member_of_one_object_is_observed_at_its_own_key() {
         let mut value = minimal_config();
@@ -1700,7 +1700,7 @@ mod tests {
     /// A value under two unsafe keys is located by a path that keeps every
     /// safe member and takes the pinned `value-path-member` token for each
     /// unsafe one. The locator is no RFC 6901 pointer, and its span still
-    /// finds the value (D15:756, 790, 3395).
+    /// finds the value (D15:757, 791, 3520).
     #[test]
     fn a_locator_takes_the_pinned_token_for_each_unsafe_member() {
         let mut value = minimal_config();
@@ -1748,7 +1748,7 @@ mod tests {
     /// A member missing under an unsafe key is observed at its nearest
     /// locatable owner, the redacted entry, followed by its schema-defined
     /// name. The key's own Finding keeps its span while neither the key nor
-    /// its direct digest is retained (D15:790, 3396).
+    /// its direct digest is retained (D15:791, 3521).
     #[test]
     fn a_member_missing_under_an_unsafe_key_keeps_its_field_name() {
         let mut value = minimal_config();
@@ -1832,7 +1832,7 @@ mod tests {
     /// An unknown member is observed at its own key at every depth, the
     /// members above it kept as their classes allow and its own name
     /// redacted: 015 classifies every unknown member as unsafe, so no exact
-    /// pointer can name one (D15:776, 790, 3414).
+    /// pointer can name one (D15:777, 791, 3539).
     #[test]
     fn an_unknown_member_is_redacted_at_its_key_at_every_depth() {
         let mut value = minimal_config();
@@ -1887,7 +1887,7 @@ mod tests {
 
     /// The schema selection observes the root, or its `schemaVersion` member
     /// where its check reads it, and the analysis's measure the root beside
-    /// the capability's bound (D15:790, 836).
+    /// the capability's bound (D15:791, 837).
     #[test]
     fn the_selection_and_the_measure_are_observed_at_the_root() {
         let (source, found) = observed(&json!([]), 1_000_000);
@@ -1947,7 +1947,7 @@ mod tests {
     /// fragment are admitted: a failure elsewhere in it, a missing required
     /// member, or an undeclared member leaves it selectable, while the whole
     /// root waits on every structural Finding; a unit not evaluated holds it
-    /// back with its causes (D15:2131, 2142, 2367, 3341; plan 025
+    /// back with its causes (D15:2132, 2143, 2368, 3466; plan 025
     /// interpretation #218).
     #[test]
     fn a_declaration_is_selectable_once_its_boundary_and_resource_limits_are_admitted() {

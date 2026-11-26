@@ -208,7 +208,7 @@ pub(crate) fn document_order(doc: &MaterializedDocument) -> BTreeMap<NodeId, u64
 
 /// The value a document materialized, each node in complete value preorder,
 /// and its root-value counts: the Shared domain a file and a Snapshot of one
-/// value frame alike, whichever entry materialized it (D15:2788, 2794).
+/// value frame alike, whichever entry materialized it (D15:2791, 2799).
 /// `locate` is handed each node's locus, then each of an object's member
 /// keys' loci, in that order.
 pub(crate) fn value(doc: &MaterializedDocument, mut locate: impl FnMut(Locus)) -> Digest {

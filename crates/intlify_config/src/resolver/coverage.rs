@@ -17,28 +17,28 @@
 //! raw content until a Subject content projection replaces it. Once the table
 //! is established, it also owns the Coverage Decision Evidence mapping each
 //! Basis to the Evidence of its decision sources, observed in the
-//! declaration's file (D15:1609, 1611). Not the vocabulary's admission.
+//! declaration's file (D15:1610, 1612). Not the vocabulary's admission.
 //!
 //! A count past its bound is observed where its table's Scope sits in the
 //! declaration, beside the confirmed policy, which supplies the bound
-//! (D15:1901-1905, 2249): the rules for the rule and selector-item counts,
+//! (D15:1902-1906, 2250): the rules for the rule and selector-item counts,
 //! the nearest location holding every item, and for the rule-to-cell
 //! comparisons, the factor that bound adds; the requested locales for the
 //! cells, the factor the declaration supplies (plan 025 decision #198). Each
 //! rule holding a selector is a raw parent of its own, so a selector item's
 //! Findings, and a locale item's notice, are observed at the items naming
-//! their subject in every such rule (D15:2190, 2387). A domain several rules
+//! their subject in every such rule (D15:2191, 2388). A domain several rules
 //! hold, and a cell whose maximally specific rules select two modes, are
-//! observed at each of those rules beside the others (D15:1609, 2387, 2410).
+//! observed at each of those rules beside the others (D15:1610, 2388, 2411).
 //!
 //! A rule or item structural admission did not admit holds back only what
-//! needs it (D15:2365, 2367). The rule count and each selector count take
+//! needs it (D15:2366, 2368). The rule count and each selector count take
 //! every occurrence they name, a selector count waiting only when every
-//! selector it would read failed (D15:1901-1903, 2184, 3354). An item that
+//! selector it would read failed (D15:1902-1904, 2185, 3479). An item that
 //! failed has no subject, and its rule's other items are checked. Its rule
 //! has no domain, and a rule that is no object has no subject at all. The
 //! cells need every rule's domain and mode, the table every cell, and the
-//! policy all of `coverage`, and none of them is ever partial (D15:1609,
+//! policy all of `coverage`, and none of them is ever partial (D15:1610,
 //! 2426, 3409).
 
 use std::collections::BTreeMap;
@@ -87,7 +87,7 @@ const MAX_COVERAGE_RULE_CELL_COMPARISONS: BoundId =
 /// A rule as authored, which names it until it has a normalized domain: 015's
 /// Canonical content identity of the rule object, whatever structural
 /// admission made of it, held as bytes whose unsigned order is that identity's
-/// (D15:2186). Each value starts with its type's tag, in the type order; a
+/// (D15:2187). Each value starts with its type's tag, in the type order; a
 /// string escapes its zero bytes and ends in one; and an array or object ends
 /// in a zero below every tag, so a shorter exact prefix comes first. A rule's
 /// two selectors are sets, so their elements sort with every repeat kept.
@@ -254,7 +254,7 @@ pub(crate) fn object_identity(
 }
 
 /// A selector as structural admission left it: absent, why it has no item to
-/// read, or each item's spelling or why it has none (D15:2367).
+/// read, or each item's spelling or why it has none (D15:2368).
 pub(crate) type SelectorField<'a> = Admitted<Option<Vec<Admitted<&'a str>>>>;
 
 /// One object of `coverage.rules`: the content naming it and what structural
@@ -641,13 +641,13 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
         Err(causes) => Err(causes),
     };
     // The table owns every cell's Basis and its Coverage Decision Evidence,
-    // so neither exists unless every cell is decided (D15:1609; plan 025
+    // so neither exists unless every cell is decided (D15:1610; plan 025
     // decision #225). The Evidence observes the decision sources in the
     // declaration's file.
     let owner = unit(CoverageSubject::Table, Check::CompleteTable);
     // An unknown mode blocks the table whichever cells take it, a rule's even
     // where narrower rules decide all its cells, or where its selector failed
-    // and it holds no domain (D15:2426, 3607).
+    // and it holds no domain (D15:2427, 3732).
     let modes = modes_of(
         rules
             .iter()
@@ -667,7 +667,7 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
         evaluation.decided(&owner, cells.clone(), decisions)?;
     }
     // The policy needs all of `coverage`, an undeclared member included, as
-    // the checks above do not (D15:2367). The default mode exists whenever
+    // the checks above do not (D15:2368). The default mode exists whenever
     // all of it does, and the span whenever the table does, so neither adds a
     // cause of its own.
     let whole = fields.and_then(|fields| fields.whole.clone());
@@ -727,7 +727,7 @@ struct Selectors<'a, P: Provider> {
 impl<P: Provider> Selectors<'_, P> {
     /// The items at `at`, each a rule's position and an item's, rule by rule,
     /// each at its token, or none without the declaration's file: each raw
-    /// rule is a parent of its own (D15:790, 2190).
+    /// rule is a parent of its own (D15:791, 2191).
     fn items(
         &self,
         selector: &str,
@@ -756,7 +756,7 @@ impl<P: Provider> Selectors<'_, P> {
     }
 
     /// The rules at `positions`, each at its token, or none without the
-    /// declaration's file (D15:790).
+    /// declaration's file (D15:791).
     fn rules(
         &self,
         positions: &[usize],
@@ -852,7 +852,7 @@ fn normalize<P: Provider>(
                     .or_insert_with(|| (Vec::new(), rule.mode.clone()));
                 // A domain held twice is blocking, yet each rule holding it is a
                 // cause of what needs every mode, whichever content orders first
-                // (D15:2365).
+                // (D15:2366).
                 *mode = both(mode.clone(), rule.mode.clone()).map(|(first, _)| first);
                 holding.extend(holders.iter().map(|&(position, _)| position));
                 holding.sort_unstable();
@@ -863,7 +863,7 @@ fn normalize<P: Provider>(
     for (domain, (holding, _)) in &domains {
         // Only a rule that normalized holds a domain, so what the domain waits
         // on, those rules' units, has passed. Rules sharing it are found each
-        // at its own rule, beside the others (D15:2387, 2410).
+        // at its own rule, beside the others (D15:2388, 2411).
         let sharing = if holding.len() > 1 {
             selectors.rules(holding)?
         } else {
@@ -976,11 +976,11 @@ type Attempt = Admitted<Result<CanonicalLocale, Blocking>>;
 /// The three units of one subject of a rule's locale selector. Each rule
 /// holding the selector is a raw parent of its own, so a unit's candidates
 /// are the items spelling its subject in every such rule, each at its token
-/// (D15:2190, 2387): one past the identifier bound beside the confirmed
+/// (D15:2191, 2388): one past the identifier bound beside the confirmed
 /// policy, which supplies the bound; a corrected one as its notice's
 /// occurrence; a repeated one beside the others repeating it in the same
-/// rule (D15:1567, 2410); and one outside the requested locales beside them,
-/// a set that counts as one location (D15:2249). Returns the subject's
+/// rule (D15:1568, 2411); and one outside the requested locales beside them,
+/// a set that counts as one location (D15:2250). Returns the subject's
 /// canonical locale once every unit passed.
 fn locale_units<P: Provider>(
     evaluation: &mut Evaluation,
@@ -1076,7 +1076,7 @@ fn observed(
 }
 
 /// One candidate of `blocking` for each of the rules' repeated items, each
-/// beside the other items repeating it in the same rule (D15:1567, 2410), or
+/// beside the other items repeating it in the same rule (D15:1568, 2411), or
 /// the one candidate without the declaration's file.
 fn each_rule(blocking: Blocking, rules: Vec<Vec<EvidenceProjection>>) -> Found {
     rules
@@ -1094,10 +1094,10 @@ const INTENT_SURFACE_CLASSES: &str = "intentSurfaceClasses";
 /// names no member is unknown, not a duplicate. An item that failed has no
 /// subject and holds back only the rule's domain. Each rule holding the
 /// selector is a raw parent of its own, so a unit's candidates are the items
-/// naming its subject in every such rule, each at its token (D15:2190, 2387):
+/// naming its subject in every such rule, each at its token (D15:2191, 2388):
 /// an unknown one beside the vocabulary's root, which it was compared with
-/// (D15:2249), and a repeated one beside the others repeating it in the same
-/// rule (D15:1567, 2410). Returns the selector's surface classes as a set
+/// (D15:2250), and a repeated one beside the others repeating it in the same
+/// rule (D15:1568, 2411). Returns the selector's surface classes as a set
 /// once every item is there and every unit passed.
 fn selected_surfaces<P: Provider>(
     evaluation: &mut Evaluation,
@@ -1196,9 +1196,9 @@ fn selected_surfaces<P: Provider>(
 /// normalized to a domain of its own and the comparison bound passed. A cell
 /// no domain holds takes the default, so only it waits on the default. One a
 /// domain holds needs the mode of each of its maximally specific rules and of
-/// no other rule, unless two of those modes already conflict (D15:2365). A
+/// no other rule, unless two of those modes already conflict (D15:2366). A
 /// cell whose maximally specific rules select two modes is found at each rule
-/// selecting one, beside the others (D15:1609, 2410).
+/// selecting one, beside the others (D15:1610, 2411).
 fn decide<P: Provider>(
     evaluation: &mut Evaluation,
     (decidable, domains, default, selectors): (
@@ -1336,7 +1336,7 @@ fn basis(maximal: &[(&Domain, &Held)]) -> Result<Basis, Blocking> {
 /// declaration's file: one mapping for each `default` Basis, to the declared
 /// project default or, when it is omitted, to the Coverage Specification
 /// input, and one for each matched domain of a `rule` Basis, to the one rule
-/// holding it, in cell order and then domain order (D15:1609, 1611). A rule
+/// holding it, in cell order and then domain order (D15:1610, 1612). A rule
 /// deciding several cells is mapped once for each.
 fn decision_evidence(
     cells: &Cells,
@@ -1360,7 +1360,7 @@ fn decision_evidence(
             Decision::Rules(matched) => {
                 for domain in matched {
                     // An established table rejected every duplicate domain,
-                    // so one rule holds each matched domain (D15:1611).
+                    // so one rule holds each matched domain (D15:1612).
                     let (holding, _) = &domains[domain];
                     decisions.push(DecisionEvidence {
                         cell: cell.clone(),
@@ -1374,7 +1374,7 @@ fn decision_evidence(
     Ok(decisions)
 }
 
-/// The rule at `position`, at its token (D15:790).
+/// The rule at `position`, at its token (D15:791).
 fn rule_token(
     observer: &DeclarationObserver<'_>,
     position: usize,
@@ -2111,7 +2111,7 @@ mod tests {
             )]
         );
         // Each rule holding the domain is found at its token, beside the
-        // other (D15:2387, 2410).
+        // other (D15:2388, 2411).
         assert_eq!(
             observed(&resolved.evaluation),
             each_beside_the_other(&declaration, &duplicate, [0, 1])
@@ -2180,7 +2180,7 @@ mod tests {
         assert_eq!(notices(&resolved.evaluation), [en(Check::CanonicalLocale)]);
         // Each item is found at its token: `de` beside the requested
         // locales, the corrected `EN` as its notice's occurrence, each `en`
-        // beside the other, and `zz` alone (D15:2249, 2410).
+        // beside the other, and `zz` alone (D15:2250, 2411).
         let item = |position| locale_item(&declaration, 0, position);
         let requested = beside_policy(&declaration, &["requestedLocales"]).primary;
         let at = |unit: Unit, primary, related: &[EvidenceProjection]| {
@@ -2233,7 +2233,7 @@ mod tests {
 
     /// Identical rules share their units but are each a raw parent of their
     /// own: a locale repeated in their selector is found at each rule's
-    /// items, each beside the other items of its own rule (D15:1567, 2190,
+    /// items, each beside the other items of its own rule (D15:1568, 2191,
     /// 2387).
     #[test]
     fn identical_rules_are_each_a_parent_of_their_own_items() {
@@ -2267,7 +2267,7 @@ mod tests {
 
     /// Identical rules can spell their sets in different orders, so each
     /// rule's own items locate a subject's Findings, not the first rule's
-    /// positions (D15:516, 2190, 2387, 3353).
+    /// positions (D15:517, 2191, 2388, 3478).
     #[test]
     fn identical_rules_in_different_orders_are_found_at_their_own_items() {
         let declaration = declared(json!({"rules": [
@@ -2326,7 +2326,7 @@ mod tests {
     /// The same holds for surface items: in identical rules, a repeated
     /// member is found at each rule's items beside the other of its own rule,
     /// and an unknown item at each rule's item beside the vocabulary's root
-    /// (D15:1567, 2190, 2387).
+    /// (D15:1568, 2191, 2388).
     #[test]
     fn identical_rules_are_each_a_parent_of_their_own_surface_items() {
         let selector =
@@ -2395,7 +2395,7 @@ mod tests {
         );
         // Each `nav` is found beside the other, and each item naming no
         // member beside the vocabulary's root, which it was compared with
-        // (D15:1567, 2249, 2410).
+        // (D15:1568, 2250, 2411).
         let item = |position| selector_item(&declaration, "intentSurfaceClasses", 0, position);
         let vocabulary_root = EvidenceProjection::resolver_input(ComponentPath::vocabulary_root());
         let duplicate = member_unit(&owner, "nav", Check::UniqueSurfaceClass);
@@ -2448,7 +2448,7 @@ mod tests {
     /// `surface-class-duplicate`. Every raw item counts before either is
     /// rejected; the rule has no normalized domain, though the rule beside it
     /// has one; and every cell and the table wait on the Finding, so no cell,
-    /// Basis, or mapping is left (D15:516, 1567, 2426, 3409).
+    /// Basis, or mapping is left (D15:517, 1568, 2427, 3534).
     #[test]
     fn a_selector_repeating_a_member_leaves_no_rule_domain_or_partial_table() {
         type Repeat = fn(&RuleContent) -> Unit;
@@ -2480,7 +2480,7 @@ mod tests {
             let waiting = Some(vec![repeated.clone()]);
             // The rules share one logical unit, which the rule beside this
             // one evaluates: this rule's own candidate is the one that waits
-            // (D15:2184).
+            // (D15:2185).
             let candidate = unit(
                 CoverageSubject::Rule(owner.clone()),
                 Check::NormalizedDomain,
@@ -2555,7 +2555,7 @@ mod tests {
         );
         // Each maximally specific rule is found at its token, beside the
         // other, in domain order: the surface rule spans every locale
-        // (D15:1609, 2410).
+        // (D15:1610, 2411).
         assert_eq!(
             observed(&resolved.evaluation),
             each_beside_the_other(&declaration, &conflict, [1, 0])
@@ -2611,7 +2611,7 @@ mod tests {
             exactly(MAX_COVERAGE_RULES, 2, 3)
         );
         // Past it, the rules are observed beside the confirmed policy, which
-        // supplies the bound (D15:1901, 2249).
+        // supplies the bound (D15:1902, 2250).
         assert_eq!(
             observed(&over.evaluation),
             [(
@@ -2884,7 +2884,7 @@ mod tests {
     /// Specification input when the default is omitted, or to the declared
     /// default, and each matched domain of a `rule` Basis to the rule holding
     /// it, cell by cell, a rule deciding several cells once for each
-    /// (D15:1609, 1611).
+    /// (D15:1610, 1612).
     #[test]
     fn an_established_table_maps_each_basis_to_its_decision_sources() {
         let fr = json!({"requestedLocales": ["fr"], "mode": "fallback-allowed"});
@@ -2927,7 +2927,7 @@ mod tests {
     /// established table owns every cell's Basis, the declaration's file or
     /// not, and a table that is not established keeps neither Basis nor
     /// mapping, nor does an evaluation without the file keep a mapping
-    /// (D15:1607, 1609, 1611).
+    /// (D15:1608, 1610, 1612).
     #[test]
     fn each_matched_domain_is_mapped_and_an_unestablished_table_keeps_none() {
         let locale_only = json!({"requestedLocales": ["fr"], "mode": "fallback-allowed"});
@@ -2977,7 +2977,7 @@ mod tests {
     /// Basis, and a cell two rules decide keeps them in domain order. The
     /// Coverage Decision Evidence keeps every mapping in its order, and only
     /// a moved rule's mappings follow it to the new index; the rule that
-    /// stays in place, and the default, keep their Evidence (D15:1605, 1607,
+    /// stays in place, and the default, keep their Evidence (D15:1606, 1608,
     /// 1609, 1611, 3406).
     #[test]
     fn reordering_rules_moves_only_the_mappings_of_the_rules_that_moved() {
@@ -3039,7 +3039,7 @@ mod tests {
     /// The recorded mappings become Coverage Decision Evidence records under
     /// the invocation's tokens, each owned by the decision table: the declared
     /// rule's Materialized Value Evidence, and the Coverage Specification
-    /// input for the omitted default (D15:1609, 2485).
+    /// input for the omitted default (D15:1610, 2486).
     #[test]
     fn the_recorded_mappings_become_records_under_the_decision_table() {
         use crate::resolver::decision_evidence::{records, redacted};
@@ -3216,7 +3216,7 @@ mod tests {
         }
         assert_eq!(units(&resolved.policy.unwrap_err()), units(&missing));
         // A locale a set with an invalid element holds is a member: the
-        // element is needed only by what the set does not hold (D15:2367).
+        // element is needed only by what the set does not hold (D15:2368).
         let held = resolve(&requesting(|app| {
             app["requestedLocales"] = json!(["en", "fr", "ja", "zz"]);
             app["coverage"] = json!({"rules": [selector]});
@@ -3366,7 +3366,7 @@ mod tests {
         );
         assert_eq!(notices(&at.evaluation), [corrected(Check::CanonicalLocale)]);
         // The item is the notice's occurrence, and found outside the
-        // requested locales beside them (D15:2249, 2410).
+        // requested locales beside them (D15:2250, 2411).
         let item = locale_item(&declaration, 0, 0);
         let requested = beside_policy(&declaration, &["requestedLocales"]).primary;
         assert_eq!(
@@ -3468,7 +3468,7 @@ mod tests {
 
     /// A conflict needs the modes of the rules selecting one, so a third
     /// maximally specific rule whose mode failed neither hides it nor is
-    /// found with it (D15:1609, 2365, 2410).
+    /// found with it (D15:1610, 2366, 2411).
     #[test]
     fn a_conflict_is_found_at_the_rules_that_have_a_mode() {
         let declaration = declared(json!({"rules": [

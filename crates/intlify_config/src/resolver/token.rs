@@ -4,7 +4,7 @@
 //! Design 015's Redacted subject token: the projected logical subject of a
 //! unit's subject, the token record that frames it, and the token itself,
 //! with the collision ordinals that keep unequal records with one digest
-//! apart (D15:2179-2194, 2454-2468).
+//! apart (D15:2180-2195, 2455-2469).
 //!
 //! The projected logical subject follows the key strategy the Check Registry
 //! gives the subject's kind. A singleton is its subject kind ID (Decision
@@ -86,7 +86,7 @@ enum Own<'a> {
     Position(usize),
 }
 
-/// The projected logical subject of `subject` (D15:2468).
+/// The projected logical subject of `subject` (D15:2469).
 pub(crate) fn projected(subject: &Subject) -> Value {
     let (own, parent) = own(subject);
     let own = match own {
@@ -111,7 +111,7 @@ pub(crate) fn projected(subject: &Subject) -> Value {
 /// type, and a collection member's semantic digest dropped. Two subjects have
 /// one logical subject exactly when they have one projected logical subject,
 /// so a unit over the logical subject is 015's evaluation unit, which every
-/// raw value with that projection joins as a candidate (D15:2203).
+/// raw value with that projection joins as a candidate (D15:2204).
 pub(crate) fn logical(subject: &Subject) -> Subject {
     match subject {
         Subject::Slot(_)
@@ -245,7 +245,7 @@ pub(crate) fn logical_member(key: &MemberKey) -> MemberKey {
     }
 }
 
-/// The token record of `subject`: its eight field frames (D15:2454).
+/// The token record of `subject`: its eight field frames (D15:2455).
 ///
 /// # Panics
 ///
@@ -269,7 +269,7 @@ pub(crate) fn record(specification: Specification<'_>, subject: &Subject) -> Vec
 }
 
 /// The digest a token takes of its preimage: SHA-256, or in a test a digest
-/// that makes chosen records collide (D15:2194).
+/// that makes chosen records collide (D15:2195).
 pub(crate) trait Digest {
     fn digest(&self, preimage: &[u8]) -> [u8; 32];
 }
@@ -296,7 +296,7 @@ pub(crate) struct RedactedToken {
 impl RedactedToken {
     /// A token as long as every token without a collision ordinal, which
     /// measures a path before tokens are assigned: path admission comes before
-    /// token generation, so a path's bytes never count an ordinal (D15:724;
+    /// token generation, so a path's bytes never count an ordinal (D15:725;
     /// plan 025 interpretation #234).
     pub(crate) const fn measuring() -> Self {
         Self {
@@ -306,7 +306,7 @@ impl RedactedToken {
     }
 
     /// The token's view, `{ token, collision? }`, the ordinal as a decimal
-    /// string (D15:2452, 2468).
+    /// string (D15:2453, 2469).
     pub(crate) fn view(&self) -> Value {
         let mut view = serde_json::Map::new();
         view.insert(
@@ -414,7 +414,7 @@ pub(crate) fn number<K: Ord>(
 
 /// The own key of a subject of structural admission's scope levels and the
 /// key that scopes it: a field's path under its entry's key, and an entry's
-/// key under the key of the profile that holds the entry (D15:2173).
+/// key under the key of the profile that holds the entry (D15:2174).
 fn structural_own(subject: &StructuralSubject) -> (Own<'_>, Option<Subject>) {
     use StructuralSubject as S;
     /// An identity in its view, or a key's content, which is a string.
@@ -552,7 +552,7 @@ fn fallback_subject(subject: &FallbackSubject) -> (Own<'_>, Option<Subject>) {
         FallbackSubject::Sources => (Own::Field(vec!["messageFallback"]), None),
         FallbackSubject::Source(key) => (locale_key(key), None),
         // The sequence is the value of its mapping entry: the empty path
-        // under that entry (D15:2184).
+        // under that entry (D15:2185).
         FallbackSubject::Sequence(source) => (Own::Field(Vec::new()), under(source)),
         FallbackSubject::Candidate(source, position) => (Own::Position(*position), under(source)),
         FallbackSubject::Literal(source, locale) => (locale_key(locale), under(source)),
@@ -670,7 +670,7 @@ fn conflict(group: &ConflictKey) -> Value {
     })
 }
 
-/// A normalized rule domain, `{ locales, surfaceClasses }` (D15:2487).
+/// A normalized rule domain, `{ locales, surfaceClasses }` (D15:2488).
 pub(super) fn rule_domain(domain: &Domain) -> Value {
     json!({
         "locales": domain.locales().iter().map(CanonicalLocale::as_str).collect::<Vec<_>>(),
@@ -698,7 +698,7 @@ pub(crate) mod fixtures {
 
     /// A digest of 31 bytes of `7` and a last byte, the one of the first mark
     /// the preimage contains, or `0`: records that only the last byte of
-    /// their digests tells apart, and records that collide (D15:2194).
+    /// their digests tells apart, and records that collide (D15:2195).
     pub(crate) struct LastByte<'a>(pub(crate) &'a [(&'a str, u8)]);
 
     impl Digest for LastByte<'_> {
@@ -1483,7 +1483,7 @@ mod tests {
     }
 
     /// One subject of each name in the frozen token vectors: every key
-    /// strategy, every compound identity view of D15:2468, and a content key
+    /// strategy, every compound identity view of D15:2469, and a content key
     /// of each JSON type a collection member can have.
     fn frozen_subjects() -> Vec<(&'static str, Subject)> {
         let member = |key| Subject::ArtifactCollection(CollectionSubject::Member(key));
@@ -1565,9 +1565,9 @@ mod tests {
     }
 
     /// Every strategy and projection, and every compound identity view, is
-    /// a frozen preimage and token that a Python script wrote from D15:2454
+    /// a frozen preimage and token that a Python script wrote from D15:2455
     /// and 2468 apart from this crate (`.plans/drafts/025-pr7/t2-vectors.py`;
-    /// D15:3319, 3358). Equal projected subjects in different owning scopes
+    /// D15:3444, 3483). Equal projected subjects in different owning scopes
     /// keep different tokens.
     #[test]
     fn every_strategy_and_compound_view_is_its_frozen_preimage_and_token() {
@@ -1609,7 +1609,7 @@ mod tests {
 
     /// Every identity key orders before every content key, and content keys
     /// order by their JSON type in the type order of Canonical content
-    /// identity, not by the bytes of the type's name (D15:2181, 2186, 3358).
+    /// identity, not by the bytes of the type's name (D15:2182, 2187, 3483).
     #[test]
     fn content_keys_follow_the_type_order_after_every_identity() {
         let member = |key| logical(&Subject::ArtifactCollection(CollectionSubject::Member(key)));
@@ -1737,7 +1737,7 @@ mod tests {
 
     /// A token compares by all 32 digest bytes and then by its ordinal,
     /// absence first: the higher ordinal of the lower digest precedes the
-    /// lower ordinal of a digest that differs only in its last byte (D15:735,
+    /// lower ordinal of a digest that differs only in its last byte (D15:736,
     /// 772, 812, 825).
     #[test]
     fn tokens_compare_by_every_digest_byte_then_the_ordinal() {

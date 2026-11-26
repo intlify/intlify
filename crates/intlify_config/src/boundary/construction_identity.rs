@@ -4,16 +4,16 @@
 //! 015's `resolver-construction-identity-reference` boundary: the Resolver
 //! Construction Identity an invocation names, admitted as the identity the
 //! resolver was constructed with or refused with one of the three reasons of
-//! its row (D15:1106, 3151).
+//! its row (D15:1107, 3156).
 //!
 //! The reference is the identity's text, `rci0_` and the unpadded base64url
 //! of its 32 bytes. The boundary's checks run in 015's order: a missing
 //! reference, then a text that is not a canonical identity, which includes a
 //! last character with non-zero unused bits, and last the comparison with the
-//! constructed identity, so a malformed text is never compared (D15:987,
+//! constructed identity, so a malformed text is never compared (D15:988,
 //! 3155). The boundary reads no capability bound and fixes no Safe Origin
 //! Kind. The admitted reference is the identity every outcome of the
-//! invocation carries; no phase changes it (D15:1150, 2147).
+//! invocation carries; no phase changes it (D15:1151, 2148).
 
 use crate::base64url;
 use crate::construction::identity::ConstructionIdentity;

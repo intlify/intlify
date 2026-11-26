@@ -2,31 +2,31 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! Design 015's Resolution Evidence projections: what reporting finalization
-//! makes of the slices each diagnostic domain committed (D15:1161-1183,
+//! makes of the slices each diagnostic domain committed (D15:1162-1184,
 //! 2143).
 //!
 //! Finalization only orders. Every record keeps the owner and bytes its slice
 //! committed it with, and no record is added, dropped, or moved to the other
-//! domain (D15:2143, 2211). A projection holds its records record kind by
-//! record kind, in 015's order of record kinds (D15:2518), and each kind's
+//! domain (D15:2144, 2212). A projection holds its records record kind by
+//! record kind, in 015's order of record kinds (D15:2519), and each kind's
 //! records in canonical order. The slices commit unit by unit in canonical
 //! unit order, so their order is already canonical for every kind but the
 //! evidence index: Findings in their total order and occurrences in theirs
-//! (D15:2213, 2389), Shared-unavailability causes by the Finding Keys they
-//! name (D15:1165), statuses and semantic dependencies by their owners, and
+//! (D15:2214, 2390), Shared-unavailability causes by the Finding Keys they
+//! name (D15:1166), statuses and semantic dependencies by their owners, and
 //! the decision table's records and the dependency records of one owner in
-//! the order their slice holds them (D15:1607, 1611; plan 025 interpretation
+//! the order their slice holds them (D15:1608, 1612; plan 025 interpretation
 //! #244). A slice holds an index
 //! record for each Evidence it is the first to refer to, so the domain's
-//! index is reordered by the Evidence comparisons (D15:840-842, 2505; plan
+//! index is reordered by the Evidence comparisons (D15:841-843, 2506; plan
 //! 025 interpretation #250).
 //!
 //! A domain that a bound exhausted also holds its terminal Finding and terminal
 //! state, which take its reserved slots rather than being records of a slice
-//! (D15:1972, 2408, 2518), and, without a Shared projection, the Entry reserve
+//! (D15:1973, 2409, 2519), and, without a Shared projection, the Entry reserve
 //! holds the Shared-unavailability cause that names the Entry terminal Finding
-//! (D15:2014). Resolution Evidence reserves no Rust struct or wire encoding
-//! (D15:1161), so the projection keeps them beside its records.
+//! (D15:2015). Resolution Evidence reserves no Rust struct or wire encoding
+//! (D15:1162), so the projection keeps them beside its records.
 
 use serde_json::Value;
 
@@ -173,7 +173,7 @@ mod tests {
     /// What `check` asserts of each domain's projection within every bound,
     /// with the domain's committed records, for each of three invocations: the
     /// complete one, `failing`'s, and `entered`'s, which materializes no value.
-    /// Each record's view is the one its bytes count (D15:2518).
+    /// Each record's view is the one its bytes count (D15:2519).
     fn each_projection(mut check: impl FnMut(&Projection<'_>, &[(&Unit, Retained<'_>)])) {
         each_viewed_projection(|projection, records, _| check(projection, records));
     }
@@ -234,7 +234,7 @@ mod tests {
     /// record kind in 015's order of record kinds, each with the owner and
     /// bytes it was committed with. Every kind but the evidence index keeps
     /// the order its slices committed it in; the three invocations hold all
-    /// twelve kinds between them (D15:2143, 2211, 2518).
+    /// twelve kinds between them (D15:2144, 2212, 2519).
     #[test]
     fn a_projection_groups_its_records_by_kind_and_keeps_each_kinds_order() {
         let mut kinds = BTreeSet::new();
@@ -260,10 +260,10 @@ mod tests {
     }
 
     /// One record of each of the twelve kinds is charged the frozen `C` of
-    /// its accounting view. A Python script wrote each view from D15:2472-2518
+    /// its accounting view. A Python script wrote each view from D15:2473-2519
     /// and framed it apart from this crate, reading only each row's strategy,
     /// scope, projection, severity, and blocking state from the committed
-    /// registries (`.plans/drafts/025-pr7/t2-vectors.py`; D15:3319).
+    /// registries (`.plans/drafts/025-pr7/t2-vectors.py`; D15:3444).
     #[test]
     fn each_record_kinds_accounting_view_is_its_frozen_vector() {
         let vectors: Value =
@@ -336,10 +336,10 @@ mod tests {
 
     /// Rejected envelopes and an unsafe vocabulary member reach retained
     /// records and Finding Occurrence Keys only as the `redacted-key` of their
-    /// JSON type, whose frozen tokens the vectors hold (D15:2468). Their raw
+    /// JSON type, whose frozen tokens the vectors hold (D15:2469). Their raw
     /// bodies, keys, secret-resolving locators, and direct digests are absent,
     /// the position each was submitted at changes nothing, and an injected
-    /// collision keeps the two keys apart by their ordinals (D15:825, 827,
+    /// collision keeps the two keys apart by their ordinals (D15:826, 828,
     /// 834, 3367).
     #[test]
     fn rejected_inputs_leave_nothing_raw_in_retained_records() {
@@ -427,7 +427,7 @@ mod tests {
 
     /// The index takes the Evidence comparisons, not the order of the slices
     /// that first referred to each Evidence, which differ for at least one of
-    /// the invocations; each Evidence has one index record (D15:840-842,
+    /// the invocations; each Evidence has one index record (D15:841-843,
     /// 2505; plan 025 interpretation #250).
     #[test]
     fn the_evidence_index_takes_the_evidence_order() {
@@ -450,7 +450,7 @@ mod tests {
     /// several units own: Findings in their total order, occurrences by
     /// Finding, primary Evidence, and ordinal, and statuses, causes, and
     /// semantic dependencies by their owners, with every kind's order checked
-    /// over at least two records (D15:2213, 2389; plan 025 interpretation
+    /// over at least two records (D15:2214, 2390; plan 025 interpretation
     /// #244).
     #[test]
     fn the_kinds_several_units_own_come_in_their_canonical_order() {
@@ -514,7 +514,7 @@ mod tests {
 
     /// A domain that a bound exhausted projects the prefix it committed as
     /// it projects it within every bound, and holds the terminal Finding and
-    /// state of how it was exhausted (D15:1185, 2211, 2408, 2518).
+    /// state of how it was exhausted (D15:1186, 2212, 2409, 2519).
     #[test]
     fn an_exhausted_domain_holds_its_terminal_finding_and_state() {
         failing().resolve(|evaluation, _| {
@@ -578,7 +578,7 @@ mod tests {
 
     /// Without a Shared projection, the reserve of the exhausted Entry domain
     /// also holds the Shared-unavailability cause that names its terminal
-    /// Finding (D15:2014, 2408).
+    /// Finding (D15:2015, 2409).
     #[test]
     fn without_a_value_the_entry_reserve_holds_the_unavailability_cause() {
         let (evaluation, causes) = entered();

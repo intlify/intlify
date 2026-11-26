@@ -6,7 +6,7 @@
 //! counting. Parsing stops only at the token bound or at the first byte that
 //! is not UTF-8 or not strict JSON. Past a duplicate member, a lone surrogate,
 //! or a number outside the Portable JSON Number domain it continues, so the
-//! complete file's facts are known (D15:802, Decision 015-150). Each fact
+//! complete file's facts are known (D15:803, Decision 015-150). Each fact
 //! keeps the internal structural path of its value or member: the parser
 //! follows the current path, and enters it into [`Paths`] only when a fact
 //! is found there, so a file without facts enters none. The raw-token index,

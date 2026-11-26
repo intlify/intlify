@@ -66,11 +66,11 @@ fn all_active_pairs_keep_distinct_owner_boundaries_and_exact_method_meaning() {
     assert_eq!(identities.len(), 20);
 }
 
-/// D15:2765, 2777, 2824; plan 025 decision #316: only an end-to-end
+/// D15:2766, 2780, 2829; plan 025 decision #316: only an end-to-end
 /// boundary names children, the component boundary of each phase its
 /// invocation runs, Phase 1's its entry's, and no boundary names a parent,
 /// so each component keeps its boundary. A replay's names those from
-/// structural analysis through the Shared projection stage (D15:2659, 2775).
+/// structural analysis through the Shared projection stage (D15:2660, 2776).
 #[test]
 fn an_end_to_end_boundary_names_the_component_boundaries_it_includes() {
     // No invocation builds an authoring model or constructs a resolver, and
@@ -1072,7 +1072,7 @@ fn actual_provider_description_is_supported_without_a_numeric_threshold() {
     }
 }
 
-/// D15:2773, 2775, 2792; D26:1527, 1534: only a construction and each entry's
+/// D15:2774, 2776, 2797; D26:1527, 1534: only a construction and each entry's
 /// complete invocation have a memory pair. Each invocation has a boundary of
 /// its own, whose interval is its duration's, with the same markers and the
 /// same component overlap, and states its entry, which the one cost does not
@@ -1260,7 +1260,7 @@ fn each_method_decodes_as_its_own_shape_and_a_mixed_one_as_neither() {
 /// Every interval leaves out what 015 keeps outside component intervals:
 /// fixture generation and input acquisition, timer or allocator setup,
 /// checksum observation and result validation, reporting, and teardown
-/// (D15:2824). Each duration and memory boundary names a marker for each and
+/// (D15:2829). Each duration and memory boundary names a marker for each and
 /// includes none of them.
 #[test]
 fn every_interval_excludes_the_work_015_keeps_outside_it() {

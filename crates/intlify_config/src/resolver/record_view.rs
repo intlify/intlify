@@ -2,7 +2,7 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! Design 015's record views of what an evaluation records: a unit, a Finding
-//! Key, a Finding, and an evaluation status (D15:2450, 2472-2492). Each view
+//! Key, a Finding, and an evaluation status (D15:2451, 2473-2493). Each view
 //! is a closed number-free JSON value, and `C` of it is the record's canonical
 //! bytes.
 //!
@@ -22,12 +22,12 @@
 //! not `none` (Decision 015-181). Its key determines the details: the reason,
 //! and the slot, component, or subject kind of the subject, come from the key,
 //! and only a bound and its counts come with the result, equal for every
-//! candidate of the key (D15:2381). A suggestion is a single-member object
+//! candidate of the key (D15:2382). A suggestion is a single-member object
 //! keyed by its kind (Decision 015-180).
 //!
 //! Accounting charges a retained ordinary record the bytes of its accounting
 //! view, `{ owner, record: { <record kind>: view } }`, which names the
-//! record's Evidence record owner as a unit view (D15:2518).
+//! record's Evidence record owner as a unit view (D15:2519).
 //!
 //! Nothing outside the tests takes a view yet: the Findings and statuses of
 //! Resolution Evidence come later (plan 025 PRs 5d to 5h).
@@ -73,7 +73,7 @@ pub(crate) struct RecordViews<'a> {
     tokens: Tokens,
     /// The token of the diagnostic domain, which the terminal
     /// reporting-limit Finding of an exhausted domain names while no unit is
-    /// recorded over it (D15:2359; plan 025 decision #227). The domain is the
+    /// recorded over it (D15:2360; plan 025 decision #227). The domain is the
     /// one subject of its kind, so its token is the same assigned alone.
     domain: Tokens,
 }
@@ -151,7 +151,7 @@ impl<'a> RecordViews<'a> {
 
     /// The view of the terminal state of the diagnostic domain `domain`, whose
     /// terminal Finding is `cause` and whose omitted slices start at
-    /// `cursor`'s: `{ domain, nextUnitCursor, cause }` (D15:2408, 2489).
+    /// `cursor`'s: `{ domain, nextUnitCursor, cause }` (D15:2409, 2490).
     ///
     /// # Errors
     ///
@@ -171,8 +171,8 @@ impl<'a> RecordViews<'a> {
     }
 
     /// The view of the Shared-unavailability cause that names the blocking
-    /// Entry Finding `key`: `{ cause }` (D15:2369, 2488). The unit of `key`
-    /// owns it (D15:2207).
+    /// Entry Finding `key`: `{ cause }` (D15:2370, 2489). The unit of `key`
+    /// owns it (D15:2208).
     ///
     /// # Errors
     ///
@@ -276,9 +276,9 @@ impl<'a> RecordViews<'a> {
 
     /// The accounting view of a record of kind `kind` whose view is `view`
     /// and whose Evidence record owner is `owner`: `{ owner, record: {
-    /// <record kind>: view } }` (D15:2518). Every view a test builds is
+    /// <record kind>: view } }` (D15:2519). Every view a test builds is
     /// checked against the Check Registry: the row of `owner`'s check must
-    /// list the record kind (D15:2251).
+    /// list the record kind (D15:2252).
     ///
     /// # Errors
     ///
@@ -331,7 +331,7 @@ fn details(finding: &Finding<'_>) -> Result<Option<Value>, ViewInvariant> {
 
 /// The value of `member` in `finding`'s details, from its key or from the
 /// bound the result carries, or none when the finding has none. A count is
-/// its decimal string, and a field its path from its key (D15:2231).
+/// its decimal string, and a field its path from its key (D15:2232).
 fn member_value(finding: &Finding<'_>, member: DetailsMember) -> Option<Value> {
     use DetailsMember as M;
     let key = finding.key;
@@ -391,13 +391,13 @@ fn member_value(finding: &Finding<'_>, member: DetailsMember) -> Option<Value> {
 }
 
 /// The schema-relative path of the field `unit` checks, as an array of the
-/// schema's member names, `*` standing for a map's entry (D15:2231): the root
+/// schema's member names, `*` standing for a map's entry (D15:2232): the root
 /// that the schema selection finds an object, and its `schemaVersion` member
-/// (D15:2291, 2292); a scope level's field, its subject's path from its
+/// (D15:2292, 2293); a scope level's field, its subject's path from its
 /// entry, the missing member's, the value's, or the object an undeclared
-/// member is in (D15:2184, 2291-2294); and an identity map's key, the map's
+/// member is in (D15:2185, 2292-2295); and an identity map's key, the map's
 /// path from the entry that holds it with `*` for the entry, as structural
-/// admission spells a map's entries (D15:2184, 2231).
+/// admission spells a map's entries (D15:2185, 2232).
 fn field(unit: &Unit) -> Option<Value> {
     use StructuralSubject as S;
     match (&unit.subject, unit.check) {
@@ -1078,7 +1078,7 @@ mod tests {
 
     /// A schema selection Finding's field is the path its check reads: the
     /// root it finds no object, or the root's `schemaVersion` member
-    /// (D15:2291, 2292).
+    /// (D15:2292, 2293).
     #[test]
     fn a_schema_selection_findings_field_is_the_path_its_check_reads() {
         use crate::resolver::structural_admission::selection;
@@ -1114,7 +1114,7 @@ mod tests {
 
     /// A Finding of the root's fields names the path of its unit's subject:
     /// the missing member's, the value's, or that of the object an undeclared
-    /// member is in (D15:2184, 2291-2294).
+    /// member is in (D15:2185, 2292-2295).
     #[test]
     fn a_root_field_findings_field_is_its_subjects_path() {
         use crate::resolver::structural_admission::StructuralSubject;
@@ -1158,7 +1158,7 @@ mod tests {
 
     /// A Finding of a level below the root names its field's path from the
     /// entry, and a key's Finding its map's path from the entry that holds
-    /// it with `*` for the entry (D15:2184, 2231).
+    /// it with `*` for the entry (D15:2185, 2232).
     #[test]
     fn a_finding_below_the_root_names_its_path_from_the_entry() {
         use crate::resolver::structural_admission::{EntryKey, Field, StructuralSubject as S};

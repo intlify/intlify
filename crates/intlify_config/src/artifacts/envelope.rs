@@ -158,7 +158,7 @@ pub(crate) struct ExactTuple {
 impl ExactTuple {
     /// 017's exact reference to the tuple, the five members a declaration
     /// writes: the view of an admitted envelope's canonical exact-reference
-    /// identity (D15:824, 834).
+    /// identity (D15:825, 835).
     pub(crate) fn view(&self) -> Value {
         json!({
             "kind": self.kind.spelling(),

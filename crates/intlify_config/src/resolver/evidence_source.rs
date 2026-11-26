@@ -4,7 +4,7 @@
 //! Design 015's configuration source evidence: the Portable Source Identity
 //! that a source's exact identity projects to, and the Portable Source Span
 //! admitted over that source's exact snapshot, with the order and view of each
-//! (D15:732-737, 745, 840, 2481, 2495; Decision 015-185). The Portable Source
+//! (D15:733-738, 746, 841, 2482, 2496; Decision 015-185). The Portable Source
 //! Locator keeps the form and order that `boundary::locator` gives it.
 //!
 //! The adapter or frontend that owns an identity domain supplies, with each
@@ -49,7 +49,7 @@ pub(crate) enum SourceIdentity {
 
 impl SourceIdentity {
     /// Project `identity`, which an input of `origin` supplied and whose owner
-    /// marked it non-secret when `marked` (D15:734-737).
+    /// marked it non-secret when `marked` (D15:735-738).
     ///
     /// # Errors
     ///
@@ -105,7 +105,7 @@ pub(crate) enum PortableSourceIdentity {
 
 impl PortableSourceIdentity {
     /// `{ "safe-opaque": hex }` or `{ "redacted": Token }`, the bytes in
-    /// lowercase hexadecimal (D15:2452, 2495).
+    /// lowercase hexadecimal (D15:2453, 2496).
     pub(crate) fn view(&self) -> Value {
         match self {
             Self::SafeOpaque(bytes) => json!({ "safe-opaque": hex(bytes) }),
@@ -126,19 +126,19 @@ pub(crate) struct SourceSpan {
 impl SourceSpan {
     /// Admit the candidate `[start, end)` over `snapshot`, the exact bytes of
     /// the source the span points into, or `None` for absence: an inverted
-    /// interval, or one that ends past the snapshot (D15:745).
+    /// interval, or one that ends past the snapshot (D15:746).
     pub(crate) fn admit(start: u64, end: u64, snapshot: &[u8]) -> Option<Self> {
         (start <= end && end <= count(snapshot.len())).then_some(Self { start, end })
     }
 
-    /// `{ start, end }`, each as its decimal string (D15:2452, 2481).
+    /// `{ start, end }`, each as its decimal string (D15:2453, 2482).
     pub(crate) fn view(self) -> Value {
         json!({ "start": self.start.to_string(), "end": self.end.to_string() })
     }
 }
 
 /// `bytes` as lowercase hexadecimal digits, two per byte, as a view writes a
-/// byte string that need not be UTF-8 (D15:2452).
+/// byte string that need not be UTF-8 (D15:2453).
 pub(crate) fn hex(bytes: &[u8]) -> String {
     let mut text = String::with_capacity(bytes.len() * 2);
     for byte in bytes {
@@ -334,7 +334,7 @@ mod tests {
     /// Unmarked identities compare by every digest byte and then by the
     /// ordinal: the digests here differ only in their last byte and run
     /// against the origins' order, and the second ordinal of the lower digest
-    /// precedes the first of the higher (D15:735, 3370).
+    /// precedes the first of the higher (D15:736, 3495).
     #[test]
     fn redacted_identities_order_by_every_digest_byte_then_the_ordinal() {
         let digest = LastByte(&[("configuration-programmatic", 1), ("configuration-file", 2)]);
@@ -380,7 +380,7 @@ mod tests {
 
     /// An unmarked identity's payload and the direct digest of it or of the
     /// whole identity reach neither the token's record nor its view
-    /// (D15:722, 735, 3370).
+    /// (D15:723, 736, 3495).
     #[test]
     fn an_unmarked_identity_keeps_no_payload_or_digest_of_it() {
         let payload = "t2-canary-source-payload";
@@ -408,7 +408,7 @@ mod tests {
 
     /// A `safe-opaque` identity is the owner's exact bytes: its domain and
     /// payload stay apart, and no decoding, normalization, collation, or case
-    /// folding merges or reorders two of them (D15:734, 739, 3369).
+    /// folding merges or reorders two of them (D15:735, 740, 3494).
     #[test]
     fn a_safe_opaque_identity_is_compared_as_exact_bytes() {
         let safe =
@@ -450,7 +450,7 @@ mod tests {
     }
 
     /// The identity a source keeps does not move with its revision, whatever
-    /// the source's bytes are, those that are no text included (D15:739, 743,
+    /// the source's bytes are, those that are no text included (D15:740, 744,
     /// 3369).
     #[test]
     fn a_safe_opaque_identity_is_unchanged_across_source_revisions() {

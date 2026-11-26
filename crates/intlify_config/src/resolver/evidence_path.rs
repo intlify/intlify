@@ -4,7 +4,7 @@
 //! Design 015's Evidence paths: the Logical input path that locates Entry
 //! Source Evidence before a complete value exists, and the Portable Value
 //! Locator that locates Materialized Value Evidence inside the materialized
-//! value, with the order and view of each (D15:755-758, 770-776, 842,
+//! value, with the order and view of each (D15:756-759, 771-777, 843,
 //! 2497-2499).
 //!
 //! The resolver walks an internal path, the exact member names and array
@@ -58,7 +58,7 @@ use super::origin::SafeOriginKind;
 use super::token::{RedactedToken, Specification};
 
 /// What `specification-admission` bound tells of a locale key: whether the
-/// Intlify conformance layer returns a canonical identifier for it (D15:776).
+/// Intlify conformance layer returns a canonical identifier for it (D15:777).
 pub(crate) trait LocaleKeys {
     fn canonicalizes(&self, key: &str) -> bool;
 }
@@ -80,7 +80,7 @@ pub(crate) struct KeyFacts<'a> {
 
 impl KeyFacts<'_> {
     /// The steps of `edges`, an internal path from the configuration root,
-    /// each member classified at its place in `schema` (D15:776).
+    /// each member classified at its place in `schema` (D15:777).
     pub(crate) fn steps<'e, Policy, Target>(
         &self,
         schema: &AuthoringSchema<Policy, Target>,
@@ -148,7 +148,7 @@ pub(crate) enum PathSegment {
 
 impl PathSegment {
     /// `{ "safe-member": name }`, `{ "array-index": decimal }`, or
-    /// `{ "redacted-member": Token }` (D15:2499).
+    /// `{ "redacted-member": Token }` (D15:2500).
     pub(crate) fn view(&self) -> Value {
         match self {
             Self::SafeMember(name) => json!({ "safe-member": name.as_ref() }),
@@ -216,7 +216,7 @@ fn measured(segments: &[Segment]) -> Vec<PathSegment> {
 
 /// What 015's path bounds count of a projected path: its segments, and the
 /// length of `C` of the view Evidence retains it as, each token written
-/// without a collision ordinal (D15:1834, 1835; plan 025 interpretations
+/// without a collision ordinal (D15:1835, 1836; plan 025 interpretations
 /// #234 and #238).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct PathSize {
@@ -247,7 +247,7 @@ pub(crate) struct InputPath(Vec<Segment>);
 
 impl InputPath {
     /// Project `steps`, the internal path from the root that an input of
-    /// `origin` supplied (D15:770-776).
+    /// `origin` supplied (D15:771-777).
     ///
     /// # Errors
     ///
@@ -267,7 +267,7 @@ impl InputPath {
     }
 
     /// What the path bounds count of the path: its segments and its view,
-    /// the array of their views (D15:2497).
+    /// the array of their views (D15:2498).
     pub(crate) fn size(&self) -> PathSize {
         PathSize::of(self.0.len(), &view(&measured(&self.0)))
     }
@@ -275,7 +275,7 @@ impl InputPath {
     /// What the path bounds count of the path `steps` project to, the
     /// [`Self::size`] of their projection under any origin, without
     /// projecting it: a redacted member is measured as a token without a
-    /// collision ordinal whatever its origin (D15:1851; plan 025 decision
+    /// collision ordinal whatever its origin (D15:1852; plan 025 decision
     /// #299).
     pub(crate) fn measure(steps: &[Step<'_>]) -> PathSize {
         let segments: Vec<PathSegment> = steps
@@ -306,7 +306,7 @@ pub(crate) struct LogicalInputPath(Vec<PathSegment>);
 
 impl LogicalInputPath {
     /// The array of its segments' views; the empty array is the input root
-    /// (D15:2497).
+    /// (D15:2498).
     pub(crate) fn view(&self) -> Value {
         view(&self.0)
     }
@@ -323,7 +323,7 @@ pub(crate) enum ValueLocation {
 impl ValueLocation {
     /// Project `steps`, the internal path from the root of the value that an
     /// input of `origin` supplied: the exact pointer when every member is
-    /// non-secret, and otherwise the redacted logical path (D15:755-758).
+    /// non-secret, and otherwise the redacted logical path (D15:756-759).
     ///
     /// # Errors
     ///
@@ -342,7 +342,7 @@ impl ValueLocation {
 
     /// What the path bounds count of the locator: an exact pointer's
     /// segments are its reference tokens, each led by `/`, and the view is
-    /// the variant's object (D15:2498).
+    /// the variant's object (D15:2499).
     pub(crate) fn size(&self) -> PathSize {
         let (segments, locator) = match self {
             Self::ExactJsonPointer(pointer) => (
@@ -392,7 +392,7 @@ pub(crate) enum PortableValueLocator {
 
 impl PortableValueLocator {
     /// `{ "exact-json-pointer": text }` or `{ "redacted-logical-path":
-    /// segment[] }` (D15:2498).
+    /// segment[] }` (D15:2499).
     pub(crate) fn view(&self) -> Value {
         match self {
             Self::ExactJsonPointer(pointer) => json!({ "exact-json-pointer": pointer.as_ref() }),
@@ -703,7 +703,7 @@ mod tests {
     /// Redacted members compare by every digest byte and then by the ordinal,
     /// whichever path holds them: the digests differ only in their last byte,
     /// and the second ordinal of the lower digest precedes the first of the
-    /// higher (D15:772, 774, 3379, 3382).
+    /// higher (D15:773, 775, 3504, 3507).
     #[test]
     fn redacted_members_order_by_every_digest_byte_then_the_ordinal() {
         let digest = LastByte(&[("configuration-file", 1), ("configuration-programmatic", 2)]);
@@ -748,7 +748,7 @@ mod tests {
     /// A name that classification finds unsafe reaches a token only as the
     /// `logical-input-path-member` projection: unequal names are one segment,
     /// and neither a name nor its direct digest is in the record or the view
-    /// (D15:772, 774, 3382).
+    /// (D15:773, 775, 3507).
     #[test]
     fn an_unsafe_name_and_its_digest_stay_out_of_its_token() {
         let comparable = comparable();
@@ -900,7 +900,7 @@ mod tests {
     /// Each ID key is kept when it matches the identifier syntax and is within
     /// the capability's bound for its own identifier; the schema goes on below
     /// a key over the bound, and below one outside the syntax, whose entry
-    /// structural admission evaluates (D15:2184, 3380).
+    /// structural admission evaluates (D15:2185, 3505).
     #[test]
     fn an_id_key_is_kept_within_its_identifiers_bound() {
         let comparable = comparable();
@@ -1009,7 +1009,7 @@ mod tests {
     /// Safe members order by their exact UTF-8 bytes in either path kind: a
     /// decomposed spelling before its composed one, and a supplementary
     /// character after U+FF5E, which UTF-16 code units would put first
-    /// (D15:770, 3381).
+    /// (D15:771, 3506).
     #[test]
     fn safe_members_compare_by_their_exact_utf8_bytes() {
         let names = ["Z", "a", "e\u{301}", "\u{e9}", "\u{ff5e}", "\u{1f600}"];
@@ -1033,7 +1033,7 @@ mod tests {
     /// The empty name and canonically equivalent spellings are never
     /// classified non-secret, at any place that holds dynamic keys, before
     /// or after the data is admitted. No name reaches the segment, so such
-    /// spellings of one name project alike (D15:770, 774, 3381).
+    /// spellings of one name project alike (D15:771, 775, 3506).
     #[test]
     fn an_empty_name_and_equivalent_spellings_are_never_non_secret() {
         let comparable = comparable();
@@ -1080,7 +1080,7 @@ mod tests {
 
     /// Indices ascend numerically over the whole unsigned 64-bit range in
     /// either path kind, where their decimal text would not, and each keeps
-    /// only its decimal digits (D15:771, 3381).
+    /// only its decimal digits (D15:772, 3506).
     #[test]
     fn array_indices_ascend_over_the_unsigned_64_bit_range() {
         let indices = [0, 1, 9, 10, u64::from(u32::MAX) + 1, u64::MAX - 1, u64::MAX];

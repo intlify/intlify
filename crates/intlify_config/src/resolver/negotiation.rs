@@ -10,12 +10,12 @@
 //! Phase 7 did. A subject names a key or destination as Phase 7 did: by its
 //! canonical identity, or by its spelling when it has none.
 //!
-//! Each Finding is observed where its check looked (D15:2249): past the bound,
+//! Each Finding is observed where its check looked (D15:2250): past the bound,
 //! the alias map, beside the confirmed policy, which supplies the bound; a key
-//! two entries name, at each entry's key beside the others' (D15:2387, 2410);
+//! two entries name, at each entry's key beside the others' (D15:2388, 2411);
 //! and a destination outside the requested locales, at each entry's value
 //! naming it, beside the requested locales, a set that counts as one location.
-//! An entry's key is classified by the canonicalizer Phase 5 bound (D15:776).
+//! An entry's key is classified by the canonicalizer Phase 5 bound (D15:777).
 
 use std::collections::BTreeMap;
 
@@ -82,8 +82,8 @@ impl<Id> NegotiationProfile<Id> {
 /// `observer` when the declaration's file is there; the caller hands it what
 /// Phase 5 bound. Every unit waits on the alias bound, which counts each
 /// submitted entry, whatever its destination, before any collision is looked
-/// for (D15:1898); the profile exists only when every unit passed and every
-/// entry, and all else under `localeNegotiation`, was admitted (D15:2418).
+/// for (D15:1899); the profile exists only when every unit passed and every
+/// entry, and all else under `localeNegotiation`, was admitted (D15:2419).
 pub(crate) fn resolve_negotiation<Id: Clone>(
     evaluation: &mut Evaluation,
     policy: Result<&ConfirmedPolicy, &Causes>,
@@ -168,7 +168,7 @@ fn by_key(entries: &[AliasLocales]) -> BTreeMap<&LocaleKey, Vec<(usize, &AliasLo
 
 /// The key's unit: two entries naming one canonical key are a duplicate whose
 /// reason their destinations give, found at each entry's key beside the
-/// others' keys (D15:2387, 2410).
+/// others' keys (D15:2388, 2411).
 fn unique(
     evaluation: &mut Evaluation,
     bounded: &Admitted<()>,
@@ -232,7 +232,7 @@ fn duplicate<'a>(
 /// The destinations by their subject under their key's subject, each with
 /// the ranks of the entries naming it: entries whose keys and destinations
 /// share their subjects are one unit, each entry one occurrence of it. A
-/// destination without a spelling names no subject (D15:1477, 2367).
+/// destination without a spelling names no subject (D15:1478, 2368).
 fn destinations(
     entries: &[AliasLocales],
 ) -> BTreeMap<(&LocaleKey, &LocaleKey), (&Spelled, Vec<usize>)> {
@@ -252,7 +252,7 @@ fn destinations(
 /// A destination's unit: its canonical locale must be one of the project's
 /// requested locales. One outside them is found at each entry's value naming
 /// it, beside the requested locales, a set that counts as one location
-/// (D15:2249, 2387).
+/// (D15:2250, 2388).
 fn member(
     evaluation: &mut Evaluation,
     (bounded, requested): (&Admitted<()>, &KnownSet),
@@ -576,7 +576,7 @@ mod tests {
                     Some(reason)
                 )]
             );
-            // Each entry is found at its key, beside the other's (D15:2387,
+            // Each entry is found at its key, beside the other's (D15:2388,
             // 2410).
             assert_eq!(
                 observed(&resolved.evaluation),
@@ -672,7 +672,7 @@ mod tests {
             )]
         );
         // Found at the entry's destination, beside the requested locales, a
-        // set that counts as one location (D15:2249).
+        // set that counts as one location (D15:2250).
         let (destination, requested) = at(&declaration, |observer| {
             (
                 observer.ranked_value(&ALIASES, 0).unwrap(),
@@ -701,7 +701,7 @@ mod tests {
 
     /// Entries sharing a key and a destination are one unit of each, and
     /// each entry is a candidate of both: at its key, beside the other's, and
-    /// at its destination, beside the requested locales (D15:2387).
+    /// at its destination, beside the requested locales (D15:2388).
     #[test]
     fn entries_sharing_a_key_and_a_destination_are_each_a_candidate_of_both() {
         let declaration = declared(&["en"], json!({"EN": "fr", "en": "fr"}));
@@ -766,7 +766,7 @@ mod tests {
             )]
         );
         // Past it, the map is observed beside the confirmed policy, which
-        // supplies the bound (D15:2249).
+        // supplies the bound (D15:2250).
         assert_eq!(
             observed(&resolved.evaluation),
             [(
@@ -857,7 +857,7 @@ mod tests {
 
     /// A destination that failed counts under the bound, which is measured
     /// exactly, and names no subject, while the entry beside it is found
-    /// outside the requested locales at its own rank (D15:1477, 1898, 2367).
+    /// outside the requested locales at its own rank (D15:1478, 1899, 2368).
     #[test]
     fn a_failed_destination_counts_and_holds_back_only_itself() {
         let declaration = declared(&["en"], json!({"de": "en", "fr": "ja"}));

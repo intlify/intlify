@@ -11,11 +11,11 @@
 //! final Finding/Evidence construction. Consumers cannot obtain a checked Profile.
 //!
 //! The evaluation also records a candidate for each applicable evaluation of a
-//! structural check (D15:2173), keyed by the identity map entry that scopes it
-//! and its logical field path from that entry (D15:2184). An `anyOf` is one
+//! structural check (D15:2174), keyed by the identity map entry that scopes it
+//! and its logical field path from that entry (D15:2185). An `anyOf` is one
 //! closed-value evaluation of its value: what its branches evaluate records no
 //! candidate. The value of an entry whose key lacks the identifier syntax is
-//! evaluated as well, under that entry (D15:2184, 2190).
+//! evaluated as well, under that entry (D15:2185, 2191).
 
 use crate::input_limits::Bound;
 use crate::materialize::{Locus, MaterializedDocument, NodeId, NodeKind, ObjectMember};
@@ -271,7 +271,7 @@ impl<'input> Walker<'input> {
 
     /// The level of the entries of the identity map at `position`: 015's
     /// scope levels are the root, an entry of its `profiles`, and an entry of
-    /// a declaration's `targetProfiles` or `deploymentGroups` (D15:2173).
+    /// a declaration's `targetProfiles` or `deploymentGroups` (D15:2174).
     fn level_below(&self, position: Position) -> Result<Level, EvaluationFailure> {
         let level = self.facts.scope(position.scope).level;
         let steps = self.facts.steps(position.path);
@@ -288,7 +288,7 @@ impl<'input> Walker<'input> {
 
     /// Records the key of an identity map entry, whose map is at `position`,
     /// and gives the position of the entry's value: the empty path under the
-    /// entry (D15:2184).
+    /// entry (D15:2185).
     fn entry(
         &mut self,
         position: Position,
@@ -359,7 +359,7 @@ impl<'input> Walker<'input> {
                 self.value_issue(IssueKind::TypeInvalid, id, subject);
                 self.fragment(id, subject, FragmentState::TypeUnavailable);
                 // The checks of the same path that need the type leave this
-                // value to the type check (D15:2184).
+                // value to the type check (D15:2185).
                 if constrains_value(schema) {
                     self.record(
                         Check::Value,
@@ -586,7 +586,7 @@ impl<'input> Walker<'input> {
                             // A key without the identifier syntax still
                             // scopes its value, which structural admission
                             // evaluates, while later phases have no subject
-                            // for the entry (D15:2184, 2190).
+                            // for the entry (D15:2185, 2191).
                             let entry = self.entry(position, level, subject, member, false);
                             self.walk(child, member.value(), entry)?;
                         } else {

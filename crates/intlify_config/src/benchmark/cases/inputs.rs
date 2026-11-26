@@ -74,7 +74,7 @@ pub(in crate::benchmark) enum Recipe {
 
 impl Recipe {
     /// The entry kind of a case whose cost both entry kinds have: a file or a
-    /// programmatic entry's invocation for an Evidence stage (D15:2792; plan
+    /// programmatic entry's invocation for an Evidence stage (D15:2797; plan
     /// 025 decision #255). `None` for every other case, whose cost names its
     /// entry or has none.
     pub(in crate::benchmark) const fn entry_kind(self) -> Option<super::EntryKind> {

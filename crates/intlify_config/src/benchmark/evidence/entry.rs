@@ -2,7 +2,7 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! 015's Entry projection stage over one file entry's complete invocation
-//! (D15:2771, 2775). The stage takes what the Shared projection stage left,
+//! (D15:2772, 2776). The stage takes what the Shared projection stage left,
 //! so before the interval the invocation's evaluation phases and the Shared
 //! projection stage run on an evaluation of their own; the interval runs the
 //! Entry projection stage: path admission, the complete invocation's Evidence
@@ -41,7 +41,7 @@ pub(in crate::benchmark) fn entry<'e, 'a>(
 }
 
 /// What the complete invocation counts under the six `evidenceMetadata`
-/// bounds the resolver applies itself, in their units (D15:1834-1839, 1851):
+/// bounds the resolver applies itself, in their units (D15:1835-1840, 1852):
 /// the largest path Evidence needs, by its segments and by the canonical
 /// bytes of its view, since each path is checked on its own, and, over what
 /// path admission leaves, the raw candidates, the token inputs, and the
@@ -188,7 +188,7 @@ pub(in crate::benchmark) fn require_observable(
 
 /// The Entry projection, all of it entry-specific Evidence, framed in the
 /// entry checksum domain. The stage has no Shared semantic output, so its
-/// shared domain frames nothing (D15:175, 2794; plan 025 interpretation
+/// shared domain frames nothing (D15:176, 2799; plan 025 interpretation
 /// #259).
 pub(in crate::benchmark) fn observe(resolved: &Resolved) -> Result<Observation, OutputFailure> {
     let retained = require_observable(resolved)?;
@@ -240,7 +240,7 @@ mod tests {
 
     /// The example's file with its default locale twice: a duplicate member,
     /// so no value, and the duplicate's Logical input path the only path
-    /// Evidence carries (D15:780, 3440).
+    /// Evidence carries (D15:781, 3565).
     fn duplicate(metadata: EvidenceMetadataLimits) -> Resolved {
         let member = br#""defaultRequestedLocale":"en""#;
         let mut prepared = prepared(R::Storefront);
@@ -269,7 +269,7 @@ mod tests {
     /// Each recipe's Entry domain commits whole: the example's with no Entry
     /// Finding, the dense one's with an occurrence of each of its Shared
     /// Findings, and the malformed one's with the Finding that leaves it
-    /// without a value and the cause that names it (D15:1165, 1176-1183).
+    /// without a value and the cause that names it (D15:1166, 1177-1184).
     #[test]
     fn each_recipe_commits_the_entry_domain_whole() {
         for recipe in R::ENTRY {
@@ -290,7 +290,7 @@ mod tests {
     }
 
     /// The stage commits exactly the records of the outcome's Entry
-    /// projection, which finalization only orders (D15:2143).
+    /// projection, which finalization only orders (D15:2144).
     #[test]
     fn the_stage_commits_the_records_of_the_entry_projection() {
         for recipe in R::ENTRY {
@@ -329,7 +329,7 @@ mod tests {
 
     /// A Logical input path is a path Evidence needs: without a value the
     /// duplicate member's is the largest, and one under its size it is left
-    /// absent, which leaves the Entry domain whole (D15:776).
+    /// absent, which leaves the Entry domain whole (D15:777).
     #[test]
     fn the_largest_path_of_a_file_without_a_value_is_its_logical_input_path() {
         let resolved = duplicate(unbounded());
@@ -346,7 +346,7 @@ mod tests {
     /// Phase 1 projects the duplicate's Logical input path only within the
     /// path bounds, yet the path is still measured past them: one under
     /// either size, the largest path the complete invocation counts is the
-    /// same as without the bound (D15:1851; plan 025 decision #299).
+    /// same as without the bound (D15:1852; plan 025 decision #299).
     #[test]
     fn a_logical_input_path_past_its_bound_is_still_measured() {
         let work = duplicate(unbounded()).invocation;
@@ -470,7 +470,7 @@ mod tests {
 
     /// An Entry domain a diagnostic bound exhausts is retained with its
     /// terminal cursor and the bound, and observed apart from the one
-    /// committed whole (D15:2408).
+    /// committed whole (D15:2409).
     #[test]
     fn an_exhausted_entry_domain_is_retained_and_observed_with_its_bound() {
         let records = BoundId {
@@ -491,7 +491,7 @@ mod tests {
 
     /// Each recipe's Entry projection has its own checksum, the same each
     /// time it is observed, and the shared domain frames nothing, the same
-    /// for every recipe (D15:2794; plan 025 interpretation #259).
+    /// for every recipe (D15:2799; plan 025 interpretation #259).
     #[test]
     fn every_recipe_has_its_own_entry_observation_and_an_empty_shared_domain() {
         let empty = Frame::new("entry-evidence-shared").finish();

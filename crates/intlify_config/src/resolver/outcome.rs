@@ -3,38 +3,38 @@
 
 //! Design 015's resolver outcome: what profile projection (Phase 14) and
 //! reporting finalization (Phase 15) make of one invocation, exactly one
-//! checked or blocked outcome (D15:1150-1166, 2142-2143).
+//! checked or blocked outcome (D15:1151-1167, 2143-2144).
 //!
 //! Every outcome carries the Resolver Construction Identity that construction
 //! and the pre-invocation boundary fixed, which no phase creates or changes
-//! (D15:1150, 1155, 2147), and one Resolution Evidence bundle: the Entry
+//! (D15:1151, 1156, 2148), and one Resolution Evidence bundle: the Entry
 //! projection, and the Shared projection once the entry materialized a value,
 //! or else `shared: null` with the canonical set of blocking Entry Finding
-//! Keys that explains why (D15:1161-1166, 2369). The bundle is complete
-//! unless a bound exhausted a domain (D15:1157, 1163, 2408).
+//! Keys that explains why (D15:1162-1167, 2370). The bundle is complete
+//! unless a bound exhausted a domain (D15:1158, 1164, 2409).
 //!
 //! An outcome is checked exactly when its bundle is complete and the
 //! invocation found no blocking Finding. Each result a check lacks waits on a
 //! blocking Finding, so a value was then materialized, the whole root
 //! admitted, every check evaluated, and every result profile projection needs
-//! established (D15:1152, 1157, 1185, 2142, 2369). Only a checked outcome
+//! established (D15:1153, 1158, 1186, 2143, 2370). Only a checked outcome
 //! carries the profile view and its Resolved Profile Artifact Bindings; a
 //! blocked one carries neither, however many results were established
-//! (D15:1153, 1159). Before it decides, reporting finalization verifies what
+//! (D15:1154, 1160). Before it decides, reporting finalization verifies what
 //! the earlier stages fixed, and the outcome's reserved records fit the
 //! mandatory reserve ([`super::finalization`]).
 //!
 //! The outcome comes in three crate-private stages, which the
 //! `profile_evidence_materialize` benchmark measures one at a time
-//! (D15:2771, 2775): the Shared projection, which counts the Shared scope's
+//! (D15:2772, 2776): the Shared projection, which counts the Shared scope's
 //! Evidence metadata work and plans the Shared domain's slices; the Entry
 //! projection, which then admits the paths of every candidate's Evidence,
 //! counts the complete invocation's work, and plans the Entry domain's; and
 //! outcome finalization, which orders each domain's records, verifies them,
-//! and projects the profile (D15:1851, 2143; plan 025 decision #253). The
+//! and projects the profile (D15:1852, 2144; plan 025 decision #253). The
 //! Shared projection stage reads no entry input, so a replay of a
 //! Materialized Resolution Input Set runs it as an invocation does and then
-//! finalizes the Shared domain alone ([`replayed`], D15:2659).
+//! finalizes the Shared domain alone ([`replayed`], D15:2660).
 
 use crate::construction::identity::ConstructionIdentity;
 
@@ -51,19 +51,19 @@ use super::resolution_evidence::{Projection, Terminal};
 use super::specification::SupportedSpecifications;
 use super::token::{Digest, Specification};
 
-/// One invocation's Resolution Evidence bundle (D15:1161-1166).
+/// One invocation's Resolution Evidence bundle (D15:1162-1167).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ResolutionEvidence<'e> {
     /// The Entry projection, which every bundle has.
     pub(crate) entry: Projection<'e>,
     /// The Shared projection once the entry materialized a value; without
-    /// one, `shared: null` (D15:1165).
+    /// one, `shared: null` (D15:1166).
     pub(crate) shared: Option<Projection<'e>>,
 }
 
 impl<'e> ResolutionEvidence<'e> {
     /// The terminal state of each exhausted domain, Entry before Shared
-    /// (D15:2408).
+    /// (D15:2409).
     pub(crate) fn terminal_states(&self) -> impl Iterator<Item = &Terminal<'e>> {
         std::iter::once(&self.entry)
             .chain(&self.shared)
@@ -71,7 +71,7 @@ impl<'e> ResolutionEvidence<'e> {
     }
 
     /// Whether the bundle is complete: no bound exhausted a domain, the only
-    /// way a revision-`"0"` bundle is incomplete (D15:1157, 1163, 2408).
+    /// way a revision-`"0"` bundle is incomplete (D15:1158, 1164, 2409).
     pub(crate) fn complete(&self) -> bool {
         self.terminal_states().next().is_none()
     }
@@ -79,7 +79,7 @@ impl<'e> ResolutionEvidence<'e> {
     /// The canonical shared-unavailability cause set, in Finding order: the
     /// blocking Entry Finding Keys that the Entry projection's cause records
     /// name, and last, when the Entry reserve holds the cause that names it,
-    /// the Entry terminal Finding Key (D15:1165, 2014, 2408). Only an
+    /// the Entry terminal Finding Key (D15:1166, 2015, 2409). Only an
     /// invocation without a Shared projection has either, and it always has
     /// one or the other, so the set is empty exactly when the Shared
     /// projection is present.
@@ -104,8 +104,8 @@ impl<'e> ResolutionEvidence<'e> {
 
 /// A checked outcome's profile: its view, which profile equality compares
 /// and the profile semantic digest covers, and its Resolved Profile Artifact
-/// Bindings (D15:1152, 2142). A replay carries one too when the shared
-/// result admits it, though a replay is no outcome (D15:2659).
+/// Bindings (D15:1153, 2143). A replay carries one too when the shared
+/// result admits it, though a replay is no outcome (D15:2660).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Checked<'e, 's> {
     pub(crate) profile: ProfileView,
@@ -113,17 +113,17 @@ pub(crate) struct Checked<'e, 's> {
 }
 
 /// One invocation's outcome: checked when it carries a profile, and
-/// otherwise blocked (D15:1150-1153).
+/// otherwise blocked (D15:1151-1154).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Outcome<'e, 's> {
-    /// The Resolver Construction Identity both outcomes carry (D15:1150,
+    /// The Resolver Construction Identity both outcomes carry (D15:1151,
     /// 1155).
     pub(crate) identity: ConstructionIdentity,
     pub(crate) checked: Option<Checked<'e, 's>>,
     pub(crate) evidence: ResolutionEvidence<'e>,
 }
 
-/// What the Shared projection stage leaves (D15:2775): the reporting of the
+/// What the Shared projection stage leaves (D15:2776): the reporting of the
 /// Shared domain, the Evidence metadata work of the Shared scope, and the
 /// slices the Shared domain committed.
 #[derive(Debug)]
@@ -142,7 +142,7 @@ impl<'e> SharedStage<'e, '_> {
     }
 }
 
-/// What the Entry projection stage leaves (D15:2775): the reporting of both
+/// What the Entry projection stage leaves (D15:2776): the reporting of both
 /// domains and the slices each committed.
 #[derive(Debug)]
 pub(crate) struct EntryStage<'e, 'a> {
@@ -163,12 +163,12 @@ impl<'e> EntryStage<'e, '_> {
 /// `invoked` left ([`super::profile_resolution::invoke_file`] or
 /// [`super::profile_resolution::invoke_programmatic`]), under
 /// `identity`: its three stages in turn, the Shared projection, the Entry
-/// projection, and outcome finalization (D15:2771, 2775; plan 025 decision
+/// projection, and outcome finalization (D15:2772, 2776; plan 025 decision
 /// #253). The subject and evidence tokens `digest` assigns once the
 /// resolver's own Evidence metadata work is within the capability's
 /// `evidenceMetadata` bounds, and each domain reports under the capability's
 /// `policyComparable` bounds until Phase 4 admits a Resource Limit Policy,
-/// and under the Policy's from then on (D15:1851, 2391).
+/// and under the Policy's from then on (D15:1852, 2392).
 ///
 /// # Errors
 ///
@@ -191,8 +191,8 @@ pub(crate) fn outcome<'e, 's, Id: AsRef<str>>(
 /// scope of the invocation `evaluation` recorded and `invoked` left, whose
 /// subject tokens `digest` assigns once it is within the capability's
 /// `evidenceMetadata` bounds, and then the slices of the Shared domain
-/// (D15:1851, 2771, 2775; plan 025 decision #253). Without a value no unit
-/// reports into the Shared domain, which then commits nothing (D15:2369).
+/// (D15:1852, 2772, 2776; plan 025 decision #253). Without a value no unit
+/// reports into the Shared domain, which then commits nothing (D15:2370).
 ///
 /// # Errors
 ///
@@ -207,7 +207,7 @@ pub(crate) fn shared_projection<'e, 'a, Id: AsRef<str>>(
 }
 
 /// The Shared projection stage over `state`, the semantic state or the
-/// causes of its absence, which reads no entry input (D15:1851, 2659).
+/// causes of its absence, which reads no entry input (D15:1852, 2660).
 fn shared_stage<'e, 'a, Id: AsRef<str>>(
     evaluation: &'e Evaluation,
     state: Result<&'e SemanticState<'_, Id>, &'e Causes>,
@@ -240,7 +240,7 @@ fn shared_stage<'e, 'a, Id: AsRef<str>>(
 /// path admission and the Evidence metadata work of the complete invocation,
 /// whose remaining subject tokens and evidence tokens `digest` assigns once
 /// it is within the capability's `evidenceMetadata` bounds, and then the
-/// slices of the Entry domain (D15:1851, 2771, 2775; plan 025 decision
+/// slices of the Entry domain (D15:1852, 2772, 2776; plan 025 decision
 /// #253).
 ///
 /// # Errors
@@ -281,10 +281,10 @@ pub(crate) fn entry_projection<'e, 'a, Id: AsRef<str>>(
 }
 
 /// Outcome finalization, after the Entry projection stage `stage`, under
-/// `identity` (D15:2771, 2775): each domain's projection in canonical order,
+/// `identity` (D15:2772, 2776): each domain's projection in canonical order,
 /// reporting finalization's verification of what the earlier stages fixed,
 /// the profile that Phase 14 projects for a checked outcome, and the
-/// mandatory reserve (D15:1150-1166, 2142-2143).
+/// mandatory reserve (D15:1151-1167, 2143-2144).
 ///
 /// # Errors
 ///
@@ -305,7 +305,7 @@ pub(crate) fn finalize<'e, 's, Id: AsRef<str>>(
     let state = invoked.state.as_ref();
     let entry = Projection::finalized(&reporting, ReportingDomain::Entry, reported.entry)?;
     // Without a value no unit reports into the Shared domain, whose
-    // projection is then absent (D15:2369).
+    // projection is then absent (D15:2370).
     let shared = state
         .is_ok()
         .then(|| Projection::finalized(&reporting, ReportingDomain::Shared, reported.shared))
@@ -332,14 +332,14 @@ pub(crate) fn finalize<'e, 's, Id: AsRef<str>>(
 
 /// What a replay of a Materialized Resolution Input Set reports of the
 /// semantic state `state` that `evaluation` recorded under `invocation`
-/// (D15:2659): the Shared projection stage as an invocation's, then the
+/// (D15:2660): the Shared projection stage as an invocation's, then the
 /// Shared projection in canonical order, verified by reporting finalization
 /// within the Shared domain, and the profile Phase 14 projects only when the
 /// Shared domain is complete and the replayed phases found no blocking
 /// Finding. Every check is then evaluated, since each one held back waits on
-/// a blocking Finding (D15:2142, 2369). Without an entry there is no Entry
+/// a blocking Finding (D15:2143, 2370). Without an entry there is no Entry
 /// projection and no outcome, so neither the bundle's checks nor the
-/// mandatory reserve, which holds the outcome envelope, apply (D15:2143,
+/// mandatory reserve, which holds the outcome envelope, apply (D15:2144,
 /// 2518).
 ///
 /// # Errors
@@ -381,7 +381,7 @@ fn policy<'e, Id>(state: Option<&'e SemanticState<'_, Id>>) -> Option<&'e Diagno
 }
 
 /// The profile of `state` when no blocking Finding holds a result back: its
-/// view and its bindings (D15:1152, 2142).
+/// view and its bindings (D15:1153, 2143).
 ///
 /// # Errors
 ///
@@ -524,7 +524,7 @@ pub(crate) mod tests {
     /// `complete`'s profile without its project default and with a target
     /// locale that is no locale. The two are independent: the default's
     /// Finding holds back what inherits it, and Phase 7 still finds the
-    /// target's locale (D15:2367, 3446; plan 025 interpretation #252).
+    /// target's locale (D15:2368, 3571; plan 025 interpretation #252).
     pub(crate) fn blocked() -> Inputs {
         let mut inputs = Inputs::complete();
         let declaration = inputs.declaration();
@@ -539,7 +539,7 @@ pub(crate) mod tests {
     /// 015's example with every input it needs is checked: the outcome
     /// carries the identity, a complete bundle with both projections and no
     /// Finding, and the profile view Phase 14 projects with the invocation's
-    /// bindings (D15:1150, 1152, 3441).
+    /// bindings (D15:1151, 1153, 3566).
     #[test]
     fn the_example_is_checked_with_its_identity_and_a_complete_bundle() {
         let inputs = reporting(&Inputs::complete(), &[], &[]);
@@ -565,7 +565,7 @@ pub(crate) mod tests {
 
     /// A non-canonical spelling is a warning that suggests its canonical
     /// replacement: the outcome stays checked, the Shared projection holding
-    /// the Finding and the Entry projection its occurrence (D15:1157, 2308,
+    /// the Finding and the Entry projection its occurrence (D15:1158, 2309,
     /// 3441).
     #[test]
     fn a_non_canonical_spelling_leaves_the_outcome_checked_with_its_warning() {
@@ -601,7 +601,7 @@ pub(crate) mod tests {
 
     /// A file that is no JSON is blocked without a Shared projection: its
     /// complete bundle holds the blocking Entry Findings, and their keys are
-    /// the shared-unavailability causes (D15:1153, 1165, 2369, 3440).
+    /// the shared-unavailability causes (D15:1154, 1166, 2370, 3565).
     #[test]
     fn a_file_that_is_no_json_is_blocked_without_a_shared_projection() {
         reporting(&Inputs::complete(), &[], &[]).outcome(
@@ -632,7 +632,7 @@ pub(crate) mod tests {
     /// A Phase 0 Finding blocks the outcome beside a complete Shared
     /// projection, in which the owner of the group it leaves unestablished
     /// is not evaluated, its status naming the Entry-owned Phase 0 Finding as
-    /// its cause (D15:1125, 2145, 2369, 2516; plan 025 interpretation #257).
+    /// its cause (D15:1126, 2146, 2370, 2517; plan 025 interpretation #257).
     #[test]
     fn the_shared_projection_names_a_phase_0_finding_as_a_cause() {
         let mut inputs = Inputs::complete();
@@ -666,7 +666,7 @@ pub(crate) mod tests {
         });
     }
 
-    /// D15:2298, 2299, 3427: a missing `project-profile` assertion is the
+    /// D15:2299, 2300, 3552: a missing `project-profile` assertion is the
     /// blocking `project-profile-specification-input-incomplete` Finding,
     /// whose details name the slot, and another Profile Specification
     /// identity or revision is the blocking
@@ -724,7 +724,7 @@ pub(crate) mod tests {
     /// slice, and every domain is exhausted at its first unit, each terminal
     /// Finding naming the bound by its capability path. Past only a count of
     /// the complete invocation, only the Entry domain is, and the Shared
-    /// projection is the one within every bound (D15:1851, 2408; plan 025
+    /// projection is the one within every bound (D15:1852, 2409; plan 025
     /// decisions #229, #231, #247, and #253).
     #[test]
     fn an_evidence_metadata_bound_exhausts_the_domains_of_its_scope() {
@@ -799,7 +799,7 @@ pub(crate) mod tests {
     /// complete Shared projection, which holds both Findings and the status of
     /// every unit after entry; those waiting on the missing default are not
     /// evaluated, with its key among their causes. The projection retains only
-    /// the dependencies and decision records admission established (D15:1153,
+    /// the dependencies and decision records admission established (D15:1154,
     /// 1185, 2369, 3442, 3444).
     #[test]
     fn findings_after_materialization_block_the_outcome_beside_a_shared_projection() {
@@ -836,7 +836,7 @@ pub(crate) mod tests {
             // Only what admission established is retained: the materialized
             // dependency of every slot, each established group's semantic
             // dependency while the owners of the others wait, and the
-            // decision table's records once the table is complete (D15:1185,
+            // decision table's records once the table is complete (D15:1186,
             // 1609, 2516, 3444).
             let retained = |kind| -> Vec<(Unit, Value)> {
                 let records = shared.records.iter();
@@ -876,7 +876,7 @@ pub(crate) mod tests {
 
     /// A structural failure of one reference or target no longer holds the
     /// selection back, and the phases after it run, but a profile needs the
-    /// whole root, so the outcome stays blocked (D15:2142, 2367; plan 025
+    /// whole root, so the outcome stays blocked (D15:2143, 2368; plan 025
     /// decision #342).
     #[test]
     fn a_confirmed_selection_beside_a_structural_failure_stays_blocked() {
@@ -905,7 +905,7 @@ pub(crate) mod tests {
     /// warning's occurrence, the Shared one past its `maxRecords` or, at the
     /// second warning, its `maxFindings`, or both. The complete Entry
     /// projection keeps the occurrences of the Shared Findings omitted with
-    /// the Shared suffix (D15:1157, 1185, 2408, 3443, 3450).
+    /// the Shared suffix (D15:1158, 1186, 2409, 3568, 3575).
     #[test]
     fn an_exhausted_domain_blocks_an_outcome_no_finding_blocks() {
         let occurrences = (entry("maxFindingOccurrences"), 1);
@@ -961,7 +961,7 @@ pub(crate) mod tests {
     /// Entry occurrences: either domain holds at three, a Shared `maxFindings`
     /// of one holding the merged Finding, and refuses the Finding's slice at
     /// two, keeping only what the units before it committed, while the other
-    /// domain keeps its whole projection (D15:1946, 1962, 1970, 2211, 3450,
+    /// domain keeps its whole projection (D15:1947, 1963, 1971, 2212, 3575,
     /// 3452).
     #[test]
     fn each_domain_counts_every_finding_candidate_before_equal_keys_merge() {
@@ -1043,7 +1043,7 @@ pub(crate) mod tests {
     /// An Entry overrun before materialization keeps the reserved terminal
     /// Finding and state and the reserved cause naming the terminal Finding,
     /// and commits no record of the omitted suffix, the cause records of the
-    /// Phase 1 Findings among them (D15:2014, 2408, 3455).
+    /// Phase 1 Findings among them (D15:2015, 2409, 3580).
     #[test]
     fn an_entry_overrun_without_a_value_reserves_the_cause_of_its_absence() {
         let inputs = reporting(&Inputs::complete(), &[(entry("maxRecords"), 1)], &[]);
@@ -1065,7 +1065,7 @@ pub(crate) mod tests {
     }
 
     /// Two declarations that differ only in their Profile IDs have equal
-    /// profiles and profile semantic digests (D15:1208).
+    /// profiles and profile semantic digests (D15:1209).
     #[test]
     fn declarations_differing_only_in_their_profile_ids_have_equal_profiles() {
         let profile = |inputs: &Inputs| {
@@ -1084,7 +1084,7 @@ pub(crate) mod tests {
     }
 
     /// Reordering every set, object, and the collection changes no Finding
-    /// Key, Finding order, status, or cause (D15:3449).
+    /// Key, Finding order, status, or cause (D15:3574).
     #[test]
     fn reordering_the_inputs_keeps_the_findings_statuses_and_causes() {
         let reported = |inputs: &Inputs| {
@@ -1115,7 +1115,7 @@ pub(crate) mod tests {
     /// and unavailability causes, and how many Entry records of each kind
     /// each unit owns. An Entry locator, an occurrence key, and the source's
     /// revision may change, so no other part of an Entry record is compared
-    /// (D15:2389, 3353).
+    /// (D15:2390, 3478).
     #[derive(Debug, PartialEq)]
     struct Unmoved {
         shared: Option<(Owned, Option<(Value, Value)>)>,
@@ -1157,7 +1157,7 @@ pub(crate) mod tests {
     /// a target's, the Profile, Target, and Group ID maps, a group's members
     /// and relations, the coverage rules and their selectors, the alias and
     /// fallback maps, and the artifact collection, each holding invalid or
-    /// not yet identifiable members (D15:2184, 2389, 3353).
+    /// not yet identifiable members (D15:2185, 2390, 3478).
     #[test]
     fn permuting_any_unordered_collection_keeps_subjects_tokens_causes_and_owners() {
         type Edit = fn(&mut Inputs);
@@ -1268,7 +1268,7 @@ pub(crate) mod tests {
     /// capability in Phase 1, past three of the collection's bounds in Phase
     /// 4 whatever order its members were submitted in, and past bounds of the
     /// locales, coverage rules, and group members in the phases after it
-    /// (D15:1999, 2006, 2008, 3351).
+    /// (D15:2000, 2007, 2009, 3476).
     #[test]
     fn several_resource_violations_give_the_same_findings_in_any_order() {
         let bound = |group, name| BoundId { group, name };
@@ -1446,7 +1446,7 @@ pub(crate) mod tests {
         checks.filter(|check| !check.recorded_for(other)).collect()
     }
 
-    /// D15:2129, 3228 (Decision 015-202): two entries of one value record the
+    /// D15:2130, 3233 (Decision 015-202): two entries of one value record the
     /// same status for each unit both record, and each records its own
     /// Phase 1 checks besides.
     fn assert_entry_statuses_agree(file: &Shown, snapshot: &Shown) {
@@ -1463,7 +1463,7 @@ pub(crate) mod tests {
         );
     }
 
-    /// D15:204, 743, 2507, 2516: a Snapshot's entry dependencies name the
+    /// D15:205, 744, 2508, 2517: a Snapshot's entry dependencies name the
     /// file's selector, but for the token of a redacted one, which its origin
     /// keys; under `configuration-programmatic` each source slot and under
     /// `profile-selector-programmatic` the selector's; and beside a sidecar
@@ -1496,7 +1496,7 @@ pub(crate) mod tests {
         assert_eq!(origins, &programmatic);
     }
 
-    /// D15:2145, 3228: a file and a Programmatic Entry Snapshot of its value,
+    /// D15:2146, 3233: a file and a Programmatic Entry Snapshot of its value,
     /// without a sidecar and beside one mirroring the file, have the same
     /// construction identity, checked profile and bindings, and Shared
     /// projection, every Finding Key in order, status, cause, Coverage
@@ -1567,7 +1567,7 @@ pub(crate) mod tests {
         (shown(outcome), charged.sum(), entry.terminal.is_some())
     }
 
-    /// D15:2211, 3228, 3456: a file and a Snapshot of its value charge their
+    /// D15:2212, 3233, 3581: a file and a Snapshot of its value charge their
     /// Entry projections differently, so an Entry `maxTotalCanonicalBytes` at
     /// the smaller total holds that entry's whole Entry projection and its
     /// profile, and refuses a slice of the other's, while each keeps the
@@ -1690,7 +1690,7 @@ pub(crate) mod tests {
             .collect()
     }
 
-    /// D15:747, 790, 796, 800, 3228 (Decision 015-203): beside a sidecar that
+    /// D15:748, 791, 797, 801, 3233 (Decision 015-203): beside a sidecar that
     /// mirrors the file, a Snapshot's Entry projection observes every value
     /// and key at the file's span in the call-site source, so its
     /// occurrences, Coverage Decision Evidence, and evidence index are the
@@ -1727,7 +1727,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// D15:2369, 3228, 3418: a root-value bound that stops either entry
+    /// D15:2370, 3233, 3543: a root-value bound that stops either entry
     /// before materialization blocks both without a Shared projection, with
     /// the same Entry Finding Keys and shared-unavailability causes and the
     /// same status for each unit both record; only each entry's own checks,

@@ -36,7 +36,7 @@ mod observation;
 /// Explicit bounds for this stage, not a default or a formal capability body.
 /// Structural admission applies `max_structural_analysis_units`; provisional
 /// selection applies `max_profiles` and `max_profile_id_bytes`, which 015
-/// gives `profile-selection` (D15:1885, 1886, Decision 015-162).
+/// gives `profile-selection` (D15:1886, 1887, Decision 015-162).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[expect(clippy::struct_field_names, reason = "mirror the 015 bound IDs")]
 pub(crate) struct StructuralLimits {
@@ -180,7 +180,7 @@ impl<Policy, Target> AuthoringSchema<Policy, Target> {
         let program = &self.binding.program;
         // Every applicable evaluation counts, the declarations past
         // `maxProfiles` or with an ID past `maxProfileIdBytes` included: those
-        // bounds belong to profile selection (D15:1885-1887).
+        // bounds belong to profile selection (D15:1886-1888).
         match eval::evaluate(
             program,
             &result.doc,
@@ -248,7 +248,7 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
     /// rechecks them: how many there are, every declaration counted, and the
     /// Profile ID of each whose key has the identifier syntax, in their
     /// unsigned byte order. A later phase has no subject for a declaration
-    /// whose key lacks the syntax (D15:1885, 1886, 2184). None without a
+    /// whose key lacks the syntax (D15:1886, 1887, 2185). None without a
     /// selected version or a `profiles` object.
     ///
     /// # Errors
@@ -277,7 +277,7 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
     }
     /// The key of the identity map entry `entry` when it has the identifier
     /// syntax: the admitted canonical identity that keys the entry's
-    /// subjects (D15:2181, 2184). None for a key without the syntax.
+    /// subjects (D15:2182, 2185). None for a key without the syntax.
     pub(crate) fn admitted_key(&self, entry: &facts::Entry) -> Option<&str> {
         if !entry.admitted {
             return None;
@@ -291,7 +291,7 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
             .map(|(name, _)| name.as_str())
     }
     /// The materialized document and the value of the root's `profiles`
-    /// member in it, which a later phase's Evidence locates (D15:790). None
+    /// member in it, which a later phase's Evidence locates (D15:791). None
     /// without a selected version or the member.
     pub(crate) fn profiles_value(&self) -> Option<(&MaterializedDocument, NodeId)> {
         self.profiles.map(|value| (&*self.doc, value))
@@ -299,7 +299,7 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
     /// The materialized document and the value of the declaration `id` in
     /// it, where a later phase finds what structural admission left at each
     /// of its values. None without that declaration, or under a key without
-    /// the identifier syntax (D15:2184).
+    /// the identifier syntax (D15:2185).
     pub(crate) fn declaration_value(&self, id: &str) -> Option<(&MaterializedDocument, NodeId)> {
         self.profile_node(id).map(|value| (&*self.doc, value))
     }
@@ -372,7 +372,7 @@ impl<Policy, Target> StructuralAnalysis<Policy, Target> {
 
     /// The value of the declaration `id`. A key without the identifier syntax
     /// has none: structural admission evaluates its value, but later phases
-    /// have no subject for the entry (D15:2184).
+    /// have no subject for the entry (D15:2185).
     fn profile_node(&self, id: &str) -> Option<NodeId> {
         if !self.selected_version || !valid_identity(id) {
             return None;

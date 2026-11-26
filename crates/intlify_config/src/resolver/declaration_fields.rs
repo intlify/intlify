@@ -6,7 +6,7 @@
 //! and each `policies` slot, map entry, and array element on its own, with
 //! its value, absent where an optional one is, or the causes of its absence.
 //! What structural admission did not admit suppresses only the work that
-//! reads it, while its independently admitted siblings continue (D15:393,
+//! reads it, while its independently admitted siblings continue (D15:394,
 //! 2367, 3340); an undeclared member of the declaration belongs to no field.
 //!
 //! The checks decide: a field they admitted and the analysis did not, or a
@@ -236,7 +236,7 @@ impl<Policy: DeserializeOwned, Target: DeserializeOwned> DeclarationFields<Polic
 impl<Policy, Target> DeclarationFields<Policy, Target> {
     /// The fields of no declaration: each unavailable with `causes`, why
     /// profile selection selected none, so that each check that reads one is
-    /// not evaluated with them (D15:2131).
+    /// not evaluated with them (D15:2132).
     pub(crate) fn unavailable(causes: &Causes) -> Self {
         Self {
             project_id: Err(causes.clone()),
@@ -423,7 +423,7 @@ mod tests {
     }
 
     /// A field structural admission rejected is unavailable with the
-    /// Findings under it, and its siblings stay admitted (D15:2367, 3340).
+    /// Findings under it, and its siblings stay admitted (D15:2368, 3465).
     #[test]
     fn a_rejected_field_holds_back_only_itself() {
         let mut config = minimal_config();
@@ -592,7 +592,7 @@ mod tests {
             fields.delivery.as_ref().err(),
         ];
         assert!(unavailable.iter().all(|field| *field == Some(&causes)));
-        // Each slot is named without a value (D15:1171, 2131).
+        // Each slot is named without a value (D15:1172, 2132).
         assert_eq!(
             fields.policies.slots,
             crate::resolver::resource_policy::PolicySlot::ALL

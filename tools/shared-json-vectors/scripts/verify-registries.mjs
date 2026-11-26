@@ -793,9 +793,9 @@ for (const [name] of kinds) {
 }
 // A row's prerequisites name earlier rows, or rows of its own kind, whose
 // units an earlier subject may run at any check rank, itself included
-// (D15:2149, Decision 015-195), each once and in row order. Following those
+// (D15:2150, Decision 015-195), each once and in row order. Following those
 // that name other rows never comes back to a row, since no cycle may join
-// distinct rows (D15:2275), and none is one another listed prerequisite,
+// distinct rows (D15:2276), and none is one another listed prerequisite,
 // other than the row itself, already waits on.
 const rowIndex = new Map(checkRows.map((row, index) => [row.checkId, index]))
 const others = new Map()

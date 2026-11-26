@@ -3,7 +3,7 @@
 
 //! Design 015's Profile Selector Evidence Projection: what profile-selector
 //! Evidence keeps of the selector the invocation boundary admitted, once the
-//! final projection authority is fixed (D15:804-812, 2500-2501; Decision
+//! final projection authority is fixed (D15:805-813, 2501-2502; Decision
 //! 015-183).
 //!
 //! `absent` means no selector was supplied and keeps nothing else.
@@ -64,7 +64,7 @@ pub(crate) enum SelectorProjection {
 impl SelectorProjection {
     /// Project `input`, which an input of `origin` supplied, under the final
     /// projection authority `authority` and the independently admitted
-    /// declared Profile IDs `declared` (D15:806-808, 819).
+    /// declared Profile IDs `declared` (D15:807-809, 820).
     ///
     /// # Errors
     ///
@@ -157,7 +157,7 @@ pub(crate) enum SelectorEvidence {
 
 impl SelectorEvidence {
     /// `{ "absent": null }`, `{ "safe-profile-id": text }`, or
-    /// `{ "redacted-value": { type, length?, token } }` (D15:2500-2501, 2505).
+    /// `{ "redacted-value": { type, length?, token } }` (D15:2501-2502, 2506).
     pub(crate) fn view(&self) -> Value {
         match self {
             Self::Absent => json!({ "absent": null }),
@@ -411,7 +411,7 @@ mod tests {
 
     /// Safe IDs compare by their exact unsigned ASCII bytes: not by length,
     /// which would put `b` first, and with `-`, `.`, digits, and `_` where
-    /// their bytes put them (D15:286, 812, 3363).
+    /// their bytes put them (D15:287, 813, 3488).
     #[test]
     fn safe_ids_compare_by_their_exact_ascii_bytes() {
         let names = ["b", "aa", "a_b", "a0", "a.b", "a-b"];
@@ -441,7 +441,7 @@ mod tests {
 
     /// Redacted values rank by all six JSON types, a string's facts by
     /// ascending exact length, numerically, and then `over-limit`, and a value
-    /// without a fact before any with one (D15:810, 812, 3364).
+    /// without a fact before any with one (D15:811, 813, 3489).
     #[test]
     fn redacted_values_rank_by_type_then_string_length_fact() {
         use InvalidSelectorType::{Array, Boolean, Null, Number, Object};
@@ -495,7 +495,7 @@ mod tests {
 
     /// Selectors with equal facts share one projection and token, an
     /// over-limit one whatever its final length; across origins they compare
-    /// by every digest byte and then by the ordinal (D15:808, 810, 812, 3364).
+    /// by every digest byte and then by the ordinal (D15:809, 811, 813, 3489).
     #[test]
     fn equal_facts_group_and_then_order_by_digest_and_ordinal() {
         let string = |value: &str, authority| {

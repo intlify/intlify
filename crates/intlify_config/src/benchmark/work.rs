@@ -470,7 +470,7 @@ impl WorkKind {
             }
             Self::SharedEvidenceFindings | Self::EntryEvidenceFindings => WorkUnit::FindingKey,
             // A status's distinct causes, after cause-set deduplication, and
-            // every cause occurrence, before it (D15:1953, 1954, 1965, 1966).
+            // every cause occurrence, before it (D15:1954, 1955, 1966, 1967).
             Self::SharedEvidenceMaximumCausesPerStatus
             | Self::EntryEvidenceMaximumCausesPerStatus => WorkUnit::CausalFindingKey,
             Self::SharedEvidenceCauseOccurrences | Self::EntryEvidenceCauseOccurrences => {

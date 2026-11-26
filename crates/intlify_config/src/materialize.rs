@@ -8,7 +8,7 @@
 //! only at the token bound or the first byte that is not UTF-8 or not strict
 //! JSON; past a duplicate member or a value outside the JSON-compatible domain
 //! it continues, and reports every one in the complete file with its internal
-//! structural path (D15:802, Decision 015-150). Complete logical counts are
+//! structural path (D15:803, Decision 015-150). Complete logical counts are
 //! checked before constructing any materialized value nodes. Rejected input never yields an authoritative
 //! prefix. The index and parser stack use ordinary safe collections; nested
 //! values contain indices, so successful and failed cleanup do not recurse.
@@ -67,7 +67,7 @@ impl PortableNumber {
     }
 
     /// A finite binary64 value whose magnitude is at most
-    /// `9007199254740991`, with negative zero as positive zero (D15:856).
+    /// `9007199254740991`, with negative zero as positive zero (D15:857).
     pub(crate) fn new(value: f64) -> Option<Self> {
         if !value.is_finite() || value.abs() > 9_007_199_254_740_991.0 {
             return None;
@@ -223,7 +223,7 @@ pub(crate) struct DuplicateMember {
 
 /// A string value or member name outside the Unicode scalar domain, or a
 /// number outside the Portable JSON Number domain, at its token and at the
-/// path of the value or member (D15:2289).
+/// path of the value or member (D15:2290).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct IncompatibleValue {
     pub(crate) reason: Incompatibility,
@@ -241,7 +241,7 @@ pub(crate) struct LongString {
 
 /// One step of an internal structural path from the root: a member, by the
 /// span of its key, or an array element, by its index from 0. A step holds no
-/// member name, so no path exposes one (D15:776).
+/// member name, so no path exposes one (D15:777).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PathStep {
     Member(ByteSpan),
@@ -254,7 +254,7 @@ pub(crate) enum PathStep {
 pub(crate) struct PathId(usize);
 
 /// The internal structural paths a completely parsed file's facts were found
-/// at (D15:802): each member and array element on one of them, after the one
+/// at (D15:803): each member and array element on one of them, after the one
 /// that contains it, so facts share their common prefixes.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct Paths(Vec<(Option<PathId>, PathStep)>);
@@ -367,7 +367,7 @@ pub(crate) fn materialize_file(
 /// The name of the member whose key is at `key` in the parsed `source`, for
 /// classification only: a lone surrogate becomes U+FFFD, so a name outside
 /// the Unicode scalar domain is never schema-defined or a valid identifier,
-/// and its member stays unsafe (D15:776).
+/// and its member stays unsafe (D15:777).
 pub(crate) fn member_name(source: &[u8], key: ByteSpan) -> String {
     String::from_utf16_lossy(&parse::name_units(source, key))
 }

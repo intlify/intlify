@@ -3,30 +3,30 @@
 
 //! Design 015's complete in-memory invocation, which the `profile_resolve_e2e`
 //! pair measures from an already acquired entry through the final outcome
-//! (D15:2772).
+//! (D15:2773).
 //!
 //! Before any interval, a case holds what a binding submits as the raw values
 //! the pre-invocation boundaries read: the Resolver Construction Identity
 //! reference, the Common Invocation Input Set with the committed ICU4X Locale
 //! Canonicalization Data Artifact, and one file Entry Admission Input Set
-//! (D15:2824), or one programmatic entry's, whose formal Snapshot is the
-//! value the file's bytes spell (D15:2788). [`complete`] is the production
+//! (D15:2829), or one programmatic entry's, whose formal Snapshot is the
+//! value the file's bytes spell (D15:2791). [`complete`] is the production
 //! path an end-to-end interval runs on a constructed resolver: the
 //! pre-invocation admission of that set, and Phases 0 to 15 over what it
-//! admitted, through the outcome (D15:2775).
+//! admitted, through the outcome (D15:2776).
 //! A checked or a blocked outcome is an expected result; a refused set or a
-//! resolver defect is a benchmark failure (D15:2826).
+//! resolver defect is a benchmark failure (D15:2831).
 //!
 //! `file_entry_complete_workflow` and `programmatic_entry_complete_workflow`
-//! measure that path on a resolver in one of three states (D15:2789; plan 025 decision #33): constructed before each
+//! measure that path on a resolver in one of three states (D15:2792; plan 025 decision #33): constructed before each
 //! start mark from the input its preparation constructed from, the one its
 //! preparation constructed and every interval reuses, or that one right after
 //! it resolved the Blocked recipe's same entry before each start mark, which
-//! shows the invocation reset (D15:2751, 3689). Its identity is derived
+//! shows the invocation reset (D15:2752, 3814). Its identity is derived
 //! before the start mark. The submission, the slot for the admitted set, and
 //! the storage the outcome borrows are made before it; the outcome and the
 //! Materialized Resolution Input Set beside it are copied out after the end
-//! mark, and what the interval admitted is counted then (D15:2824).
+//! mark, and what the interval admitted is counted then (D15:2829).
 
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -77,7 +77,7 @@ use super::operation::{Operation, OutputFailure};
 use super::quantity::Quantity;
 
 /// The Programmatic Entry identity every programmatic case submits, which its
-/// frontend marks non-secret, and its locator, a safe label (D15:204, 728, 743).
+/// frontend marks non-secret, and its locator, a safe label (D15:205, 729, 744).
 const ENTRY: &str = "intlify-programmatic-entry.v0:storefront";
 const LOCATOR: &str = "storefront-app";
 
@@ -85,7 +85,7 @@ const LOCATOR: &str = "storefront-app";
 /// owner marks non-secret, with the revision of its bytes and no locator, as
 /// the Evidence stages' file is; the programmatic entry by [`ENTRY`] at
 /// [`LOCATOR`], its revision the Snapshot's digest, with no call-site
-/// sidecar (D15:743, 889; plan 025 decision #316).
+/// sidecar (D15:744, 890; plan 025 decision #316).
 #[derive(Clone, PartialEq)]
 pub(super) enum RawEntry {
     File {
@@ -227,7 +227,7 @@ impl RawInvocation {
 
 /// Why a complete invocation yields no outcome. Neither is an expected
 /// result: the case's submission is one the resolver admits, and no input
-/// causes a resolver defect (D15:2826). The defect is boxed, so that the
+/// causes a resolver defect (D15:2831). The defect is boxed, so that the
 /// failure stays small.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum WorkflowFailure {
@@ -261,7 +261,7 @@ where
 }
 
 /// What each repetition of a complete invocation case runs before its start
-/// mark, by the state of the resolver it invokes (D15:2789, 2824; plan 025
+/// mark, by the state of the resolver it invokes (D15:2792, 2829; plan 025
 /// decision #33).
 #[derive(PartialEq)]
 pub(in crate::benchmark) enum Before {
@@ -391,7 +391,7 @@ impl PreparedWorkflow {
     /// case's state runs first has run: a fresh case constructs a resolver
     /// from the input preparation constructed from, and a case reused after
     /// a blocked outcome resolves the Blocked recipe's submission on the
-    /// prepared resolver and releases that outcome (D15:2751, 2824). `None`
+    /// prepared resolver and releases that outcome (D15:2752, 2829). `None`
     /// when that construction is refused, or that outcome is not blocked.
     fn with_resolver<T>(&self, invoke: impl FnOnce(&Resolver<'_>) -> T) -> Option<T> {
         match &self.before {
@@ -462,7 +462,7 @@ fn blocks(resolver: &Resolver<'_>, raw: &RawInvocation) -> bool {
 
 /// The entry's two counts in its bounds' units: a file's bytes and the
 /// tokens its parser visits, or a Snapshot's canonical envelope bytes and the
-/// nodes and edges a traversal visits (D15:1794, 1795, 1802, 1804).
+/// nodes and edges a traversal visits (D15:1795, 1796, 1803, 1805).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::benchmark) enum EntryCounts {
     File { bytes: u64, tokens: u64 },
@@ -474,7 +474,7 @@ pub(in crate::benchmark) enum EntryCounts {
 /// complete, as strict file entry counts them under the admitted
 /// capability's bounds, or as the admitted Snapshot's marker-free tree
 /// counts them, and the collection's members and their `C(member)` bytes
-/// (D15:1889, 2129, 2796).
+/// (D15:1890, 2130, 2801).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::benchmark) struct AdmittedCounts {
     pub(in crate::benchmark) entry: EntryCounts,
@@ -540,7 +540,7 @@ pub(in crate::benchmark) type Binding = (ExactTuple, Vec<u8>);
 /// outcome's profile view and its bindings, each tuple with `C(member)` of
 /// its member, and the mandatory reserve; and the snapshot-content digest of
 /// the Materialized Resolution Input Set's value, when Phase 1 materialized
-/// one (D15:1150-1166, 1847, 2657).
+/// one (D15:1151-1167, 1848, 2658).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(in crate::benchmark) struct RetainedWorkflow {
     pub(in crate::benchmark) identity: ConstructionIdentity,
@@ -590,7 +590,7 @@ pub(in crate::benchmark) struct Resolved {
 }
 
 /// A refused set or a resolver defect is no outcome: the case fails rather
-/// than completing as an expected result (D15:2826). Logical work uses this
+/// than completing as an expected result (D15:2831). Logical work uses this
 /// screen.
 pub(in crate::benchmark) fn require_observable(
     resolved: &Resolved,
@@ -608,7 +608,7 @@ pub(in crate::benchmark) fn require_observable(
 /// a Materialized Resolution Input Set came beside the outcome with the digest
 /// of its value in the shared domain, and the Entry projection in the entry
 /// domain. Neither domain names the entry kind, so either entry of one value
-/// can share the shared one (D15:2659, 2775, 2788, 2794).
+/// can share the shared one (D15:2660, 2776, 2791, 2799).
 pub(in crate::benchmark) fn observe(resolved: &Resolved) -> Result<Observation, OutputFailure> {
     let retained = require_observable(resolved)?;
     let specification = Specification {
@@ -799,7 +799,7 @@ pub(in crate::benchmark) mod tests {
         require_observable(resolved).unwrap()
     }
 
-    /// D15:2788, 2794; plan 025 decision #316: a programmatic entry's
+    /// D15:2791, 2799; plan 025 decision #316: a programmatic entry's
     /// invocation of the value a file spells frames the Shared domain that
     /// file's case in the same state does, the Materialized Resolution Input
     /// Set of that value with it, and an Entry domain of its own. The
@@ -827,7 +827,7 @@ pub(in crate::benchmark) mod tests {
         }
     }
 
-    /// D15:204, 728, 743, 889: a programmatic entry submits its Snapshot in
+    /// D15:205, 729, 744, 890: a programmatic entry submits its Snapshot in
     /// the programmatic slots, under the Programmatic Entry identity its
     /// frontend marks non-secret, at a non-secret safe-label locator, its
     /// revision the Snapshot's digest, with no call-site sidecar.
@@ -864,7 +864,7 @@ pub(in crate::benchmark) mod tests {
         assert_eq!(origins, (own(slots.0), own(slots.1)));
     }
 
-    /// D15:889, 1889, 2796: a programmatic entry submits its file case's
+    /// D15:890, 1890, 2801: a programmatic entry submits its file case's
     /// set but for the entry, the Snapshot of the value the file spells, its
     /// revision the digest, and the interval counts the admitted Snapshot's
     /// envelope bytes and traversal units, and its value as the file's, but
@@ -949,7 +949,7 @@ pub(in crate::benchmark) mod tests {
         }
     }
 
-    /// D15:2657, 2659, 2775, 2826: each recipe's timed invocation retains
+    /// D15:2658, 2660, 2776, 2831: each recipe's timed invocation retains
     /// what an untimed one does. Only the example's outcome is checked, and a
     /// Shared projection and a Materialized Resolution Input Set come with an
     /// outcome exactly when Phase 1 materialized a value, the set with the
@@ -974,7 +974,7 @@ pub(in crate::benchmark) mod tests {
         }
     }
 
-    /// D15:1847, 2129, 2796: what the interval admitted is counted as strict
+    /// D15:1848, 2130, 2801: what the interval admitted is counted as strict
     /// file entry counts it, a value's counts only when the raw parse
     /// completed, with each submitted member's `C(member)` bytes; a checked
     /// outcome's bindings keep those bodies, the mandatory reserve grows only
@@ -1044,7 +1044,7 @@ pub(in crate::benchmark) mod tests {
         }
     }
 
-    /// D15:2777, 2788, 2794: the codec frames, in order, the shared domain
+    /// D15:2780, 2791, 2799: the codec frames, in order, the shared domain
     /// under a name that does not say which entry the invocation had: the
     /// identity, the Shared projection behind its flag, the profile view and
     /// each binding's tuple and body behind theirs, and the set's value
@@ -1135,7 +1135,7 @@ pub(in crate::benchmark) mod tests {
         }
     }
 
-    /// D15:2789, 2824, 3689: before every start mark, and before an untimed
+    /// D15:2792, 2829, 3814: before every start mark, and before an untimed
     /// run too, a fresh case constructs a resolver of its own and never
     /// invokes the prepared one, a reused case invokes the prepared one, and
     /// a case reused after a blocked outcome invokes it once it resolved the
@@ -1161,7 +1161,7 @@ pub(in crate::benchmark) mod tests {
         }
     }
 
-    /// D15:2751, 2826: a case reused after a blocked outcome measures nothing
+    /// D15:2752, 2831: a case reused after a blocked outcome measures nothing
     /// unless what it resolves first is admitted and blocked. A checked
     /// outcome or a refused set first leaves a repetition, timed or not,
     /// unavailable before its start mark.
@@ -1182,7 +1182,7 @@ pub(in crate::benchmark) mod tests {
         assert_eq!(counts(&prepared), [0, 4, 0]);
     }
 
-    /// D15:2751, 2789, 3689; D26:1739, 1815: the expectations pin each
+    /// D15:2752, 2792, 3814; D26:1739, 1815: the expectations pin each
     /// recipe's three cases to one result and one logical work, so a fresh
     /// resolver and one reused right after a blocked outcome resolve it as
     /// the reused one does, while each case's input context, which binds
@@ -1221,7 +1221,7 @@ pub(in crate::benchmark) mod tests {
         }
     }
 
-    /// D15:2805; D26:1667: each state's case is described as running in the
+    /// D15:2810; D26:1667: each state's case is described as running in the
     /// engine state its resolver is in, fresh only for a fresh resolver,
     /// which the invocation Memory Observation Domain of that state agrees
     /// with and the other engine state's does not. Its facts say what runs
@@ -1268,7 +1268,7 @@ pub(in crate::benchmark) mod tests {
         assert_eq!(resolvers.len(), STATES.len());
     }
 
-    /// D15:2775, 2824: the interval begins with the pre-invocation admission
+    /// D15:2776, 2829: the interval begins with the pre-invocation admission
     /// of a resolver every state made beforehand, so what it is handed is
     /// that resolver and the submission beside an empty slot for the set it
     /// admits and the storage the outcome borrows, never an admitted set,

@@ -3,7 +3,7 @@
 
 //! 015's `implementation-capability` boundary: one submitted capability value,
 //! admitted against the constructed Capability Specification or refused with
-//! one of the nine reasons of its row (D15:1764-1788, 3150).
+//! one of the nine reasons of its row (D15:1765-1789, 3155).
 //!
 //! The value names the specification it asserts and sets every bound of both
 //! namespaces: `policyComparable`, the mirror of a Resource Limit Policy's
@@ -13,16 +13,16 @@
 //! before the inventory that specification defines; every group and bound of
 //! the inventory, refusing an unknown or mistyped member before a missing one;
 //! and every bound's value, in the order of the reasons: its spelling, zero,
-//! its size, and last its minimum (D15:1788). The first check that fails
+//! its size, and last its minimum (D15:1789). The first check that fails
 //! decides, and among the bounds failing the same check the first in the
-//! specification's canonical order is named (D15:3155, 3157). Construction
+//! specification's canonical order is named (D15:3160, 3162). Construction
 //! admits only the Capability Specification this crate writes from its
 //! inventory, so the inventory and its minimum vector are the constructed
 //! specification's.
 //!
 //! Only complete success admits the capability. The admitted value keeps the
 //! specification it asserts and both namespaces, and writes them back as the
-//! normalized value the Materialized Resolution Input Set carries (D15:205).
+//! normalized value the Materialized Resolution Input Set carries (D15:206).
 
 use serde_json::{Map, Value};
 

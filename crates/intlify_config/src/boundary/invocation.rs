@@ -3,21 +3,21 @@
 
 //! 015's admission of one Resolver Invocation Input Set: the Resolver
 //! Construction Identity reference, the Common Invocation Input Set, and
-//! exactly one file or programmatic Entry Admission Input Set (D15:201,
+//! exactly one file or programmatic Entry Admission Input Set (D15:202,
 //! 1106).
 //!
 //! The three are admitted in stages of their own: the reference at its
 //! boundary, the common set in its step, and the entry in the step of its
-//! kind, each with that step's own order (D15:3159). Every stage is
+//! kind, each with that step's own order (D15:3164). Every stage is
 //! evaluated whatever the others yield, and each keeps its own typed result,
 //! so several invalid components give several results, never one combined
-//! failure (D15:3159). The entry step reads the capability the common step's
+//! failure (D15:3164). The entry step reads the capability the common step's
 //! capability boundary admitted, and leaves its bound-reading boundaries
 //! unevaluated only when that boundary refused it, never because another
 //! common component was refused (plan 025 decision #304). The Verification
 //! Input assertion is the trusted setup path's parameter beside the set
-//! (D15:1106). The set exists only when every stage admits its part
-//! (D15:3159).
+//! (D15:1107). The set exists only when every stage admits its part
+//! (D15:3164).
 
 use std::sync::Arc;
 
@@ -66,7 +66,7 @@ impl EntryInputs {
 
 /// Two entries are equal when they are of one kind and equal by value. A
 /// file and a programmatic entry differ at least in their fixed Safe Origin
-/// Kinds (D15:2583).
+/// Kinds (D15:2584).
 impl PartialEq for EntryInputs {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -80,7 +80,7 @@ impl PartialEq for EntryInputs {
 /// An admitted Resolver Invocation Input Set. No `Debug`: an entry can carry
 /// configuration and an arbitrary selector. The common set is shared, so a
 /// Materialized Resolution Input Set holds it without copying it and without
-/// borrowing this set (D15:2749).
+/// borrowing this set (D15:2750).
 pub(crate) struct InvocationInputs<D> {
     pub(crate) construction_identity: ConstructionIdentity,
     pub(crate) common: Arc<CommonInputs<D>>,
@@ -88,7 +88,7 @@ pub(crate) struct InvocationInputs<D> {
 }
 
 /// Two sets are equal when every logical field and occurrence is: the
-/// reference, the common set, and the entry, each by value (D15:2583, 2589).
+/// reference, the common set, and the entry, each by value (D15:2584, 2590).
 impl<D: Eq> PartialEq for InvocationInputs<D> {
     fn eq(&self, other: &Self) -> bool {
         let Self {
@@ -105,7 +105,7 @@ impl<D: Eq> PartialEq for InvocationInputs<D> {
 /// A refused Resolver Invocation Input Set: each stage's own failures, `None`
 /// when that stage admitted its part. Under a refused capability the entry's
 /// list holds only its origin failures and may be empty, never the
-/// capability's own failure, which the common list holds (D15:3163).
+/// capability's own failure, which the common list holds (D15:3168).
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct InvocationFailures {
     pub(crate) construction_identity: Option<IdentityRefusal>,

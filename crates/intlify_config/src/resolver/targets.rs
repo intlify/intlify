@@ -21,10 +21,10 @@
 //! A target whose locale set is not a subset of the project's is observed at
 //! its locale set beside the project's, and one whose effective default is
 //! outside its set at that default where it is written, its own override or
-//! the project's default, beside its set (D15:2416). A requested locale its
+//! the project's default, beside its set (D15:2417). A requested locale its
 //! Target Profile has no direction for is observed at each item that names
 //! it, a repeat included, beside the Target Profile, a member of the Set
-//! (D15:834, 1405, 2387).
+//! (D15:835, 1406, 2388).
 
 use std::collections::BTreeMap;
 
@@ -157,7 +157,7 @@ impl<'s> ResolvedTargets<'s> {
     /// Whether `id` names a declared Target ID, once the map is within its
     /// bound: an admitted key proves it, and naming none is proved only beside
     /// every key, a value the set lacks being unproved while a key failed
-    /// (D15:2365, 2367).
+    /// (D15:2366, 2368).
     pub(crate) fn declares(&self, id: &TargetId) -> Admitted<bool> {
         self.bounded.clone()?;
         if self.facts.contains_key(id) {
@@ -184,8 +184,8 @@ impl<'s> ResolvedTargets<'s> {
 /// selected declaration's, when there is one. Each check of a target waits on
 /// its Target ID's bounds. The subset, the effective default, and the
 /// directions are checked independently of each other, over the values of its
-/// set that were admitted (D15:2184, 3354); only the directions wait on the
-/// Target Profile, so an invalid one stops what needs it alone (D15:2367), and
+/// set that were admitted (D15:2185, 3479); only the directions wait on the
+/// Target Profile, so an invalid one stops what needs it alone (D15:2368), and
 /// the resolved target needs every one. Without a map to read there is no
 /// target, and no unit.
 ///
@@ -264,12 +264,12 @@ impl Checks<'_, '_> {
     ) -> Result<TargetFacts<'s>, TargetInvariant> {
         let admitted = own.admitted.clone();
         // The identities of the target's set that were admitted: a check
-        // over them waits only when every element is excluded (D15:2184,
+        // over them waits only when every element is excluded (D15:2185,
         // 3354).
         let counted = own.requested.counted().cloned();
         // A target locale the project's set holds is in it whatever else
         // the set lacks, and one it does not hold is unproved while it lacks
-        // any (D15:2365, 2367).
+        // any (D15:2366, 2368).
         let covered = match &counted {
             Ok(own) => locales.requested_set.covers(own.as_slice()),
             Err(_) => locales.requested_set.complete().map(|_| true),
@@ -299,7 +299,7 @@ impl Checks<'_, '_> {
         let origin = effective_default(own, locales);
         let default_origin = origin.as_ref().ok().map(|&(_, reason)| reason);
         // The default is among the admitted values, or else unproved beside
-        // an element without an identity (D15:2365, 2367).
+        // an element without an identity (D15:2366, 2368).
         let held = own
             .requested
             .holds(&origin.clone().map(|(locale, _)| locale));
@@ -332,7 +332,7 @@ impl Checks<'_, '_> {
         )?;
         // The check read the values admitted, while what a later phase reads
         // also waits on those excluded: an invalid target emits no effective
-        // default (D15:2184, 2416).
+        // default (D15:2185, 2417).
         let default =
             both(checked, own.requested.complete().map(|_| ())).map(|(locale, ())| locale);
         let profile = profile(references, self.id);
@@ -417,7 +417,7 @@ struct Directions {
 
 impl Directions {
     /// One observation for each item that names one of `missing`, a repeat
-    /// included, beside the Target Profile (D15:2387).
+    /// included, beside the Target Profile (D15:2388).
     fn at(&self, missing: &[&CanonicalLocale]) -> Vec<Option<Observation>> {
         self.items
             .iter()
@@ -877,7 +877,7 @@ mod tests {
                 )]
             );
             // Observed at the item that names `ja`, beside the browser's
-            // Target Profile (D15:1405).
+            // Target Profile (D15:1406).
             assert_eq!(
                 observed(&evaluation),
                 [(
@@ -923,7 +923,7 @@ mod tests {
     }
 
     /// Each item that names a locale without a direction is observed, a
-    /// repeat included, beside the Target Profile (D15:1405, 2387).
+    /// repeat included, beside the Target Profile (D15:1406, 2388).
     #[test]
     fn each_item_naming_an_undirected_locale_is_observed() {
         let mut inputs = Inputs::new();
@@ -988,7 +988,7 @@ mod tests {
                 [(subset.clone(), Code::TargetLocalesNotSubset, None)]
             );
             // Observed at the browser's locale set, beside the project's
-            // (D15:2416).
+            // (D15:2417).
             assert_eq!(
                 observed(&evaluation),
                 [(
@@ -1041,7 +1041,7 @@ mod tests {
             );
             // Each at the default where it is written, the browser's own
             // override or the project's default the server inherits, beside
-            // the target's locale set (D15:2416).
+            // the target's locale set (D15:2417).
             let set = |id| inputs.at(&["targetProfiles", id, "requestedLocales"]);
             assert_eq!(
                 observed(&evaluation),
@@ -1276,7 +1276,7 @@ mod tests {
 
     /// A default the admitted values hold passes its check, and a later phase
     /// still reads no effective default from a target whose set lacks an
-    /// identity (D15:2184, 2365, 2416).
+    /// identity (D15:2185, 2366, 2417).
     #[test]
     fn a_default_held_beside_a_failed_element_hands_on_no_effective_default() {
         let mut inputs = Inputs::new();
@@ -1304,7 +1304,7 @@ mod tests {
     }
 
     /// With no element of its set admitted, a target's checks over its
-    /// values have none to read and wait on why (D15:2184, 3354).
+    /// values have none to read and wait on why (D15:2185, 3479).
     #[test]
     fn a_target_without_an_admitted_locale_waits_on_its_elements() {
         let mut inputs = Inputs::new();
@@ -1427,7 +1427,7 @@ mod tests {
 
     /// Beside a failure under the map, each target keeps its facts, while
     /// what needs every target waits on it, and every target's own causes
-    /// join it (D15:2367).
+    /// join it (D15:2368).
     #[test]
     fn a_map_not_admitted_whole_keeps_each_targets_facts() {
         let mut inputs = Inputs::new();

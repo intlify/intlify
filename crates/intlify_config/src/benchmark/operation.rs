@@ -44,7 +44,7 @@ pub(super) type Analysis = StructuralAnalysis<PolicyReference, TargetProfileRefe
 pub(super) type Schema = AuthoringSchema<PolicyReference, TargetProfileReference>;
 
 /// A case's configuration file, which the phases after profile selection
-/// observe the selected declaration in (D15:790), admitted as entry admission
+/// observe the selected declaration in (D15:791), admitted as entry admission
 /// would under the fixture owner's source identity.
 pub(super) struct ConfigFile {
     source: Arc<[u8]>,
@@ -67,7 +67,7 @@ impl ConfigFile {
 }
 
 /// Where a check after profile selection observes the declaration `selected`
-/// of `analysis`: in `entry`, as profile selection hands it on (D15:790),
+/// of `analysis`: in `entry`, as profile selection hands it on (D15:791),
 /// built before the interval. None when the configuration does not hold the
 /// declaration.
 pub(super) fn observer<'a>(
@@ -203,11 +203,11 @@ impl Operation {
         }
     }
     /// The pair and boundary of the peak live memory measured over this
-    /// operation's interval (D15:2773): a fresh resolver construction's, and
+    /// operation's interval (D15:2774): a fresh resolver construction's, and
     /// each entry's complete invocation's. The two invocations' intervals
     /// begin with their own entry's admission, so each has a boundary of its
     /// own, and their one cost names no entry, so each states its entry kind
-    /// (D15:2775, 2792; D26:1527). A replay is neither.
+    /// (D15:2776, 2797; D26:1527). A replay is neither.
     pub(super) const fn peak_memory(self) -> Option<PeakMemory> {
         const PHASE: &str = "profile_resolve_peak_memory";
         const INVOCATION: &str = "invocation_peak_live_memory";

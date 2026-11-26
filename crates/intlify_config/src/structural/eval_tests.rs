@@ -181,7 +181,7 @@ fn unsafe_unknown_or_invalid_dynamic_keys_never_enter_issue_text() {
     assert!(!result.admitted);
     // The root's undeclared member and the invalid key, and under the key's
     // entry, its undeclared member and the seven required members its value
-    // lacks (D15:2184). A key is never named, and a missing member only by
+    // lacks (D15:2185). A key is never named, and a missing member only by
     // the schema's own name.
     assert_eq!(result.issues.len(), 10);
     for issue in &result.issues {
@@ -623,7 +623,7 @@ fn identity_keys_are_checked_under_their_map_and_scope_their_entries() {
         assert_eq!(facts.scope(scope).level, Level::Profile);
     }
     // Each entry's value is evaluated under its own scope, the failing key's
-    // included, so the two raw parents stay apart (D15:2184, 2190).
+    // included, so the two raw parents stay apart (D15:2185, 2191).
     let scopes: Vec<_> = keys
         .iter()
         .map(|key| match key.at {
@@ -765,7 +765,7 @@ fn an_identity_map_without_entries_fails_its_minimum_member_count() {
 }
 
 /// Every applicable evaluation counts even when another check blocks
-/// (D15:1887): the value of an entry whose key fails is the same work as the
+/// (D15:1888): the value of an entry whose key fails is the same work as the
 /// value of an entry whose key passes.
 #[test]
 fn a_failing_keys_value_counts_the_work_of_any_other_entry() {
@@ -783,7 +783,7 @@ fn a_failing_keys_value_counts_the_work_of_any_other_entry() {
 /// Each candidate needs the type check its evaluation depends on: its
 /// containing value's for a type, its value's own, or else the containing
 /// value's, for the other checks of its path, the object's for a required
-/// member, and the map's for a key (D15:2149, 2184).
+/// member, and the map's for a key (D15:2150, 2185).
 #[test]
 fn each_candidate_needs_the_type_check_it_depends_on() {
     let mut value = complete_config();

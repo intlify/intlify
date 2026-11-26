@@ -2,25 +2,25 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! The Finding Registry's disclosure policies: one for each of design 015's
-//! seven evidence kinds, in a table beside the registry's rows (D15:720,
+//! seven evidence kinds, in a table beside the registry's rows (D15:721,
 //! 2233, 2249; Decision 015-192).
 //!
 //! A policy names the members every Evidence of its kind has and each
-//! component its view can retain: a leaf variant of a member of D15:2492's
+//! component its view can retain: a leaf variant of a member of D15:2493's
 //! view, such as `source.redacted` or
 //! `value.redacted-logical-path.redacted-member`. Each component has one of
 //! the two disclosure policies. A `non-secret-literal` component whose
 //! content is not fixed lists the classifications under which that content
 //! counts as non-secret: the owner's mark on an exact identity (Decision
-//! 015-185), the adapter's classification of a locator (D15:766), a
+//! 015-185), the adapter's classification of a locator (D15:767), a
 //! schema-defined name, an identifier key, or a canonical locale key
-//! (D15:776), a declared Profile ID (D15:807), and a vocabulary member's
-//! identity or an admitted envelope's exact reference (D15:824). A
+//! (D15:777), a declared Profile ID (D15:808), and a vocabulary member's
+//! identity or an admitted envelope's exact reference (D15:825). A
 //! `redacted-structure` component names the projection whose Redacted
-//! evidence token replaces it (D15:722).
+//! evidence token replaces it (D15:723).
 //!
 //! A resolver-input kind's policy also lists the component path shapes that
-//! some retained Evidence can carry, and no other (D15:838; Decision
+//! some retained Evidence can carry, and no other (D15:839; Decision
 //! 015-190): each with its Safe Origin Kind, its fixed roles and their
 //! ranks, and the key that ends it, as the Resolver Input Component Path
 //! builds them. No Finding reaches the verification `mode` role, the root of
@@ -52,7 +52,7 @@ use crate::resolver::specification::Slot;
 use super::safe_origin::SafeOriginKindRegistry;
 use super::RANK_PATTERN;
 
-/// A member of an Evidence view (D15:2481).
+/// A member of an Evidence view (D15:2482).
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
 )]
@@ -69,7 +69,7 @@ pub(crate) enum Member {
 
 /// A component an Evidence view can retain: a leaf variant of one of its
 /// members, in the order of the view's members and of each member's
-/// variants (D15:2492).
+/// variants (D15:2493).
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
 )]
@@ -159,7 +159,7 @@ impl Component {
     }
 
     /// The projection whose Redacted evidence token replaces the component,
-    /// for a redacted one (D15:722).
+    /// for a redacted one (D15:723).
     pub(crate) const fn projection(self) -> Option<TokenKind> {
         match self {
             Self::SourceRedacted => Some(TokenKind::SourceIdentity),
@@ -172,7 +172,7 @@ impl Component {
     }
 }
 
-/// One of the two disclosure policies of a component (D15:720).
+/// One of the two disclosure policies of a component (D15:721).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum Disclosure {
@@ -190,22 +190,22 @@ pub(crate) enum NonSecretClass {
     /// non-secret (Decision 015-185).
     OwnerMarkedIdentity,
     /// The supplying adapter classifies the canonical locator non-secret
-    /// (D15:766).
+    /// (D15:767).
     AdapterClassifiedLocator,
-    /// The member name is defined by the configuration schema (D15:776).
+    /// The member name is defined by the configuration schema (D15:777).
     SchemaDefinedName,
     /// A `profiles`, `targetProfiles`, or `deploymentGroups` key that matches
-    /// the identifier syntax within the capability's byte bound (D15:776).
+    /// the identifier syntax within the capability's byte bound (D15:777).
     IdentifierKey,
     /// A `localeNegotiation.aliases` or `messageFallback` key for which the
     /// admitted canonicalization data returns a canonical identifier
-    /// (D15:776).
+    /// (D15:777).
     CanonicalLocaleKey,
-    /// A selector that exactly matches a declared Profile ID (D15:807).
+    /// A selector that exactly matches a declared Profile ID (D15:808).
     DeclaredProfileId,
-    /// A vocabulary member's canonical vocabulary identity (D15:824).
+    /// A vocabulary member's canonical vocabulary identity (D15:825).
     VocabularyIdentity,
-    /// An admitted envelope's canonical exact-reference identity (D15:824).
+    /// An admitted envelope's canonical exact-reference identity (D15:825).
     AdmittedExactReference,
 }
 
@@ -227,7 +227,7 @@ pub(crate) struct ComponentPolicy {
 }
 
 /// A fixed role of a component path, with its rank within its parent path
-/// (D15:823).
+/// (D15:824).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct RoleShape {
@@ -280,7 +280,7 @@ impl PathShape {
     }
 
     /// Evidence order: the origin's rank, then the roles by rank with a
-    /// shorter equal prefix first, then the key, `safe-key` first (D15:823,
+    /// shorter equal prefix first, then the key, `safe-key` first (D15:824,
     /// 827). `None` when a rank is not a shortest decimal string.
     pub(crate) fn order(&self, other: &Self) -> Option<Ordering> {
         let ranks = |shape: &Self| {
@@ -386,7 +386,7 @@ pub(crate) const fn resolver_input(kind: EvidenceKind) -> bool {
     )
 }
 
-/// The members every Evidence of `kind` has (D15:2492).
+/// The members every Evidence of `kind` has (D15:2493).
 const fn required(kind: EvidenceKind) -> &'static [Member] {
     match kind {
         EvidenceKind::EntrySource => &[Member::Source],
@@ -399,7 +399,7 @@ const fn required(kind: EvidenceKind) -> &'static [Member] {
     }
 }
 
-/// The members `kind`'s view can have (D15:2492).
+/// The members `kind`'s view can have (D15:2493).
 const fn members(kind: EvidenceKind) -> &'static [Member] {
     match kind {
         EvidenceKind::EntrySource => &[Member::Source, Member::Locator, Member::Path, Member::Span],
@@ -416,7 +416,7 @@ const fn members(kind: EvidenceKind) -> &'static [Member] {
 
 /// How `kind`'s view discloses each component it can retain, in view order.
 /// Only the vocabulary and the artifact collection have keyed component
-/// paths (D15:832, 834).
+/// paths (D15:833, 835).
 fn components(kind: EvidenceKind) -> Vec<ComponentPolicy> {
     Component::ALL
         .into_iter()
@@ -441,7 +441,7 @@ fn components(kind: EvidenceKind) -> Vec<ComponentPolicy> {
 /// The classifications under which `component` counts as non-secret, none
 /// when its content is fixed or redacted. Only Entry Source Evidence has
 /// path members, and it precedes the admission of the canonicalization data,
-/// so none of them is a canonical locale key (D15:776); only the artifact
+/// so none of them is a canonical locale key (D15:777); only the artifact
 /// input has keys.
 const fn classes(component: Component) -> &'static [NonSecretClass] {
     use NonSecretClass as C;
@@ -518,7 +518,7 @@ fn origin_shapes(origin: SafeOriginKind) -> Vec<PathShape> {
 }
 
 /// For the vocabulary and the artifact collection, a member with each key:
-/// an admitted identity's, then a redacted one (D15:832, 834).
+/// an admitted identity's, then a redacted one (D15:833, 835).
 fn member_shapes(origin: SafeOriginKind) -> Vec<PathShape> {
     [KeyKind::SafeKey, KeyKind::RedactedKey]
         .into_iter()
@@ -544,7 +544,7 @@ pub(crate) fn member_shape(origin: SafeOriginKind, key: KeyKind) -> Option<PathS
 /// Every shape the Resolver Input Component Path builds: each resolver
 /// input's root, each Specification Input slot, a vocabulary or artifact
 /// member with either key, each verification component, and each capability
-/// bound (D15:829-836).
+/// bound (D15:830-837).
 fn grammar() -> Vec<PathShape> {
     let roots = SafeOriginKind::ALL
         .into_iter()
@@ -609,7 +609,7 @@ mod tests {
     }
 
     /// Each kind discloses the members of its view, and only those
-    /// (D15:2492).
+    /// (D15:2493).
     #[test]
     fn each_kind_discloses_the_components_of_its_view() {
         use Component as C;
@@ -670,7 +670,7 @@ mod tests {
 
     /// A redacted component names the projection whose token replaces it,
     /// and a literal one the classifications that make its content
-    /// non-secret (D15:722, 776, 807, 824).
+    /// non-secret (D15:723, 777, 808, 825).
     #[test]
     fn a_component_is_disclosed_as_015_requires() {
         let find = |kind: EvidenceKind, component: Component| {
@@ -753,7 +753,7 @@ mod tests {
     /// The pinned shapes are those some retained Evidence carries: no
     /// verification `mode`, no Specification Input, verification, or
     /// capability root, and only the `bootstrapOnly` groups construction and
-    /// invocation check (D15:838, 2356; Decision 015-190).
+    /// invocation check (D15:839, 2357; Decision 015-190).
     #[test]
     fn a_resolver_input_policy_pins_only_reachable_shapes() {
         fn roles(shape: &PathShape) -> Vec<(&str, &str)> {

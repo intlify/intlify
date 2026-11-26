@@ -4,7 +4,7 @@
 //! Design 015's Coverage Decision Evidence: for each cell of an established
 //! coverage decision table, the decision source its Coverage Decision Basis
 //! admitted, the project default or one matched rule domain, and the Evidence
-//! of where that source sits (D15:1609, 1611).
+//! of where that source sits (D15:1610, 1612).
 //!
 //! Coverage makes one candidate for each mapping once the table is
 //! established, with its Evidence as projected before the invocation's
@@ -12,18 +12,18 @@
 //! the table's unit. The caller assigns those tokens once, to these
 //! candidates' redacted components together with those of the Finding
 //! Occurrence candidates, so that one component keeps one token in every
-//! record (D15:2194). Each candidate then becomes one record, `{ cell: {
+//! record (D15:2195). Each candidate then becomes one record, `{ cell: {
 //! locale, surfaceClass }, source: "default" | RuleDomain, evidence }`
-//! (D15:2485, 2487), in the candidates' order: cell order, and then, for a
-//! `rule` Basis, its normalized matched-domain order (D15:1611).
+//! (D15:2486, 2488), in the candidates' order: cell order, and then, for a
+//! `rule` Basis, its normalized matched-domain order (D15:1612).
 //!
 //! Every record's Evidence record owner is the decision table's unit
-//! (D15:1609). Under that unit, the record refers to its Evidence, a record of
-//! the evidence index (D15:1972), and accounting charges the unit the record's
-//! accounting view (D15:2518). One rule deciding several cells gives each cell
-//! its own record, all of them referring to one index record (D15:1611). A
+//! (D15:1610). Under that unit, the record refers to its Evidence, a record of
+//! the evidence index (D15:1973), and accounting charges the unit the record's
+//! accounting view (D15:2519). One rule deciding several cells gives each cell
+//! its own record, all of them referring to one index record (D15:1612). A
 //! record's Evidence is Materialized Value Evidence of the declaration, or the
-//! Coverage Specification input when the safe default is omitted (D15:1609).
+//! Coverage Specification input when the safe default is omitted (D15:1610).
 
 use intlify_shared_json::token::Token;
 use serde_json::{json, Value};
@@ -43,7 +43,7 @@ use super::token::{rule_domain, Specification};
 /// One Coverage Decision Evidence mapping, before the invocation's evidence
 /// tokens are assigned: a cell, the decision source its Coverage Decision
 /// Basis admitted, the project default or a matched rule domain, and the
-/// Evidence of that source (D15:1609, 2485).
+/// Evidence of that source (D15:1610, 2486).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DecisionEvidence {
     pub(crate) cell: (CanonicalLocale, Token),
@@ -54,7 +54,7 @@ pub(crate) struct DecisionEvidence {
 
 impl DecisionEvidence {
     /// The candidate with its Evidence as path admission leaves it under
-    /// `limits` (D15:1851).
+    /// `limits` (D15:1852).
     ///
     /// # Errors
     ///
@@ -101,7 +101,7 @@ impl CoverageDecisionEvidence {
     }
 
     /// The record's Evidence record owner: the decision table's unit
-    /// (D15:1609).
+    /// (D15:1610).
     pub(crate) const fn owner(&self) -> &Unit {
         &self.owner
     }
@@ -112,7 +112,7 @@ impl CoverageDecisionEvidence {
     }
 
     /// `{ cell: { locale, surfaceClass }, source: "default" | RuleDomain,
-    /// evidence }` (D15:2485, 2487).
+    /// evidence }` (D15:2486, 2488).
     pub(crate) fn view(&self) -> Value {
         let (locale, surface) = &self.cell;
         json!({
@@ -122,7 +122,7 @@ impl CoverageDecisionEvidence {
         })
     }
 
-    /// The record's accounting view, charged to its owner (D15:2518).
+    /// The record's accounting view, charged to its owner (D15:2519).
     ///
     /// # Errors
     ///
@@ -177,7 +177,7 @@ pub(crate) fn records(
 
 /// Asserts that `evidence` is what Coverage Decision Evidence carries:
 /// Materialized Value Evidence of the declaration, or the Coverage
-/// Specification input (D15:1609).
+/// Specification input (D15:1610).
 #[cfg(test)]
 fn carried(evidence: &Evidence, specification: Specification<'_>, tokens: &EvidenceTokens) {
     use super::evidence_component::ComponentPath;
@@ -292,7 +292,7 @@ mod tests {
 
     /// A record presents its cell, its source, `default` or the matched rule
     /// domain, and its Evidence, and the records keep the candidates' order
-    /// (D15:1611, 2485, 2487).
+    /// (D15:1612, 2486, 2488).
     #[test]
     fn a_record_presents_its_cell_source_and_evidence() {
         let candidates = [
@@ -334,7 +334,7 @@ mod tests {
     /// The decision table's unit owns every record and is charged each
     /// record's accounting view; one rule deciding two cells gives two
     /// records that refer to one index record, which the table owns too
-    /// (D15:1609, 1611, 2518).
+    /// (D15:1610, 1612, 2519).
     #[test]
     fn the_decision_table_owns_each_record_and_one_rule_is_one_index_record() {
         let candidates = [
@@ -374,7 +374,7 @@ mod tests {
 
     /// A member the declaration's path names unsafely is one of the
     /// candidates' redacted components; tokens assigned without it leave the
-    /// cell's record a resolver bug (D15:2194).
+    /// cell's record a resolver bug (D15:2195).
     #[test]
     fn a_redacted_member_needs_the_invocations_token() {
         let candidates = [mapping(("fr", "nav"), Some(fr()), rule(Step::Unsafe, 0))];

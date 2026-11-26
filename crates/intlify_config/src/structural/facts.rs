@@ -2,10 +2,10 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! What structural admission found: one candidate for each applicable
-//! evaluation of a structural check (D15:2173), with the entry that scopes
+//! evaluation of a structural check (D15:2174), with the entry that scopes
 //! its subject, the subject's logical field path from that entry, where the
 //! check looked, and its outcome. The Check Registry's units and Findings of
-//! structural admission are built from them (D15:2184).
+//! structural admission are built from them (D15:2185).
 //!
 //! A candidate holds nodes, loci, and the names the configuration schema
 //! defines, never a name or a value from the configuration.
@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 use crate::materialize::{Locus, NodeId};
 
 /// A closed schema keyword class of structural admission, in the order of a
-/// scope level's rows, and the key of an identity map (D15:2173).
+/// scope level's rows, and the key of an identity map (D15:2174).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Check {
     /// A required member is present.
@@ -31,7 +31,7 @@ pub(crate) enum Check {
     Key,
 }
 
-/// A scope level of structural admission (D15:2173).
+/// A scope level of structural admission (D15:2174).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Level {
     /// The configuration root.
@@ -82,7 +82,7 @@ pub(crate) enum FieldStep {
 
 impl FieldStep {
     /// The step as a `logical-field` path spells it: the member's name, or
-    /// `*` (D15:2184).
+    /// `*` (D15:2185).
     pub(crate) fn name(&self) -> &str {
         match self {
             Self::Member(name) => name,
@@ -113,7 +113,7 @@ pub(crate) enum Outcome {
     Passed,
     Failed,
     /// The value's type did not match, so this check of the same path did
-    /// not evaluate it (D15:2184).
+    /// not evaluate it (D15:2185).
     Excluded,
 }
 
@@ -145,7 +145,7 @@ pub(crate) struct Candidate {
     /// type, the value's own, or else the containing value's, for a closed
     /// value, a known member, or an excluded check, the object's for a
     /// required member, and the map's for a key. None for the root's type,
-    /// which the analysis's measure admits (D15:2149, 2184).
+    /// which the analysis's measure admits (D15:2150, 2185).
     pub(crate) after: Option<CandidateId>,
 }
 

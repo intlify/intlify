@@ -18,17 +18,17 @@
 //! definitions, which 020 owns, and not the canonicalization of the keys,
 //! which Phase 7 did.
 //!
-//! Each Finding is observed where its check looked (D15:2249): past a bound,
+//! Each Finding is observed where its check looked (D15:2250): past a bound,
 //! the mapping or a key's sequence, beside the confirmed policy, which
 //! supplies the bound; a source two keys name, at each key beside the
-//! others' (D15:2387, 2410); a source outside the requested locales, at each
+//! others' (D15:2388, 2411); a source outside the requested locales, at each
 //! key naming it, beside the requested locales, a set that counts as one
 //! location; and a candidate at its own token: a literal that fails or
 //! corrects its spelling alone, or beside the confirmed policy past the
 //! identifier bound, one naming its own source beside the key, and a
 //! repeated literal or Intent source-locale candidate beside the others
 //! that repeat it. A key is classified by the canonicalizer Phase 5 bound
-//! (D15:776).
+//! (D15:777).
 
 use std::collections::BTreeMap;
 
@@ -143,11 +143,11 @@ const FALLBACK: &str = "messageFallback";
 /// and the sequences `fallback` holds, with the canonicalizer Phase 5 bound,
 /// observed through `observer` when the declaration's file is there; the
 /// caller hands it what Phase 5 bound. Every unit waits on the mapping's
-/// bound, which counts every entry whatever its sequence (D15:1899); a
+/// bound, which counts every entry whatever its sequence (D15:1900); a
 /// sequence's units wait on its key holding alone with an identity, and its
 /// candidates on the sequence's bound. A candidate structural admission did
 /// not admit has no unit, and holds back only the policy, which exists only
-/// when every unit passed and every candidate was admitted (D15:2367, 2422).
+/// when every unit passed and every candidate was admitted (D15:2368, 2423).
 pub(crate) fn resolve_fallback<Id: Clone, P: Provider>(
     evaluation: &mut Evaluation,
     confirmed: Result<&ConfirmedPolicy, &Causes>,
@@ -242,7 +242,7 @@ fn entries<'a>(
 }
 
 /// How many of a sequence's candidates its bound counts: those of an admitted
-/// kind, so that only a sequence with none waits on why (D15:1900, 2184,
+/// kind, so that only a sequence with none waits on why (D15:1901, 2185,
 /// 3354).
 fn counted(sequence: &Admitted<Vec<Admitted<&FallbackCandidate>>>) -> Admitted<usize> {
     let candidates = sequence.as_ref().map_err(Causes::clone)?;
@@ -271,9 +271,9 @@ fn by_source<'e, 'a>(entries: &'e [Entry<'a>]) -> BTreeMap<&'a LocaleKey, Vec<&'
 
 /// The two units of one key's subject, which entries under it share: two keys
 /// naming one source are a duplicate, found at each key beside the others'
-/// (D15:2387, 2410), and a source outside the requested locales is found at
+/// (D15:2388, 2411), and a source outside the requested locales is found at
 /// each key naming it, beside them, a set that counts as one location
-/// (D15:2249). Returns the source when its key holds alone, and whether it
+/// (D15:2250). Returns the source when its key holds alone, and whether it
 /// is requested.
 fn source(
     evaluation: &mut Evaluation,
@@ -338,8 +338,8 @@ fn source(
 /// A key's sequence under `maxFallbackCandidatesPerSource`, once the key
 /// holds alone: it then has one sequence, the one the bound measures, which
 /// past the bound is observed beside the confirmed policy that supplies the
-/// bound (D15:2249). It counts the candidates of an admitted kind, the others
-/// being excluded (D15:1900, 3354). The key can stand for several sources, so
+/// bound (D15:2250). It counts the candidates of an admitted kind, the others
+/// being excluded (D15:1901, 3479). The key can stand for several sources, so
 /// past the bound the sequence reports only the first-over witness (Decision
 /// 015-157).
 fn bounded_sequence(
@@ -353,7 +353,7 @@ fn bounded_sequence(
     observer: Option<&DeclarationObserver<'_>>,
 ) -> Result<Admitted<CanonicalLocale>, LocaleInvariant> {
     // Only a key holding alone has one sequence to count: otherwise its
-    // collision is what the unit waits on (D15:1519).
+    // collision is what the unit waits on (D15:1520).
     let (observed, submitted) = match sharing {
         [entry] => (
             beside(confirmed, observer, |observer| {
@@ -395,7 +395,7 @@ struct Sight<'s> {
 }
 
 impl Sight<'_> {
-    /// The candidate at `position`, at its token (D15:790).
+    /// The candidate at `position`, at its token (D15:791).
     fn candidate(&self, position: usize) -> Result<Option<EvidenceProjection>, ObserverInvariant> {
         match (self.observer, self.entry) {
             (Some(observer), Some(entry)) => observer
@@ -461,7 +461,7 @@ fn candidates<P: Provider>(
                 }
                 Ok(FallbackCandidate::IntentSource(_)) => intents.push(position),
                 // A candidate that failed is of no admitted kind: it holds
-                // back the policy alone, and no check names it (D15:2367).
+                // back the policy alone, and no check names it (D15:2368).
                 Err(_) => {}
             }
         }
@@ -538,7 +538,7 @@ struct LiteralAt {
 /// source. They are evaluated only under a key holding alone, which has one
 /// literal at the position, and observe it at its token: past the
 /// identifier bound beside the confirmed policy, which supplies the bound,
-/// and naming its own source beside the key (D15:2249, 2410).
+/// and naming its own source beside the key (D15:2250, 2411).
 fn literal_at<P: Provider>(
     evaluation: &mut Evaluation,
     canonicalizing: &Admitted<&Canonicalizer<P>>,
@@ -585,7 +585,7 @@ fn literal_at<P: Provider>(
         |attempt| attempt.map_err(|blocking| Found::through(blocking, failed)),
     )?;
     if let (true, Ok(canonical)) = (corrected, &locale) {
-        // The corrected candidate is the notice's occurrence (D15:2410).
+        // The corrected candidate is the notice's occurrence (D15:2411).
         let corrected = sight.candidate(position)?.map(|primary| Observation {
             primary,
             related: Vec::new(),
@@ -630,7 +630,7 @@ fn literal_at<P: Provider>(
 }
 
 /// A candidate's issue when one sequence holds it more than once, found at
-/// each candidate holding it beside the others (D15:2387, 2410).
+/// each candidate holding it beside the others (D15:2388, 2411).
 fn repeated(
     repeating: &[Option<EvidenceProjection>],
     holding: usize,
@@ -1058,7 +1058,7 @@ mod tests {
     /// Reciprocal mappings are finite independent sequences rather than graph
     /// cycles: two sources naming each other, or three naming one another in
     /// a ring, are admitted, and each keeps exactly the candidates it declares
-    /// (D15:1517, 3591).
+    /// (D15:1518, 3716).
     #[test]
     fn reciprocal_sequences_are_admitted_and_stay_independent() {
         for (requested, fallback, expected) in [
@@ -1093,7 +1093,7 @@ mod tests {
             )]
         );
         // Found at the key, beside the requested locales, a set that counts
-        // as one location (D15:2249).
+        // as one location (D15:2250).
         let (source, requested) = at(&declaration, |observer| {
             (
                 observer.member_key(&[FALLBACK], "fr").unwrap(),
@@ -1151,7 +1151,7 @@ mod tests {
             notices(&resolved.evaluation),
             [0, 3].map(|position| candidate_unit(key("ja"), position, Check::CanonicalLocale))
         );
-        // Each corrected candidate is its notice's occurrence (D15:2410).
+        // Each corrected candidate is its notice's occurrence (D15:2411).
         assert_eq!(
             observed(&resolved.evaluation),
             [0, 3].map(|position| occurrence(
@@ -1168,7 +1168,7 @@ mod tests {
 
     /// Keys naming one source outside the requested locales are each a
     /// candidate of both of its units: at the key, beside the other key, and
-    /// at the key, beside the requested locales (D15:2387).
+    /// at the key, beside the requested locales (D15:2388).
     #[test]
     fn keys_sharing_a_source_outside_the_requested_locales_are_each_a_candidate_of_both() {
         let declaration = declared(&["en"], json!({"iw-IL": ["de"], "he-IL": ["de"]}));
@@ -1227,7 +1227,7 @@ mod tests {
             issues(&resolved.evaluation),
             [(duplicate.clone(), "project-profile-locale-duplicate", None)]
         );
-        // Each key is found at its token, beside the other's (D15:2387, 2410).
+        // Each key is found at its token, beside the other's (D15:2388, 2411).
         let [upper, lower] = at(&declaration, |observer| {
             ["EN", "en"].map(|name| observer.member_key(&[FALLBACK], name).unwrap())
         });
@@ -1380,7 +1380,7 @@ mod tests {
             [candidate_unit(key("ja"), 2, Check::CanonicalLocale)]
         );
         // The self-reference beside the key, and each repeated candidate
-        // beside the other (D15:2387, 2410).
+        // beside the other (D15:2388, 2411).
         let at = |position| element(&declaration, "ja", position);
         let source = at_key(&declaration, "ja");
         assert_eq!(
@@ -1476,7 +1476,7 @@ mod tests {
             )]
         );
         // Past it, the mapping is observed beside the confirmed policy, which
-        // supplies the bound (D15:2249).
+        // supplies the bound (D15:2250).
         assert_eq!(
             observed(&resolved.evaluation),
             [(
@@ -1704,7 +1704,7 @@ mod tests {
             })
         );
         // Found at its token beside the confirmed policy, which supplies the
-        // bound (D15:2249).
+        // bound (D15:2250).
         assert_eq!(
             observed(&short.evaluation),
             [occurrence(
@@ -1752,7 +1752,7 @@ mod tests {
     }
 
     /// The source bound counts every entry, one whose sequence failed too,
-    /// and measures it exactly (D15:1899, 2184).
+    /// and measures it exactly (D15:1900, 2185).
     #[test]
     fn the_source_bound_counts_an_entry_whatever_its_sequence() {
         let declaration = declared(&["en", "ja"], json!({"en": ["ja"], "ja": ["en"]}));
@@ -1774,7 +1774,7 @@ mod tests {
 
     /// The sequence's bound counts the candidates of an admitted kind: one
     /// that failed neither counts nor names a unit, and the policy, which
-    /// needs every candidate, waits on it (D15:1900, 2184, 2367, 3354).
+    /// needs every candidate, waits on it (D15:1901, 2185, 2368, 3479).
     #[test]
     fn the_candidate_bound_counts_the_candidates_of_an_admitted_kind() {
         let declaration = declared(&["ja"], json!({"ja": ["en", "de", "fr"]}));
@@ -1813,7 +1813,7 @@ mod tests {
     }
 
     /// A candidate beside one that failed keeps its position in the sequence
-    /// and is observed there (D15:1519, 2182, 2249).
+    /// and is observed there (D15:1520, 2183, 2250).
     #[test]
     fn a_candidate_beside_a_failed_one_keeps_its_position() {
         let declaration = declared(&["ja"], json!({"ja": ["en", "de", "ja"]}));
@@ -1841,7 +1841,7 @@ mod tests {
     }
 
     /// A sequence with no candidate admitted waits on why each failed, while
-    /// its key's own checks are evaluated (D15:2184, 3354).
+    /// its key's own checks are evaluated (D15:2185, 3479).
     #[test]
     fn a_sequence_without_an_admitted_candidate_waits_on_every_cause() {
         let declaration = declared(&["ja"], json!({"ja": ["en", "de"]}));
@@ -1868,7 +1868,7 @@ mod tests {
     #[test]
     fn a_requested_set_phase_7_could_not_form_leaves_only_membership_not_evaluated() {
         // A source the set holds is requested beside the element without an
-        // identity (D15:2365, 2367).
+        // identity (D15:2366, 2368).
         let held = resolve(&declared(&["ja", "zz"], json!({"ja": ["en"]})));
         assert_eq!(
             waits_on(

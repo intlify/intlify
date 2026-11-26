@@ -519,7 +519,7 @@ fn locale_resolution_work_counts_every_role_and_marks_unresolved_sets_unavailabl
         // The rejected selector item leaves its rule without a domain, so
         // its two other units, the nine cells, and the table wait, while the
         // one unit every rule shares stays evaluated through the other rules
-        // (D15:2184).
+        // (D15:2185).
         (
             R::CoverageUncanonicalized,
             None,
@@ -962,7 +962,7 @@ fn sample_capture_rechecks_work_even_when_the_semantic_checksum_matches() {
 /// its Shared scope counted, each in its bound's unit: the example commits no
 /// Finding, the blocked recipe's statuses name the Findings they wait on, and
 /// the dense recipe commits a Finding of each of its targets' two checks
-/// (D15:1851, 1962-1970, 2796).
+/// (D15:1852, 1963-1971, 2801).
 #[test]
 fn the_shared_evidence_work_counts_what_the_stage_committed() {
     use crate::benchmark::cases::prepare::prepare;
@@ -1037,7 +1037,7 @@ fn the_shared_evidence_work_counts_what_the_stage_committed() {
 
 /// The causes of one not-evaluated status count as distinct causal Finding
 /// Keys, after cause-set deduplication, and every cause as a causal Finding
-/// Key occurrence, before it, in either domain (D15:1953, 1954, 1965, 1966).
+/// Key occurrence, before it, in either domain (D15:1954, 1955, 1966, 1967).
 #[test]
 fn the_cause_counts_are_in_their_bounds_units() {
     for (kind, unit, spelling) in [
@@ -1085,7 +1085,7 @@ fn entry_candidate(
 
 /// Each fact of the Entry projection stage's work, counted again from what
 /// `output`'s Entry domain committed and what the complete invocation
-/// counted, each in its bound's unit (D15:1851, 1946-1956, 2796): `None` for
+/// counted, each in its bound's unit (D15:1852, 1947-1957, 2801): `None` for
 /// the four counts over what path admission leaves when a path past its bound
 /// ended the count before them (plan 025 decisions #232 and #265).
 fn recounted(output: &Output) -> Vec<(WorkKind, Option<u64>)> {
@@ -1188,7 +1188,7 @@ fn recounted(output: &Output) -> Vec<(WorkKind, Option<u64>)> {
 /// the complete invocation counted, each in its bound's unit: the example
 /// commits no Finding Occurrence, the dense recipe one with a related
 /// Evidence for each of its Shared Findings, and the file without a value
-/// its Entry Finding and the causes it is of, with no path (D15:1851,
+/// its Entry Finding and the causes it is of, with no path (D15:1852,
 /// 1946-1956, 2796).
 #[test]
 fn the_entry_evidence_work_counts_what_the_stage_committed() {
@@ -1246,7 +1246,7 @@ fn the_entry_evidence_work_counts_what_the_stage_committed() {
 
 /// Only a path a record cannot do without ends the complete invocation's
 /// count before what path admission leaves; a path a record can do without
-/// is left absent instead (D15:776; plan 025 decisions #232, #265, and #296).
+/// is left absent instead (D15:777; plan 025 decisions #232, #265, and #296).
 /// In each path bound's first-over case the four counts over what path
 /// admission leaves are unavailable for that reason, the largest path is
 /// still the input's, and the Entry domain's counts are what the run
@@ -1325,7 +1325,7 @@ fn only_a_required_path_past_its_bound_leaves_the_admitted_counts_unavailable() 
 /// mandatory reserve: no Shared record without a value, the truncated
 /// recipe's Shared records cut at their bound, and its reserve holding the
 /// Shared terminal Finding and state beside the envelope every outcome
-/// reserves (D15:1847, 2408).
+/// reserves (D15:1848, 2409).
 #[test]
 fn the_outcome_finalization_work_counts_the_records_and_the_reserve() {
     use crate::benchmark::cases::prepare::prepare;

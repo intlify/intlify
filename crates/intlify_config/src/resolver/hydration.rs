@@ -27,9 +27,9 @@
 //! or the Release both outputs join (025).
 //!
 //! A count past its bound is observed where the count is, beside the
-//! confirmed policy, which supplies the bound (D15:2249): the Group ID map
+//! confirmed policy, which supplies the bound (D15:2250): the Group ID map
 //! for every group's relations, and each occurrence of an endpoint for its
-//! bytes (D15:2387). An endpoint is observed at each of its occurrences: one
+//! bytes (D15:2388). An endpoint is observed at each of its occurrences: one
 //! that names no declared Target ID beside the declared Target IDs, one that
 //! names no member of its group beside the group's members, each the set it
 //! must belong to, and one whose Target Profile lacks its field's role beside
@@ -40,12 +40,12 @@
 //! Target ID that takes both roles is observed at each of its occurrences in
 //! one role beside those in the other.
 //!
-//! Each relation and each endpoint is read on its own (D15:2149, 2367, 3445).
+//! Each relation and each endpoint is read on its own (D15:2150, 2368, 3570).
 //! The bound counts what was submitted, a relation that failed and one under
 //! an entry whose key failed included. A relation with an endpoint that failed
 //! has no identity and is keyed by its Subject content projection, so such
 //! relations of one group share a subject, each checked as its own raw parent
-//! (D15:2181, 2190, 2203): the endpoint it still holds is checked, and what
+//! (D15:2182, 2191, 2204): the endpoint it still holds is checked, and what
 //! compares the two waits on the one that failed. An element that is no object
 //! has no subject. What a later phase reads waits on all of it.
 
@@ -156,7 +156,7 @@ pub(crate) enum HydrationSubject {
 }
 
 /// What names a relation: its identity once both endpoints were admitted,
-/// which orders before every content key, and otherwise its content (D15:2181).
+/// which orders before every content key, and otherwise its content (D15:2182).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum RelationKey {
     /// The relation's server and client Target IDs.
@@ -177,7 +177,7 @@ impl RelationKey {
 
 /// Canonical content identity of a relation object with an endpoint that
 /// failed: transient, it orders the raw parents inside their one subject and
-/// is then discarded (D15:2186, 2190, 2203). Its Debug shows only its length:
+/// is then discarded (D15:2187, 2191, 2204). Its Debug shows only its length:
 /// rejected authoring text never reaches a log.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct RelationContent(Arc<[u8]>);
@@ -191,7 +191,7 @@ impl fmt::Debug for RelationContent {
 impl RelationContent {
     /// The content that stands for every such relation in a logical subject:
     /// a relation is an object, and `redacted-structure` keeps only that type
-    /// (D15:2188).
+    /// (D15:2189).
     pub(crate) fn projected() -> Self {
         Self(Arc::from([]))
     }
@@ -206,7 +206,7 @@ impl RelationContent {
 }
 
 /// One object of a group's `hydrationRelations`: its key and each endpoint,
-/// or why it has none (D15:2367).
+/// or why it has none (D15:2368).
 #[derive(Debug, Clone)]
 pub(crate) struct RelationField<'a> {
     pub(crate) key: RelationKey,
@@ -223,7 +223,7 @@ pub(crate) struct RelationGroup<'a> {
 }
 
 /// The Group ID map as Phase 13 reads it: how many relation occurrences its
-/// arrays hold, whatever their entries' keys and values (D15:1936), each entry
+/// arrays hold, whatever their entries' keys and values (D15:1937), each entry
 /// with an admitted key, and whether everything at and below the map passed,
 /// which what needs every relation waits on.
 #[derive(Debug, Clone)]
@@ -342,7 +342,7 @@ impl ResolvedHydration {
 /// the targets Phase 11 resolved, and the groups Phase 12 resolved. Every unit
 /// waits on the relations' bound, and every unit of a group on the group's
 /// bounds. Each endpoint's checks wait on that endpoint alone, and each check
-/// of a relation on just the facts it compares (D15:2365): a relation between
+/// of a relation on just the facts it compares (D15:2366): a relation between
 /// equal endpoints, or with an endpoint outside its group, still compares
 /// their locales and Target Profiles, and one whose endpoint failed checks
 /// the other. The checks observe through `observer`, the selected
@@ -573,7 +573,7 @@ impl Default for Taken {
 /// Each Target ID that serves or hydrates between two distinct endpoints
 /// takes one role in its group, waiting only on the bytes of the endpoints
 /// that name it there. One that takes both is observed at each of its
-/// occurrences in one role, beside its occurrences in the other (D15:2249,
+/// occurrences in one role, beside its occurrences in the other (D15:2250,
 /// 2387), through `observer` when there is one.
 fn single_roles(
     evaluation: &mut Evaluation,
@@ -632,7 +632,7 @@ fn default_at(
 }
 
 /// The relation at each of `positions` in the group `id`, or the endpoint
-/// `field` names in it, at its token (D15:790), when there is a declaration to
+/// `field` names in it, at its token (D15:791), when there is a declaration to
 /// observe.
 fn relations_at(
     observer: Option<&DeclarationObserver<'_>>,
@@ -706,10 +706,10 @@ impl Relation<'_> {
     /// members name it, each after its bytes alone; and whether its Target
     /// Profile takes the role its field names, after what Phase 11 found of
     /// it. An endpoint that failed has no subject, so it records no unit
-    /// (D15:1931, 2184). A check that fails observes each occurrence of the
-    /// endpoint (D15:2387): past the bound beside the policy, with the
+    /// (D15:1932, 2185). A check that fails observes each occurrence of the
+    /// endpoint (D15:2388): past the bound beside the policy, with the
     /// first-over witness of a key that can stand for several values
-    /// (D15:2203), naming no declared Target ID beside the declared Target
+    /// (D15:2204), naming no declared Target ID beside the declared Target
     /// IDs, naming no member beside the group's members, and without its role
     /// beside its Target Profile.
     fn endpoint<'t, 's>(
@@ -826,9 +826,9 @@ impl Relation<'_> {
     /// after what Phase 11 found of both; and static compatibility, after both
     /// Target Profiles. No check of the relation waits on another's failure.
     /// A check of the relation that fails observes each of its occurrences
-    /// (D15:2387): between equal endpoints alone, repeated beside the other
+    /// (D15:2388): between equal endpoints alone, repeated beside the other
     /// occurrences, and otherwise beside where it found both endpoints'
-    /// locales, effective defaults, or Target Profiles (D15:2249).
+    /// locales, effective defaults, or Target Profiles (D15:2250).
     fn check(
         &self,
         evaluation: &mut Evaluation,
@@ -1676,7 +1676,7 @@ mod tests {
     #[test]
     fn a_repeated_relation_observes_each_occurrence_of_its_endpoint() {
         // `ssr -> phone` twice: one subject, so one result for each failed
-        // check, observed at both occurrences (D15:2387), and the repeat
+        // check, observed at both occurrences (D15:2388), and the repeat
         // itself at each occurrence beside the other.
         let mut inputs = Inputs::new();
         inputs.relate(
@@ -2046,7 +2046,7 @@ mod tests {
         // `browser` is seven bytes and `ssr` three: at 6 only the client's
         // endpoint is over, at 2 both are, each its own result, with the
         // first-over witness of a key that can stand for several values
-        // (D15:2203).
+        // (D15:2204).
         let client = endpoint("web", "ssr", "browser", EndpointField::Client);
         let server = endpoint("web", "ssr", "browser", EndpointField::Server);
         for (limit, over) in [

@@ -269,10 +269,10 @@ impl CaseProjection {
 
     /// The peak live memory of a case's interval: the same fixture, workload,
     /// and execution state as its duration, and its variant with the entry
-    /// kind the memory cost does not name (D15:2792), under the memory pair
+    /// kind the memory cost does not name (D15:2797), under the memory pair
     /// and its grouping, the observer's method, and the domain of what it
     /// observes: an invocation of a resolver in the case's state, or a
-    /// construction, whose case names no resolver state (D15:2805).
+    /// construction, whose case names no resolver state (D15:2810).
     fn memory(duration: Self, memory: PeakMemory, boundary: Boundary, method: Method) -> Self {
         let (category, operation_class, performance_surface) = grouping(memory.phase);
         let domain = match duration.variant.resolver {

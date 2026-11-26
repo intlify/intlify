@@ -2,7 +2,7 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! 015's outcome finalization stage over one file entry's complete
-//! invocation (D15:2771, 2775). It takes what the Entry projection stage
+//! invocation (D15:2772, 2776). It takes what the Entry projection stage
 //! left, so before the interval the invocation's evaluation phases and both
 //! projection stages run on an evaluation of their own; the interval runs
 //! outcome finalization: each domain's projection in canonical order,
@@ -30,7 +30,7 @@ use super::{count, specification, unit, Id, PreparedEvidence, RetainedRecord};
 
 /// An outcome finalization case's inputs: the invocation's, and the Resolver
 /// Construction Identity of the committed resolver, which finalization puts
-/// in the outcome (D15:1150, 1155).
+/// in the outcome (D15:1151, 1156).
 pub(in crate::benchmark) struct PreparedOutcome {
     pub(in crate::benchmark) evidence: PreparedEvidence,
     pub(in crate::benchmark) identity: ConstructionIdentity,
@@ -70,7 +70,7 @@ pub(in crate::benchmark) fn finalization<'e, 's>(
 /// One domain's projection as the output retains it: its records in
 /// canonical order with their Evidence record owners, and its terminal
 /// Finding, state, and Shared-unavailability cause, when a bound exhausted
-/// it (D15:2408).
+/// it (D15:2409).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(in crate::benchmark) struct RetainedProjection {
     pub(in crate::benchmark) records: Vec<(Unit, RetainedRecord)>,
@@ -99,7 +99,7 @@ impl RetainedProjection {
 /// The outcome as the output retains it: its Resolver Construction Identity,
 /// both projections, a checked outcome's profile view and the tuples of its
 /// Resolved Profile Artifact Bindings, and its mandatory reserve in
-/// `maxCanonicalBytes`' unit (D15:1150-1166, 1847).
+/// `maxCanonicalBytes`' unit (D15:1151-1167, 1848).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(in crate::benchmark) struct RetainedOutcome {
     pub(in crate::benchmark) identity: ConstructionIdentity,
@@ -167,7 +167,7 @@ pub(in crate::benchmark) fn require_observable(
 /// the Shared projection or its absence, and a checked outcome's profile view
 /// and bindings in the shared domain, the Entry projection in the entry
 /// domain. Whether the outcome is checked and whether its bundle is complete
-/// follow from the profile and the terminal states (D15:1152-1153,
+/// follow from the profile and the terminal states (D15:1153-1154,
 /// 1176-1185, 2775, 2794; plan 025 interpretation #261).
 pub(in crate::benchmark) fn observe(resolved: &Resolved) -> Result<Observation, OutputFailure> {
     let outcome = require_observable(resolved)?;
@@ -255,7 +255,7 @@ mod tests {
     /// Only the example's outcome is checked. The blocked recipes' Shared
     /// projections are present and whole, the file without a value has none,
     /// and the truncated recipe's Shared domain is exhausted, so its bundle is
-    /// incomplete (D15:1152-1153, 1163-1165, 1185).
+    /// incomplete (D15:1153-1154, 1164-1166, 1186).
     #[test]
     fn each_recipe_finalizes_its_expected_outcome() {
         for recipe in R::ALL {

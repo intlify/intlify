@@ -4,7 +4,7 @@
 //! 015's Portable Source Locator admission: a candidate admitted as a file
 //! entry's `relative-path` locator, or as a Programmatic Entry's or Call-Site
 //! Source's `safe-label` or `safe-uri` locator, or treated exactly as locator
-//! absence (D15:747, 762-766, 796; 015-081, 015-171).
+//! absence (D15:748, 763-767, 797; 015-081, 015-171).
 //!
 //! The adapter or frontend constructs the canonical form and classifies it;
 //! the core only validates the variant, the classification, the bound, and
@@ -27,7 +27,7 @@
 //! Evidence compares admitted locators by variant rank, `relative-path`,
 //! `safe-label`, then `safe-uri`, and then by exact payload bytes, after their
 //! absence, and views one as a single-member object keyed by its variant
-//! (D15:840, 2496).
+//! (D15:841, 2497).
 
 use serde_json::{json, Value};
 
@@ -82,7 +82,7 @@ impl Locator {
         &self.payload
     }
 
-    /// `{ variant: payload }` (D15:2496).
+    /// `{ variant: payload }` (D15:2497).
     pub(crate) fn view(&self) -> Value {
         json!({ self.variant.id(): self.payload })
     }
@@ -172,7 +172,7 @@ fn relative_path(payload: &str) -> bool {
             .all(|segment| !matches!(segment, "" | "." | ".."))
 }
 
-/// Whether `payload` is a canonical `safe-uri` (D15:764): an absolute URI,
+/// Whether `payload` is a canonical `safe-uri` (D15:765): an absolute URI,
 /// with no query or fragment, that RFC 3986's syntax-based normalization
 /// leaves as it is, whose scheme is not `file`, and whose authority, when
 /// present, has no user information, an ASCII host, and a canonical port.
@@ -197,7 +197,7 @@ fn safe_uri(payload: &str) -> bool {
 /// Whether an authority with no user information escapes no byte past ASCII.
 /// RFC 3986 spells a non-ASCII registered name as its escaped UTF-8 bytes, so
 /// such a host is a Unicode one, which the adapter must already have converted
-/// to its A-label form (D15:764, 3377). The grammar makes every `%` the start
+/// to its A-label form (D15:765, 3502). The grammar makes every `%` the start
 /// of an escape, and a port holds none.
 fn ascii_host(authority: &str) -> bool {
     !authority
@@ -428,7 +428,7 @@ mod tests {
     }
 
     /// A `safe-label` is any non-empty string the frontend classified,
-    /// compared by its exact bytes and never normalized (D15:763).
+    /// compared by its exact bytes and never normalized (D15:764).
     #[test]
     fn a_classified_label_is_admitted_as_given() {
         for payload in ["storefront", "app.ts:12", " ", "設定 / config", "a\\b/../c"] {
@@ -449,7 +449,7 @@ mod tests {
 
     /// A `safe-uri` is admitted only already canonical: an absolute ASCII URI
     /// in syntax-based normal form, with a non-default port in its shortest
-    /// decimal, and nothing that revision `"0"` removes (D15:764).
+    /// decimal, and nothing that revision `"0"` removes (D15:765).
     #[test]
     fn a_canonical_uri_is_admitted_as_given() {
         for payload in [
@@ -527,7 +527,7 @@ mod tests {
     }
 
     /// `%7F` is the last ASCII byte and `%80` the first past it. An escape of
-    /// another ASCII byte stays in a host, as `%2B` does (D15:764, 3377).
+    /// another ASCII byte stays in a host, as `%2B` does (D15:765, 3502).
     #[test]
     fn a_host_may_escape_only_ascii_bytes() {
         for authority in ["ssh-remote%2Bhost", "a%7Fb", "example.com:8443"] {
@@ -542,7 +542,7 @@ mod tests {
     /// rewrite gives: the core admits the canonical one and refuses the other
     /// without repairing it. RFC 3986's normalization decodes an unreserved
     /// escape first and then removes the dot segments the decoding spells
-    /// (D15:764, 766, 3376, 3377).
+    /// (D15:765, 767, 3501, 3502).
     #[test]
     fn a_spelling_the_adapter_must_rewrite_is_refused_and_not_repaired() {
         for (spelled, canonical) in [
@@ -584,7 +584,7 @@ mod tests {
 
     /// A programmatic locator is a `safe-label` or a `safe-uri`, never a
     /// `relative-path`, and an unclassified, over-bound, or absent candidate
-    /// is absence (D15:747, 766, 796).
+    /// is absence (D15:748, 767, 797).
     #[test]
     fn a_programmatic_locator_takes_only_its_two_variants() {
         assert_eq!(programmatic(path("config/intlify.json")), None);

@@ -83,7 +83,7 @@ pub(super) enum Outcome {
     Structural(Analysis),
     Selection(SelectionFailure),
     /// Selection's prerequisites hold no complete construction checks: the
-    /// profile bounds selection applies (D15:1885, 1886).
+    /// profile bounds selection applies (D15:1886, 1887).
     SelectionUnavailable(SelectionPrerequisite),
     Locale(Box<Locales>),
 }

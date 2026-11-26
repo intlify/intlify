@@ -3,21 +3,21 @@
 
 //! Design 015's `programmatic_snapshot_admission`, the programmatic half of
 //! `profile_entry_materialize`: from an already constructed inert Snapshot
-//! through the document of its value (D15:2765; plan 025 decision #316).
+//! through the document of its value (D15:2766; plan 025 decision #316).
 //!
 //! A case holds the formal Snapshot a binding submits, built before any
-//! interval as live-host inspection is (D15:2824). The interval admits it at
+//! interval as live-host inspection is (D15:2829). The interval admits it at
 //! the `programmatic-entry-snapshot` boundary under the case's
 //! `bootstrapOnly.snapshot` bounds and builds the document of the admitted
 //! tree, so it ends with a document, as `file_decode_and_source_map` does.
 //! The boundary borrows the report, so the interval releases nothing built
-//! before it (D15:2805; plan 025 decision #323). A tree with a marker is
-//! admitted with no document, which Phase 1 blocks (D15:140, 2129); a
-//! refused report is no case's result (D15:2826).
+//! before it (D15:2810; plan 025 decision #323). A tree with a marker is
+//! admitted with no document, which Phase 1 blocks (D15:141, 2130); a
+//! refused report is no case's result (D15:2831).
 //!
 //! The Shared domain frames the document's value as a file document's is
 //! framed, so a file and a Snapshot of one value observe equal Shared
-//! domains (D15:2788, 2794); a tree with a marker has no value. The Entry
+//! domains (D15:2791, 2799); a tree with a marker has no value. The Entry
 //! domain frames the admitted Snapshot: its digest, its counts under the
 //! nine bounds, and its markers in canonical order.
 
@@ -46,7 +46,7 @@ pub(super) struct Admitted {
 pub(super) type Resolved = Result<Admitted, SnapshotRefusal>;
 
 /// The interval: the boundary's admission of `report` under `limits`, and
-/// the document of the admitted tree (D15:2765).
+/// the document of the admitted tree (D15:2766).
 pub(super) fn admit((report, limits): (&SnapshotReport, SnapshotLimits)) -> Resolved {
     let snapshot = read_report(Some(report), &limits)?;
     let document = MaterializedDocument::from_snapshot(snapshot.root());
@@ -69,7 +69,7 @@ pub(super) fn markers(root: &Node) -> Vec<Marker> {
     found
 }
 
-/// A refused report is a benchmark failure (D15:2826).
+/// A refused report is a benchmark failure (D15:2831).
 pub(super) fn observe(resolved: &Resolved) -> Result<Observation, OutputFailure> {
     let admitted = resolved
         .as_ref()
@@ -148,7 +148,7 @@ pub(in crate::benchmark) mod tests {
         found[0]["result"].clone()
     }
 
-    /// D15:2765, 2824: each recipe's timed admission ends with the document
+    /// D15:2766, 2829: each recipe's timed admission ends with the document
     /// of its value, built inside the interval, exactly when the tree holds
     /// no marker, and is observed as an untimed one is.
     #[test]
@@ -167,7 +167,7 @@ pub(in crate::benchmark) mod tests {
         }
     }
 
-    /// D15:2788, 2794: a Snapshot of a file's value frames the Shared domain
+    /// D15:2791, 2799: a Snapshot of a file's value frames the Shared domain
     /// the expectations pin for that file's `file_decode_and_source_map`
     /// case, and its own Entry domain.
     #[test]
@@ -180,7 +180,7 @@ pub(in crate::benchmark) mod tests {
         }
     }
 
-    /// D15:871, 889: members submitted in the reverse order and the same
+    /// D15:872, 890: members submitted in the reverse order and the same
     /// value submitted in order are one canonical tree, so both domains are
     /// observed alike.
     #[test]
@@ -190,7 +190,7 @@ pub(in crate::benchmark) mod tests {
         assert_ne!(observed(R::LongString).entry, minimal.entry);
     }
 
-    /// D15:140, 861: a tree with a marker is admitted with no document, so
+    /// D15:141, 862: a tree with a marker is admitted with no document, so
     /// its Shared domain frames no value, and its Entry domain frames its
     /// markers' records in canonical order.
     #[test]
@@ -257,7 +257,7 @@ pub(in crate::benchmark) mod tests {
 
     /// The Entry domain frames the admitted digest, then each of the nine
     /// counts in the bounds' order, then the markers' count and each
-    /// marker's record; a refused report is no observation (D15:2826).
+    /// marker's record; a refused report is no observation (D15:2831).
     #[test]
     fn the_entry_domain_is_framed_as_the_codec_spells_it() {
         let snapshot = admitted_root(R::Cycle);
@@ -285,7 +285,7 @@ pub(in crate::benchmark) mod tests {
         assert_eq!(observe(&refused), failure);
     }
 
-    /// D15:2765: each case is the cost 015 names over its recipe's file,
+    /// D15:2766: each case is the cost 015 names over its recipe's file,
     /// and its interval observes what the case's preparation does and its
     /// expectation pins.
     #[test]
@@ -311,7 +311,7 @@ pub(in crate::benchmark) mod tests {
         }
     }
 
-    /// D15:2765, 2824: a case's interval is handed the submitted report and
+    /// D15:2766, 2829: a case's interval is handed the submitted report and
     /// its bounds, never an admitted tree, and hands back the admitted tree
     /// beside its document.
     #[test]

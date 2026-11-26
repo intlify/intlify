@@ -2,24 +2,24 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! Design 015's materialized re-resolution, which the `profile_resolve_e2e`
-//! pair measures from a replay input through its replay result (D15:2772).
+//! pair measures from a replay input through its replay result (D15:2773).
 //!
 //! Before any interval, a case's preparation constructs a resolver from the
 //! committed input, as a complete invocation's does, and invokes it once on
 //! what a binding submits for one file entry's invocation: the Materialized
 //! Resolution Input Set beside that outcome, whose values were admitted then,
-//! is the case's replay input (D15:2657, 2824). Each interval replays that
+//! is the case's replay input (D15:2658, 2829). Each interval replays that
 //! set on the same resolver, from the retained set through the identity
 //! match to the replay result, and admits nothing at a pre-invocation
-//! boundary (D15:2775). The storage the result borrows is made before the
-//! start mark, and the result is copied out after the end mark (D15:2749,
-//! 2824). A stale set or a resolver defect is a benchmark failure (D15:2826).
+//! boundary (D15:2776). The storage the result borrows is made before the
+//! start mark, and the result is copied out after the end mark (D15:2750,
+//! 2824). A stale set or a resolver defect is a benchmark failure (D15:2831).
 //!
 //! The semantic checksum covers the Shared projection, and the profile view
 //! with each binding's tuple and `C(member)` when the replay has them, in
 //! the shared domain: never the Resolver Construction Identity, which Shared
 //! Resolution Evidence does not hold, nor Entry evidence, which a replay has
-//! none of (D15:174, 2659, 2775; plan 025 decision #316).
+//! none of (D15:175, 2660, 2776; plan 025 decision #316).
 
 use crate::construction::resolver::ConstructedResolver;
 use crate::construction::root::ConstructionRoot;
@@ -123,7 +123,7 @@ fn replay<'s>(
 }
 
 /// Why a replay yields no result. Neither is an expected result: the set is
-/// the resolver's own, and no input causes a resolver defect (D15:2826).
+/// the resolver's own, and no input causes a resolver defect (D15:2831).
 #[derive(Debug, PartialEq, Eq)]
 pub(in crate::benchmark) enum ReplayFailure {
     Stale(ConstructionStale),
@@ -146,8 +146,8 @@ pub(in crate::benchmark) struct Resolved {
 }
 
 /// What one replay counts in the units of the bounds that count it
-/// (D15:2796): its set's marker-free value, as a Snapshot's root value is
-/// counted (D15:1889), and its members with their `C(member)` bytes, all
+/// (D15:2801): its set's marker-free value, as a Snapshot's root value is
+/// counted (D15:1890), and its members with their `C(member)` bytes, all
 /// admitted when the set was created; then its result's Shared records with
 /// their accounting bytes, and the bindings beside its profile, none without
 /// one.
@@ -213,7 +213,7 @@ pub(in crate::benchmark) fn observe(resolved: &Resolved) -> Result<Observation, 
 /// The shared domain of a replay whose Shared projection is `shared` and
 /// whose profile is `profile`, framed as an outcome's are, so that what an
 /// invocation's outcome predicts of the replay of its set can be framed too
-/// (D15:2659).
+/// (D15:2660).
 pub(in crate::benchmark) fn frame(
     specification: Specification<'_>,
     shared: &RetainedProjection,
@@ -275,7 +275,7 @@ mod tests {
         }
     }
 
-    /// D15:2659, D26:1815; plan 025 decision #316: a replay holds and frames
+    /// D15:2660, D26:1815; plan 025 decision #316: a replay holds and frames
     /// what the invocation whose set it replays predicts of it: that
     /// outcome's Shared projection and its profile view and bindings, with
     /// no entry domain.
@@ -306,7 +306,7 @@ mod tests {
         }
     }
 
-    /// D15:2659, 2788: the set of a programmatic entry's invocation, whose
+    /// D15:2660, 2791: the set of a programmatic entry's invocation, whose
     /// Snapshot is the value the file spells, replays as the file's set does.
     #[test]
     fn a_programmatic_entry_set_replays_as_the_file_set() {
@@ -335,7 +335,7 @@ mod tests {
         prepared
     }
 
-    /// D15:2659, D26:1815; plan 025 decision #316: each declared replay
+    /// D15:2660, D26:1815; plan 025 decision #316: each declared replay
     /// frames what the invocation whose set it replays predicts of it: that
     /// outcome's Shared projection, and the profile view and bindings of the
     /// checked invocation of the example, the outcome's own but when an
@@ -374,7 +374,7 @@ mod tests {
         }
     }
 
-    /// D15:2659, 2788: the set of a programmatic entry's invocation of each
+    /// D15:2660, 2791: the set of a programmatic entry's invocation of each
     /// declared recipe, the withheld one's included, replays as the file's
     /// set does.
     #[test]
@@ -390,7 +390,7 @@ mod tests {
         }
     }
 
-    /// D15:2657, 2826: a case needs the set of an invocation that materializes
+    /// D15:2658, 2831: a case needs the set of an invocation that materializes
     /// a value: a refused submission has no outcome, and a file with no value
     /// has no set beside its outcome.
     #[test]
@@ -404,7 +404,7 @@ mod tests {
         assert!(PreparedReplay::new(root(), built, malformed).is_none());
     }
 
-    /// D15:2775, 2824: the interval begins with the retained set, so what
+    /// D15:2776, 2829: the interval begins with the retained set, so what
     /// it is handed is the resolver, the set, and the storage the result
     /// borrows, never a submission, and its result is the untimed replay's.
     #[test]
@@ -438,7 +438,7 @@ mod tests {
         assert!(!input.contains("Submitted") && !input.contains("RawInvocation"));
     }
 
-    /// D15:174, 2775; plan 025 decision #316: the codec frames, under its own
+    /// D15:175, 2776; plan 025 decision #316: the codec frames, under its own
     /// name, the Shared projection, then the profile view and each binding's
     /// tuple and body behind their flag, and no Resolver Construction
     /// Identity; a replay without the profile frames the flag alone.
@@ -506,7 +506,7 @@ mod tests {
         }
     }
 
-    /// D15:2585, 2659, 2826: a set of another construction is stale and one
+    /// D15:2586, 2660, 2831: a set of another construction is stale and one
     /// holding a marker is a resolver defect; neither is a result, so each
     /// fails the observation.
     #[test]
@@ -545,7 +545,7 @@ mod tests {
         assert_eq!(observe(&resolved), Err(OutputFailure::ReplayFailure));
     }
 
-    /// D15:1889, 2796: a replay counts its set's value as strict file entry
+    /// D15:1890, 2801: a replay counts its set's value as strict file entry
     /// counts the file, the set's members and their `C(member)` bytes, its
     /// Shared records with their bytes, and the bindings beside its profile,
     /// none without one.

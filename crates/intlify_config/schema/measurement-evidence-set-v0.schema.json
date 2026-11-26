@@ -806,7 +806,7 @@
         },
         {
           "const": "profile-specification-layout",
-          "description": "The Profile Specification written with other bytes: one construction\n(D15:2589).",
+          "description": "The Profile Specification written with other bytes: one construction\n(D15:2590).",
           "type": "string"
         },
         {
@@ -2447,7 +2447,7 @@
         },
         {
           "const": "blocked",
-          "description": "The example without its project default and with an invalid target\nlocale: blocking Findings after materialization, neither of which\nholds the other back (D15:1907, 2367, 3446; plan 025 interpretation\n#252).",
+          "description": "The example without its project default and with an invalid target\nlocale: blocking Findings after materialization, neither of which\nholds the other back (D15:1908, 2368, 3571; plan 025 interpretation\n#252).",
           "type": "string"
         },
         {
@@ -2457,17 +2457,17 @@
         },
         {
           "const": "malformed",
-          "description": "The example's file without its last byte, which is no JSON: no value,\nso no unit reports into the Shared domain (D15:2369; plan 025\ndecision #260).",
+          "description": "The example's file without its last byte, which is no JSON: no value,\nso no unit reports into the Shared domain (D15:2370; plan 025\ndecision #260).",
           "type": "string"
         },
         {
           "const": "truncated",
-          "description": "The example under a Shared `maxRecords` its Shared records outgrow:\nthe Shared domain is exhausted, so the bundle is incomplete and the\noutcome blocked (D15:1185, 2408; plan 025 decision #262).",
+          "description": "The example under a Shared `maxRecords` its Shared records outgrow:\nthe Shared domain is exhausted, so the bundle is incomplete and the\noutcome blocked (D15:1186, 2409; plan 025 decision #262).",
           "type": "string"
         },
         {
           "const": "inadmissible",
-          "description": "The example's file with its project default three times and a locale\nstring a lone surrogate: two Entry Findings, one of the duplicate\nmembers, whose two occurrences each relate the other two, and one of\nthe string that is no JSON-compatible value, and the statuses that\nwait on both name both as causes; no value (D15:3440; plan 025\ndecision #264).",
+          "description": "The example's file with its project default three times and a locale\nstring a lone surrogate: two Entry Findings, one of the duplicate\nmembers, whose two occurrences each relate the other two, and one of\nthe string that is no JSON-compatible value, and the statuses that\nwait on both name both as causes; no value (D15:3565; plan 025\ndecision #264).",
           "type": "string"
         }
       ]
@@ -4182,7 +4182,7 @@
       "type": "string"
     },
     "ProgrammaticRecipe": {
-      "description": "A programmatic entry's recipes: each Evidence recipe whose value a\nSnapshot represents, submitting the value its file spells, and the\nexample's value holding the ordinary marker of an unsupported host value,\nwhich Phase 1 blocks with no value (D15:861, 2129). The malformed file has\nno value, and the inadmissible one's repeated member and lone surrogate\nare no host value's.",
+      "description": "A programmatic entry's recipes: each Evidence recipe whose value a\nSnapshot represents, submitting the value its file spells, and the\nexample's value holding the ordinary marker of an unsupported host value,\nwhich Phase 1 blocks with no value (D15:862, 2130). The malformed file has\nno value, and the inadmissible one's repeated member and lone surrogate\nare no host value's.",
       "enum": ["storefront", "blocked", "dense", "truncated", "rejected-marker"],
       "type": "string"
     },
@@ -4498,7 +4498,7 @@
       ]
     },
     "ReplayRecipe": {
-      "description": "A replay's recipes (plan 025 decisions #34 and #316): the set of the\nexample, whose replay has the profile; the Blocked recipe's, semantically\nblocked after materialization, whose replay has the Shared projection\nalone; and the example's under a capability whose `maxTokenInputs` the\nEntry scope's token inputs exceed and the Shared scope's are within,\nwhich withholds the invocation's profile but not the replay's (D15:2659).",
+      "description": "A replay's recipes (plan 025 decisions #34 and #316): the set of the\nexample, whose replay has the profile; the Blocked recipe's, semantically\nblocked after materialization, whose replay has the Shared projection\nalone; and the example's under a capability whose `maxTokenInputs` the\nEntry scope's token inputs exceed and the Shared scope's are within,\nwhich withholds the invocation's profile but not the replay's (D15:2660).",
       "enum": ["storefront", "blocked", "entry-withheld"],
       "type": "string"
     },

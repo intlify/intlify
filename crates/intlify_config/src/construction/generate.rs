@@ -371,7 +371,7 @@ fn written_input() -> Result<ConstructionInput, serde_json::Error> {
     })
 }
 
-/// Write the construction vectors (D15:987): the Root Package's canonical
+/// Write the construction vectors (D15:988): the Root Package's canonical
 /// preimage and digest, and the Resolver Construction Identity of every
 /// authority and member this crate writes, constructed under the built-in
 /// root: its preimage, its digest, and its text.

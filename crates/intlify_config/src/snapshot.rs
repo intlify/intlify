@@ -1,7 +1,7 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! 015's canonical Programmatic Entry Snapshot (D15:850-895): the closed tree
+//! 015's canonical Programmatic Entry Snapshot (D15:851-896): the closed tree
 //! a binding builds from a host value without running host behavior, its
 //! framing `S`, the content digest that is also the Programmatic Entry
 //! revision, and what the tree counts under the nine `bootstrapOnly.snapshot`
@@ -11,7 +11,7 @@
 //! negative zero as positive zero; a string or key is a Unicode-scalar
 //! string; and an object's keys are unique and ordered by their unsigned
 //! UTF-8 bytes, which `BTreeMap<String, _>` keeps by construction
-//! (D15:854-859, 871, 889). Admitting a submitted Snapshot into this form, or
+//! (D15:855-860, 872, 890). Admitting a submitted Snapshot into this form, or
 //! refusing it, is the `programmatic-entry-snapshot` boundary's work
 //! ([`crate::boundary::snapshot`]). Like the file entry's value, the tree
 //! carries configuration and has no `Debug`.
@@ -27,7 +27,7 @@ use crate::input_limits::{Bound, ValueCounts};
 use crate::materialize::PortableNumber;
 use crate::resolver::capability::{BootstrapBoundId, BootstrapGroup, SnapshotLimits};
 
-/// The tags of `S`: 017's value tags, then a number and a marker (D15:873-886).
+/// The tags of `S`: 017's value tags, then a number and a marker (D15:874-887).
 const NULL: u8 = 0x01;
 const FALSE: u8 = 0x02;
 const TRUE: u8 = 0x03;
@@ -37,7 +37,7 @@ const OBJECT: u8 = 0x06;
 const NUMBER: u8 = 0x07;
 const MARKER: u8 = 0x08;
 
-/// One node of a canonical Snapshot (D15:871).
+/// One node of a canonical Snapshot (D15:872).
 #[derive(Clone)]
 pub(crate) enum Node {
     Null,
@@ -51,14 +51,14 @@ pub(crate) enum Node {
 
 /// A rejected-node marker: an ordinary data violation, or the terminal
 /// marker of a bootstrap overrun naming the exceeded `bootstrapOnly.snapshot`
-/// bound and its rejecting witness (D15:861, 867, 889).
+/// bound and its rejecting witness (D15:862, 868, 890).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Marker {
     Rejected(MarkerReason),
     BootstrapLimitExceeded { bound: SnapshotBound, witness: u64 },
 }
 
-/// The closed reasons of an ordinary marker (D15:861).
+/// The closed reasons of an ordinary marker (D15:862).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum MarkerReason {
     UnsupportedType,
@@ -100,7 +100,7 @@ impl MarkerReason {
 /// The reason ID of a bootstrap overrun's marker.
 pub(crate) const BOOTSTRAP_LIMIT_EXCEEDED: &str = MARKER_REASONS[9];
 
-/// A `bootstrapOnly.snapshot` bound, in the table's order (D15:1796-1804).
+/// A `bootstrapOnly.snapshot` bound, in the table's order (D15:1797-1805).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SnapshotBound {
     Nodes,
@@ -148,7 +148,7 @@ impl SnapshotBound {
     }
 
     /// The bound's capability path, such as `bootstrapOnly.snapshot.maxNodes`,
-    /// which a bootstrap marker's record carries (D15:889).
+    /// which a bootstrap marker's record carries (D15:890).
     pub(crate) fn path(self) -> String {
         let id = self.id();
         format!("bootstrapOnly.{}.{}", id.group.path(), id.name)
@@ -178,7 +178,7 @@ impl SnapshotBound {
 impl Marker {
     /// The marker record: field `0x01` the reason ID, and for a bootstrap
     /// overrun `0x02` the bound's path and `0x03` the witness as `U64`
-    /// (D15:889).
+    /// (D15:890).
     pub(crate) fn record(self) -> Vec<u8> {
         match self {
             Self::Rejected(reason) => Record::new().field(reason.id().as_bytes()).finish(),
@@ -191,7 +191,7 @@ impl Marker {
     }
 }
 
-/// A frame's tag and its `U64` payload length (D15:873).
+/// A frame's tag and its `U64` payload length (D15:874).
 const HEADER: usize = 1 + 8;
 
 /// `U64(count)` of a container's elements or members.
@@ -220,7 +220,7 @@ fn open(tag: u8, entries: usize, output: &mut Vec<u8>) -> usize {
 }
 
 impl Node {
-    /// `S` of this node appended to `output` (D15:875-889), without
+    /// `S` of this node appended to `output` (D15:876-890), without
     /// recursion: a container's frame opens with its payload length left to
     /// fill in, its members follow in place, and the length is written when
     /// it closes, so neither a deep tree nor a long payload is copied once
@@ -267,7 +267,7 @@ impl Node {
         }
     }
 
-    /// `S(self)`, the canonical bytes two equal Snapshots share (D15:889).
+    /// `S(self)`, the canonical bytes two equal Snapshots share (D15:890).
     pub(crate) fn framed(&self) -> Vec<u8> {
         let mut output = Vec::new();
         self.frame_into(&mut output);
@@ -277,7 +277,7 @@ impl Node {
     /// The snapshot-content digest, which is also the Programmatic Entry
     /// revision: SHA-256 over `intlify.programmatic-entry-snapshot.v0`
     /// followed by `S(root)`, as `sha256:` and 64 lowercase hexadecimal
-    /// digits (D15:889).
+    /// digits (D15:890).
     pub(crate) fn digest(&self) -> String {
         let mut preimage = SNAPSHOT_DOMAIN.as_bytes().to_vec();
         self.frame_into(&mut preimage);
@@ -298,7 +298,7 @@ impl Drop for Node {
 }
 
 /// Two trees are equal node for node: the same variant and value, arrays
-/// element for element, and objects key for key (D15:871). Compared without
+/// element for element, and objects key for key (D15:872). Compared without
 /// recursion, so comparing deep trees cannot exhaust the stack (plan 025
 /// decision #298).
 impl PartialEq for Node {
@@ -330,7 +330,7 @@ impl PartialEq for Node {
 }
 
 /// What a canonical tree counts under the nine `bootstrapOnly.snapshot`
-/// bounds, each in its unit (D15:1796-1804): every node, a marker included;
+/// bounds, each in its unit (D15:1797-1805): every node, a marker included;
 /// tree levels with the root at one; object members and array elements;
 /// the UTF-8 bytes of every string and key, and the longest one; markers;
 /// the bytes of `S(root)` and of the longest marker frame; and the nodes and
@@ -405,7 +405,7 @@ impl SnapshotCounts {
     }
 
     /// The five counts the root-value bounds read, which for a marker-free
-    /// tree equal a file entry's counts of the same value (D15:1889).
+    /// tree equal a file entry's counts of the same value (D15:1890).
     pub(crate) const fn value(&self) -> ValueCounts {
         ValueCounts {
             nodes: self.nodes,
@@ -505,7 +505,7 @@ mod tests {
 
     /// Each variant frames with its tag, an object its members in key order
     /// after their count, and a marker its record, and the digest is
-    /// SHA-256 over the domain separator and `S(root)` (D15:875-889).
+    /// SHA-256 over the domain separator and `S(root)` (D15:876-890).
     #[test]
     fn the_tree_frames_and_digests_as_015_defines() {
         assert_eq!(tree().framed(), bytes(TREE));
@@ -761,7 +761,7 @@ mod tests {
     /// Canonical equality is that of the complete typed tree, which is that
     /// of `S(root)`: each variant only ever equals itself, an array compares
     /// in order and a string by its scalars, and a marker through its reason,
-    /// its bound, and its witness (D15:871, 889, 3337).
+    /// its bound, and its witness (D15:872, 890, 3462).
     #[test]
     fn canonical_equality_is_the_complete_typed_tree() {
         let overrun =
@@ -805,7 +805,7 @@ mod tests {
 
     /// A shared acyclic value is written out where it occurs, so it compares
     /// and counts as the independent copies it expands to, and an ancestor
-    /// cycle compares as its canonical marker at its position (D15:859, 867,
+    /// cycle compares as its canonical marker at its position (D15:860, 868,
     /// 871, 3337).
     #[test]
     fn a_shared_value_compares_expanded_and_a_cycle_as_its_marker() {
@@ -824,7 +824,7 @@ mod tests {
     }
 
     /// Without a marker, the five counts the root-value bounds share are
-    /// those the file entry counts for the same JSON value (D15:1889).
+    /// those the file entry counts for the same JSON value (D15:1890).
     #[test]
     fn a_marker_free_tree_counts_as_the_same_json_value() {
         let value = json!({

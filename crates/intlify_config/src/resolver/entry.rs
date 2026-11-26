@@ -3,37 +3,37 @@
 
 //! Design 015's Phase 1, `entry-admission`, over strict file entry. The
 //! phase's first kind owns the entry dependency records and waits on nothing
-//! (D15:2516). The complete input is one singleton subject, of whose checks a
+//! (D15:2517). The complete input is one singleton subject, of whose checks a
 //! file records ten (Decision 015-202). They run in check-rank order, each
 //! waiting on the checks whose result it needs: the parser's tokens on the
-//! file's bytes, strict JSON on the tokens (D15:1794, 1795), duplicate
+//! file's bytes, strict JSON on the tokens (D15:1795, 1796), duplicate
 //! members and the JSON-compatible domain on a syntactically parsed file
-//! (D15:802, 2289), and the five root-value bounds
+//! (D15:803, 2290), and the five root-value bounds
 //! on both, since they bound the complete root that entry materializes
-//! (D15:1876). A check whose prerequisite failed is not evaluated, with the
-//! causes of the failure (D15:2149), and a value exists only when every check
+//! (D15:1877). A check whose prerequisite failed is not evaluated, with the
+//! causes of the failure (D15:2150), and a value exists only when every check
 //! admits it; otherwise there is no Shared projection, and the causes are
-//! why (D15:2369).
+//! why (D15:2370).
 //!
 //! Each check reports what strict file entry found: the file's bytes exactly,
 //! the parser's tokens as their first-over witness, one Finding for a syntax or
 //! UTF-8 failure, one for the duplicate members, one for each reason a value
 //! is outside the JSON-compatible domain, and each root-value bound the
 //! complete value exceeds, the single-string bound as its first-over witness
-//! (D15:1884, 1999-2006, 2203, 2287-2289, 2356).
+//! (D15:1885, 2000-2007, 2204, 2288-2290, 2357).
 //!
 //! Every candidate is observed through the file's Entry Source Evidence
-//! (D15:780-786): the file's bytes with neither path nor span, the parser's
+//! (D15:781-787): the file's bytes with neither path nor span, the parser's
 //! tokens and a syntax or UTF-8 failure at the span that stopped parsing, a
 //! duplicate member at its key, beside every other member of its name
-//! (D15:802), a value outside the domain at its token, a total at the root,
+//! (D15:803), a value outside the domain at its token, a total at the root,
 //! and a string past the single-string bound at its token. A path is the
 //! fact's internal path with each member classified, so no unsafe name is
-//! retained (D15:768, 776), and a bound is observed beside the capability's
+//! retained (D15:769, 777), and a bound is observed beside the capability's
 //! bound it exceeds. A Logical input path is projected only within the path
 //! bounds path admission applies, past which it would be absent, so a
 //! candidate holds no path past them, only its size, which those bounds count
-//! (D15:776, 1834, 1851; plan 025 decision #299).
+//! (D15:777, 1835, 1852; plan 025 decision #299).
 
 use std::sync::Arc;
 
@@ -113,7 +113,7 @@ pub(crate) enum EntryInvariant {
     Component(ComponentInvariant),
     /// A Snapshot holds a bootstrap marker its boundary refuses: one that a
     /// node follows in canonical traversal order, or whose witness is not
-    /// its bound's limit plus one under the bounds Phase 1 reads (D15:867,
+    /// its bound's limit plus one under the bounds Phase 1 reads (D15:868,
     /// 869).
     UnadmittedMarker,
 }
@@ -126,7 +126,7 @@ impl From<EvaluationInvariant> for EntryInvariant {
 
 /// The classification of the members of an internal path from the
 /// configuration root, by what `specification-admission` bound to tell a
-/// locale key once it has, `None` in a record constructed before (D15:776).
+/// locale key once it has, `None` in a record constructed before (D15:777).
 /// It may borrow what fixes it, such as the resolver's configuration schema.
 pub(crate) type Classify<'a> =
     dyn for<'e> Fn(&[Edge<'e>], Option<&dyn LocaleKeys>) -> Vec<Step<'e>> + 'a;
@@ -136,7 +136,7 @@ pub(crate) type Classify<'a> =
 /// members on a fact's internal path, which the admitted configuration schema
 /// and the capability's `policyComparable` bounds fix, and, in a record
 /// constructed once `specification-admission` bound the canonicalizer, that
-/// canonicalizer (D15:776, 780-786).
+/// canonicalizer (D15:777, 781-787).
 pub(crate) struct EntryFile<'a> {
     pub(crate) bytes: Arc<[u8]>,
     pub(crate) source: Source<'a>,
@@ -145,25 +145,25 @@ pub(crate) struct EntryFile<'a> {
 
 /// An entry as the phases after `entry-admission` observe it: the Safe
 /// Origin Kinds its slots fix, the classification of the members on a
-/// value's path, and the source and span that name a value in it (D15:204,
+/// value's path, and the source and span that name a value in it (D15:205,
 /// 776, 790, 800, 804): a file, or a programmatic entry.
 pub(crate) trait ConfigurationEntry {
-    /// The Safe Origin Kind of its configuration (D15:204).
+    /// The Safe Origin Kind of its configuration (D15:205).
     fn origin(&self) -> SafeOriginKind;
 
     /// The Safe Origin Kind of its External Profile Selector Input, which
-    /// profile-selector Evidence records (D15:204, 804).
+    /// profile-selector Evidence records (D15:205, 805).
     fn selector_origin(&self) -> SafeOriginKind;
 
-    /// The classification of the members on an internal path (D15:776).
+    /// The classification of the members on an internal path (D15:777).
     fn classify(&self) -> &Classify<'_>;
 
     /// The source that names the value at `locus`, and the value's span in
-    /// that source when one applies (D15:790, 800).
+    /// that source when one applies (D15:791, 801).
     fn source_at(&self, locus: Locus) -> (Source<'_>, Option<SourceSpan>);
 
     /// Materialized Value Evidence of the value at the internal path `edges`
-    /// from the root, each member classified, at `locus` (D15:790, 800).
+    /// from the root, each member classified, at `locus` (D15:791, 801).
     ///
     /// # Errors
     ///
@@ -177,7 +177,7 @@ pub(crate) trait ConfigurationEntry {
     }
 
     /// The same, in a record constructed once `specification-admission`
-    /// bound `locales`, which classify a locale key then (D15:776).
+    /// bound `locales`, which classify a locale key then (D15:777).
     ///
     /// # Errors
     ///
@@ -195,7 +195,7 @@ pub(crate) trait ConfigurationEntry {
 }
 
 /// A file entry's slots are `configuration-file` and `profile-selector-cli`,
-/// and a value is named in the file, at its token's span (D15:204, 790).
+/// and a value is named in the file, at its token's span (D15:205, 791).
 impl ConfigurationEntry for EntryFile<'_> {
     fn origin(&self) -> SafeOriginKind {
         SafeOriginKind::ConfigurationFile
@@ -220,7 +220,7 @@ impl ConfigurationEntry for EntryFile<'_> {
 impl EntryFile<'_> {
     /// Entry Source Evidence at the internal path `path` when one was
     /// established, the root when it has no step, and at `span`, its Logical
-    /// input path projected only within the path bounds of `paths` (D15:768,
+    /// input path projected only within the path bounds of `paths` (D15:769,
     /// 780-786; plan 025 decision #299).
     fn evidence(
         &self,
@@ -264,10 +264,10 @@ impl EntryFile<'_> {
 /// Capability gives `bootstrapOnly.rawInput` and
 /// `policyComparable.configurationInput`: the materialized document, or the
 /// causes of its absence, which are the blocking Findings of Phase 1 the
-/// Shared projection is unavailable for (D15:2369). A candidate's Logical
+/// Shared projection is unavailable for (D15:2370). A candidate's Logical
 /// input path is projected only within the path bounds of `paths`, the
 /// capability's `bootstrapOnly.evidenceMetadata`, under which path admission
-/// would leave it absent (D15:776, 1834, 1851; plan 025 decision #299).
+/// would leave it absent (D15:777, 1835, 1852; plan 025 decision #299).
 ///
 /// # Errors
 ///
@@ -393,7 +393,7 @@ impl Findings {
 }
 
 /// The duplicate members' Finding, with a candidate for each at its key,
-/// beside every other member of its name (D15:802, Decision 015-194). The
+/// beside every other member of its name (D15:803, Decision 015-194). The
 /// others are in the same object under the same name, so at the same Logical
 /// input path, and only their keys' spans differ.
 fn duplicates(
@@ -422,7 +422,7 @@ fn duplicates(
 }
 
 /// The Findings of the values outside the JSON-compatible domain, one for
-/// each reason, with a candidate for each value at its token (D15:255,
+/// each reason, with a candidate for each value at its token (D15:256,
 /// 2289).
 fn incompatible(
     file: &EntryFile<'_>,
@@ -450,9 +450,9 @@ fn incompatible(
 
 /// The root-value bounds' Findings, in check-rank order: each total of
 /// `violations`, observed at the root, and the single-string bound at each of
-/// `long_strings`, each beside the capability's bound (D15:1876, 1884,
+/// `long_strings`, each beside the capability's bound (D15:1877, 1885,
 /// 2203). `at` gives the primary Evidence of a long string, or of the root
-/// for `None`, so either entry reports them alike (D15:1889).
+/// for `None`, so either entry reports them alike (D15:1890).
 pub(super) fn root_value_bounds<L>(
     violations: &[LimitViolation],
     long_strings: &[L],
@@ -520,14 +520,14 @@ const fn root_value(name: &'static str) -> BoundId {
 }
 
 /// Resolver-input Evidence of the Implementation Capability's `bound`
-/// (D15:836).
+/// (D15:837).
 pub(super) fn capability(bound: CapabilityBound) -> Result<EvidenceProjection, EntryInvariant> {
     ComponentPath::capability(bound)
         .map(EvidenceProjection::resolver_input)
         .map_err(EntryInvariant::Component)
 }
 
-/// A `bootstrapOnly.rawInput` bound's Finding (D15:2356).
+/// A `bootstrapOnly.rawInput` bound's Finding (D15:2357).
 fn raw_bound(name: &'static str, violation: &LimitViolation) -> Blocking {
     Blocking::bootstrap_limit(BootstrapLimitExceeded {
         bound: BootstrapBoundId {
@@ -878,7 +878,7 @@ mod tests {
 
     /// A document exists only when every check a file records admits it: a
     /// check a test makes block holds the document back as a failure that
-    /// strict file entry found would (D15:2369; Decision 015-202).
+    /// strict file entry found would (D15:2370; Decision 015-202).
     #[test]
     fn a_document_needs_every_check_to_admit_it() {
         let fixture = FileFixture::new(&fixture_limits(100));
@@ -894,7 +894,7 @@ mod tests {
         }
     }
 
-    /// D15:780-786, 802: what stopped strict file entry is observed through
+    /// D15:781-787, 803: what stopped strict file entry is observed through
     /// the file: its bytes with neither path nor span, beside the capability's
     /// bound, and the parser's tokens or a syntax or UTF-8 failure at the span
     /// that stopped parsing.
@@ -928,7 +928,7 @@ mod tests {
         assert_eq!(located(utf8[0].primary()), at(2, 3));
     }
 
-    /// D15:776, 802, Decision 015-194: a duplicate member is observed at its
+    /// D15:777, 803, Decision 015-194: a duplicate member is observed at its
     /// key and path, beside every other member of its name at theirs; a
     /// member the schema defines, or a valid Profile ID, keeps its name, and
     /// any other is redacted.
@@ -968,7 +968,7 @@ mod tests {
         }
     }
 
-    /// D15:2289: a value outside the JSON-compatible domain is observed at its
+    /// D15:2290: a value outside the JSON-compatible domain is observed at its
     /// token and path, each reason's Finding with an occurrence for every
     /// value.
     #[test]
@@ -996,7 +996,7 @@ mod tests {
         );
     }
 
-    /// D15:768, 1876, 1884, 2203: a total is observed at the root and the
+    /// D15:769, 1877, 1885, 2204: a total is observed at the root and the
     /// single-string bound at every string past it, each beside the
     /// capability's bound.
     #[test]
@@ -1041,7 +1041,7 @@ mod tests {
         );
     }
 
-    /// D15:2207, 2369, 2488: without a document, the Shared projection is
+    /// D15:2208, 2370, 2489: without a document, the Shared projection is
     /// unavailable for Phase 1's blocking Findings, and each cause is owned
     /// by the unit of the Finding it names.
     #[test]
@@ -1076,7 +1076,7 @@ mod tests {
 
     /// Duplicate members and values outside the JSON-compatible domain are
     /// both reported from one parsed file, each reason a Finding of its own,
-    /// and the root-value bounds wait on both (D15:802, 2289).
+    /// and the root-value bounds wait on both (D15:803, 2290).
     #[test]
     fn duplicates_and_incompatible_values_are_reported_together_and_hold_back_the_bounds() {
         let (evaluation, admitted) =
@@ -1129,7 +1129,7 @@ mod tests {
 
     /// The raw bounds report the file's bytes exactly and the parser's tokens
     /// as their first-over witness, each under its `bootstrapOnly.rawInput`
-    /// bound (D15:1999-2006, 2356).
+    /// bound (D15:2000-2007, 2357).
     #[test]
     fn the_raw_bounds_report_their_bootstrap_details() {
         let key =
@@ -1166,7 +1166,7 @@ mod tests {
 
     /// The root-value bounds report every total the complete value exceeds
     /// exactly, and the single-string bound its first-over witness, each under
-    /// its `policyComparable.configurationInput` bound (D15:1876, 1884, 2203).
+    /// its `policyComparable.configurationInput` bound (D15:1877, 1885, 2204).
     #[test]
     fn the_root_value_bounds_report_exact_totals_and_the_single_string_witness() {
         let mut over = limits();
@@ -1201,7 +1201,7 @@ mod tests {
         );
     }
 
-    /// D15:790, 800: Materialized Value Evidence takes its origin, source,
+    /// D15:791, 801: Materialized Value Evidence takes its origin, source,
     /// and span from its entry: a file names its own origin at a value's or a
     /// key's token, and the same file under the programmatic Safe Origin
     /// Kinds names theirs at the same source and span. The key is one the
@@ -1272,7 +1272,7 @@ mod tests {
             .collect()
     }
 
-    /// D15:776, 802, 1851: a duplicate's Logical input path is projected
+    /// D15:777, 803, 1852: a duplicate's Logical input path is projected
     /// only within the path bounds, for its primary and every related
     /// Evidence alike. Past them each keeps only its size, measured as the
     /// projected path would be, and path admission leaves each candidate as

@@ -3,11 +3,11 @@
 
 //! The document of a canonical Programmatic Entry Snapshot: the value a file
 //! of the same JSON value materializes, with the same root-value counts
-//! (D15:1889), each node located at itself in the Snapshot rather than at
+//! (D15:1890), each node located at itself in the Snapshot rather than at
 //! bytes. A tree with a marker has none, since a marker is no JSON-compatible
-//! value (D15:861, 2129). Back from a document of either entry, the canonical
+//! value (D15:862, 2130). Back from a document of either entry, the canonical
 //! tree of its value is what a Materialized Resolution Input Set keeps
-//! (D15:205).
+//! (D15:206).
 
 use crate::snapshot::{Node, SnapshotCounts};
 
@@ -16,7 +16,7 @@ use super::{LocatedNode, Locus, MaterializedDocument, NodeId, NodeKind, ObjectMe
 impl MaterializedDocument {
     /// The document of the canonical tree at `root`, its nodes in canonical
     /// preorder: each node before what it holds, array elements by index,
-    /// and object members by key bytes (D15:867). None when the tree holds a
+    /// and object members by key bytes (D15:868). None when the tree holds a
     /// marker. Built without recursion, so a tree as deep as the capability
     /// admits cannot exhaust the stack (plan 025 decision #298).
     pub(crate) fn from_snapshot(root: &Node) -> Option<Self> {
@@ -181,7 +181,7 @@ mod tests {
             .collect()
     }
 
-    /// D15:1889: a Snapshot and a file of the same value materialize the
+    /// D15:1890: a Snapshot and a file of the same value materialize the
     /// same value with the same root-value counts, whatever the file's member
     /// order and number spelling.
     #[test]
@@ -282,7 +282,7 @@ mod tests {
         }
     }
 
-    /// D15:205, 3228: a document of either entry gives back the canonical
+    /// D15:206, 3233: a document of either entry gives back the canonical
     /// tree of its value, with every element in its place and every member.
     #[test]
     fn a_document_of_either_entry_gives_back_the_canonical_tree_of_its_value() {
@@ -308,7 +308,7 @@ mod tests {
             .unwrap()
     }
 
-    /// D15:1889, 3228: the same value through either entry has the same
+    /// D15:1890, 3233: the same value through either entry has the same
     /// structural analysis: its units, its version and admission issues, and
     /// its schema issues.
     #[test]

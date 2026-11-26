@@ -129,7 +129,7 @@ pub(crate) const fn body_reason(failure: &BodyFailure) -> Reason {
 }
 
 /// What 017's reader found, as the candidates of the artifact's own check
-/// (D15:832, 1569): each member that is not an `IdentityToken` at the member,
+/// (D15:833, 1570): each member that is not an `IdentityToken` at the member,
 /// a string under a key that keeps only its JSON type (plan 025
 /// interpretation #200); each occurrence of a repeated member at the member,
 /// under its canonical vocabulary identity; and a failure of the integrity or
@@ -206,7 +206,7 @@ pub(crate) fn admit_vocabulary<Id: AsRef<str>>(
     };
     let intact = evaluation.check_found(INTACT, read, |read| read)?;
     // A mismatch is observed at the artifact, beside the slot's assertion it
-    // was compared with (D15:832, 2249).
+    // was compared with (D15:833, 2250).
     let mismatch = |reason| {
         Found::observed(
             not_admitted(reason),
@@ -382,7 +382,7 @@ mod tests {
     /// What the reader found is observed where it is: each invalid member at
     /// the member, a string under a key that keeps only its JSON type; each
     /// occurrence of a repeated member at the member, under its identity; and
-    /// a broken integrity or order at the artifact's root (D15:832, 1569; plan
+    /// a broken integrity or order at the artifact's root (D15:833, 1570; plan
     /// 025 interpretation #200).
     #[test]
     fn what_the_reader_found_is_observed_where_it_is() {

@@ -9,7 +9,7 @@ use super::{ByteSpan, NodeId};
 
 /// Where a value, or a member's key, is in the input its document came
 /// from. A file document's locus is its token's byte span, which
-/// Materialized Value Evidence retains (D15:790). A Snapshot document's is
+/// Materialized Value Evidence retains (D15:791). A Snapshot document's is
 /// its node, or the key of the member whose value is that node, and has no
 /// bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

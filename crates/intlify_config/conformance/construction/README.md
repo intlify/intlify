@@ -37,7 +37,7 @@ vp run construction:check
 
 The bound values are this implementation's; 015 makes the checked-in body their sole source. The Draft 7 meta-schema is the text json-schema.org publishes, kept byte for byte in [`data/json-schema-draft-07.json`](../../data/json-schema-draft-07.json) and pinned by its digest.
 
-The construction vectors pin the preimages and digests 015 asks construction vectors to pin (D15:987). The generator writes them by constructing the authorities and registries it writes, under the digests the crate pins, and deriving the identity from what construction admitted.
+The construction vectors pin the preimages and digests 015 asks construction vectors to pin (D15:988). The generator writes them by constructing the authorities and registries it writes, under the digests the crate pins, and deriving the identity from what construction admitted.
 
 The Node checker shares no code with this crate. It hashes every artifact, frames the canonical digest and the construction identity itself, lists the roles, bounds, units, each component's envelope schemas, the package's schemas, and the precedence from its own copy of 015's tables, and reads the two pinned digests out of `src/construction/root.rs`. It does not read the design document.
 

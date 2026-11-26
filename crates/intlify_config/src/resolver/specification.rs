@@ -95,7 +95,7 @@ pub(crate) struct SpecificationInput<Id> {
 
 /// The Active Project Profile Specification: the identity and revision a
 /// `project-profile` assertion must name, and the semantic digest of the body
-/// construction admitted, which a checked profile's view carries (D15:1189).
+/// construction admitted, which a checked profile's view carries (D15:1190).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ActiveProfileSpecification<Id> {
     pub(crate) specification: VersionedIdentity<Id>,
@@ -266,7 +266,7 @@ impl From<ComponentInvariant> for SpecificationInvariant {
 }
 
 /// What a slot's check observes: the slot's Specification Input component,
-/// whether its assertion is absent or names another specification (D15:718,
+/// whether its assertion is absent or names another specification (D15:719,
 /// 831).
 fn at_slot(slot: Slot) -> Observation {
     Observation {
@@ -307,9 +307,9 @@ fn specification_slot<Id: Clone + Eq>(
 /// depends on it, so a failure blocks the outcome and leaves only the owner of
 /// the `profileSpecification` group, which the assertion establishes, waiting.
 /// Phase 0 precedes configuration entry, so its Finding and status remain
-/// when configuration materialization fails (D15:2145). A failure is observed
+/// when configuration materialization fails (D15:2146). A failure is observed
 /// through the slot's Specification Input component, whether the assertion is
-/// absent or names another specification (D15:718, 831).
+/// absent or names another specification (D15:719, 832).
 pub(crate) fn admit_project_profile<Id: Clone + Eq>(
     evaluation: &mut Evaluation,
     supported: &SupportedSpecifications<Id>,
@@ -352,7 +352,7 @@ pub(crate) struct AdmittedSpecifications<Id, P: Provider> {
 /// the vocabulary must be intact and the one its slot asserts, and the rest of
 /// the data is read under the capability's `localeData` bounds, `data_limits`,
 /// each its own check, and must carry the dataset the admitted specification
-/// admits (D15:2356, 3165).
+/// admits (D15:2357, 3170).
 /// The data is read in place, and stays its caller's.
 pub(crate) fn admit_specifications<Id, D>(
     evaluation: &mut Evaluation,
@@ -1068,7 +1068,7 @@ mod tests {
     }
 
     /// Of the data's checks only the match waits for its slot: reading the
-    /// data and measuring it need no value of the slot (D15:2133, 2149).
+    /// data and measuring it need no value of the slot (D15:2134, 2150).
     #[test]
     fn only_the_data_match_waits_for_its_slot() {
         for asserted in [None, Some(identity("another-specification", "0"))] {
@@ -1117,7 +1117,7 @@ mod tests {
 
     /// The boundary admitted only the envelope, so the rest is read in the
     /// data's checks, under the capability's `localeData` bounds, and data
-    /// whose rest does not read is not admitted there (D15:3165).
+    /// whose rest does not read is not admitted there (D15:3170).
     #[test]
     fn the_rest_of_the_data_is_read_under_the_locale_data_bounds() {
         let read = Admission::run_with(
@@ -1162,7 +1162,7 @@ mod tests {
 
     /// A slot that names nothing leaves the data's bounds provable: past one
     /// it reports beside the slot's own Finding, and only the match waits
-    /// (D15:2133, 2365).
+    /// (D15:2134, 2366).
     #[test]
     fn a_bound_of_the_data_is_reported_beside_an_invalid_slot() {
         #[derive(PartialEq, Eq)]
@@ -1204,7 +1204,7 @@ mod tests {
     }
 
     /// Nothing reads the data before the Resource Limit Policy is confirmed
-    /// (D15:2133).
+    /// (D15:2134).
     #[test]
     fn the_data_is_read_only_under_a_confirmed_policy() {
         let mut input = complete();
@@ -1305,7 +1305,7 @@ mod tests {
     /// Every Phase 0 failure is observed through the `project-profile` slot's
     /// Specification Input component, relating nothing, whether the assertion
     /// is absent or names another specification, and its occurrence carries
-    /// what the Finding Registry gives Phase 0's pair (D15:718, 831, 2145). An
+    /// what the Finding Registry gives Phase 0's pair (D15:719, 832, 2146). An
     /// admitted assertion is observed through nothing.
     #[test]
     fn a_phase_0_failure_is_observed_through_its_slot() {
@@ -1376,7 +1376,7 @@ mod tests {
             .collect()
     }
 
-    /// The view of `slot`'s Specification Input component (D15:831).
+    /// The view of `slot`'s Specification Input component (D15:832).
     fn slot_view(slot: Slot) -> Value {
         json!({
             "kind": "specification-input",
@@ -1388,7 +1388,7 @@ mod tests {
     /// Each Phase 5 slot whose assertion is absent or names another
     /// specification is observed at the slot's Specification Input
     /// component, relating nothing; the vocabulary's slot only has to be
-    /// present (D15:718, 831).
+    /// present (D15:719, 832).
     #[test]
     fn each_phase_5_slot_failure_is_observed_at_its_slot() {
         for slot in [
@@ -1429,7 +1429,7 @@ mod tests {
     }
 
     /// An intact vocabulary its slot does not assert is observed at the
-    /// artifact's root, beside the slot it was compared with (D15:832, 2249).
+    /// artifact's root, beside the slot it was compared with (D15:833, 2250).
     #[test]
     fn a_vocabulary_its_slot_does_not_assert_is_observed_at_its_root() {
         let mut input = complete();
@@ -1454,7 +1454,7 @@ mod tests {
 
     /// Data that is not the admitted specification's is observed at the
     /// data's root, the only path 015 names in it, beside the slot it must
-    /// match (D15:833, 2249).
+    /// match (D15:834, 2250).
     #[test]
     fn data_not_admitted_is_observed_at_its_root_beside_its_slot() {
         let mut stale = fixture_pins();

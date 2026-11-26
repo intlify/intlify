@@ -4,7 +4,7 @@
 //! 015's `programmatic-call-site-evidence-input` boundary: the optional
 //! sidecar a programmatic frontend submits beside its Snapshot, admitted with
 //! its span candidates as submitted, or refused with one of the ten reasons of
-//! its row (D15:144, 741, 747, 749, 3149).
+//! its row (D15:145, 742, 748, 750, 3154).
 //!
 //! The sidecar holds one Call-Site Source identity and revision, whether the
 //! frontend marks that identity non-secret, an optional locator candidate,
@@ -19,7 +19,7 @@
 //! not a failure.
 //!
 //! A sidecar is a host value with no text to parse, so no check sits at the
-//! strict-syntax position of D15:3155, and the checks take its positions in
+//! strict-syntax position of D15:3160, and the checks take its positions in
 //! the order the row lists their reasons. The first that fails decides:
 //!
 //! 1. the binding inspected the sidecar safely, or it is
@@ -37,17 +37,17 @@
 //!    bounds, with the file row's reasons: `missing-source-identity`,
 //!    `missing-source-revision`, `unstable-source-identity`,
 //!    `unbound-source-revision`, and last `source-snapshot-mismatch` against
-//!    the Call-Site Source revision of the source bytes (D15:743).
+//!    the Call-Site Source revision of the source bytes (D15:744).
 //!
 //! The locator is admitted on its own as a programmatic locator: one that is
-//! not admitted is absence and never refuses the sidecar (D15:749, 766).
+//! not admitted is absence and never refuses the sidecar (D15:750, 767).
 //! Whether a path names an established node or edge, whether its role applies
 //! there, and whether its span is valid are each candidate's own question
 //! once the sidecar is admitted, and a candidate that fails is absence
-//! (D15:749). The admitted sidecar therefore keeps every candidate as
-//! submitted, since it is replay input even when none applies (D15:2657), and
+//! (D15:750). The admitted sidecar therefore keeps every candidate as
+//! submitted, since it is replay input even when none applies (D15:2658), and
 //! only puts the mappings in canonical order, which is no change of value
-//! (D15:2585).
+//! (D15:2586).
 
 use std::collections::BTreeMap;
 
@@ -103,7 +103,7 @@ pub(crate) enum SubmittedEdge {
 
 /// A span candidate as submitted: `[start, end)` over the source bytes, each
 /// coordinate as the number the binding read. Whether it is a Portable Source
-/// Span is decided where Evidence selects it (D15:745, 749).
+/// Span is decided where Evidence selects it (D15:746, 750).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct SpanCandidate {
     pub(crate) start: f64,
@@ -112,13 +112,13 @@ pub(crate) struct SpanCandidate {
 
 impl SpanCandidate {
     /// Both coordinates, when each is an integer in `0..=u64::MAX`, which is
-    /// all a byte coordinate can be (D15:745).
+    /// all a byte coordinate can be (D15:746).
     pub(crate) fn coordinates(self) -> Option<(u64, u64)> {
         Some((unsigned(self.start)?, unsigned(self.end)?))
     }
 }
 
-/// A mapping's closed location role, in 015's order (D15:747).
+/// A mapping's closed location role, in 015's order (D15:748).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum LocationRole {
     Node,
@@ -146,12 +146,12 @@ impl LocationRole {
 }
 
 /// One edge of a Snapshot Structural Path: an object member's key, or an
-/// array element's index (D15:141). No `Debug`: a key is the configuration's.
+/// array element's index (D15:142). No `Debug`: a key is the configuration's.
 ///
 /// The derived order is 015's for mapping keys: paths compare edge by edge
 /// with a shorter equal prefix first, and at one position a key precedes an
 /// index, keys comparing by their unsigned UTF-8 bytes and indices
-/// numerically (D15:747, Decision 015-204). A key and an index meet at one
+/// numerically (D15:748, Decision 015-204). A key and an index meet at one
 /// position only when one of the paths names no established node.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum StructuralEdge {
@@ -291,7 +291,7 @@ impl AdmittedCallSite {
 }
 
 /// Two sidecars are equal by value, as invocation staleness compares them
-/// (D15:2583): the pair, the mark, the locator, the source, and the same
+/// (D15:2584): the pair, the mark, the locator, the source, and the same
 /// mappings, in canonical order, to the same candidates. A candidate keeps
 /// the numbers the binding read, so its coordinates compare as numbers: `-0`
 /// equals `+0`, as Portable JSON Numbers have it, and NaN equals NaN, so a
@@ -416,7 +416,7 @@ impl SubmittedMapping {
 impl SubmittedEdge {
     /// The edge of a Snapshot Structural Path this one is: a key that is a
     /// sequence of Unicode scalar values, or an index in `0..=u64::MAX`
-    /// (D15:141, 771).
+    /// (D15:142, 772).
     fn edge(&self) -> Option<StructuralEdge> {
         match self {
             Self::Key(bytes) => std::str::from_utf8(bytes)
@@ -636,7 +636,7 @@ pub(crate) mod tests {
 
     /// A candidate's coordinates are integers in `0..=u64::MAX`, inverted or
     /// not, or none; whether they make a span is Evidence's question
-    /// (D15:745, 749).
+    /// (D15:746, 750).
     #[test]
     fn a_candidates_coordinates_are_unsigned_integers() {
         // 2^64, the first integer past `u64::MAX`.
@@ -661,7 +661,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// No sidecar is absence under any bound, never a failure (D15:144).
+    /// No sidecar is absence under any bound, never a failure (D15:145).
     #[test]
     fn no_sidecar_is_absence() {
         let one = Bound::new(1).unwrap();
@@ -797,7 +797,7 @@ pub(crate) mod tests {
 
     /// A key must be a sequence of Unicode scalar values and an index an
     /// integer in `0..=u64::MAX`, which as a binary64 is below 2^64; an empty
-    /// key is a key, and negative zero is index zero (D15:141, 771).
+    /// key is a key, and negative zero is index zero (D15:142, 772).
     #[test]
     fn an_edge_that_is_neither_a_key_nor_an_index_is_malformed() {
         let revision = revision();
@@ -887,7 +887,7 @@ pub(crate) mod tests {
 
     /// The pair runs the file pair's checks other than its bounds, with the
     /// file row's reasons, against the Call-Site Source revision: the file
-    /// domain's revision of the same bytes is a mismatch (D15:743, 3389).
+    /// domain's revision of the same bytes is a mismatch (D15:744, 3514).
     #[test]
     fn the_pair_runs_the_file_pairs_other_checks() {
         let own = revision();
@@ -913,7 +913,7 @@ pub(crate) mod tests {
     }
 
     /// The whole boundary, not only its pair, applies the identity form and
-    /// takes no host fact for an identity or a revision (D15:743, 3388, 3389).
+    /// takes no host fact for an identity or a revision (D15:744, 3513, 3514).
     #[test]
     fn the_sidecar_applies_the_identity_form_and_takes_no_host_fact() {
         let own = revision();
@@ -943,7 +943,7 @@ pub(crate) mod tests {
     /// closed shape, the closed shape of every mapping before the source's
     /// UTF-8, the UTF-8 before a repeat, and a repeat before the pair. An
     /// absent part is held by no bound, and the identity's form decides
-    /// before the revision's presentation (D15:3155).
+    /// before the revision's presentation (D15:3160).
     #[test]
     fn the_first_failing_position_decides() {
         fn invalid(mut submitted: SubmittedCallSite<'_>) -> SubmittedCallSite<'_> {
@@ -1067,7 +1067,7 @@ pub(crate) mod tests {
     }
 
     /// The locator is admitted on its own as a programmatic locator, and one
-    /// that is not admitted is absence in an admitted sidecar (D15:749).
+    /// that is not admitted is absence in an admitted sidecar (D15:750).
     #[test]
     fn a_locator_is_admitted_on_its_own() {
         let revision = revision();

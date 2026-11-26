@@ -211,7 +211,7 @@ fn a_complete_case_keeps_every_declared_relation() {
 }
 
 /// Each change of the example reaches the decision its name says, and any
-/// other failure it proves on its own (D15:2365): `ssr` as a client lacks the
+/// other failure it proves on its own (D15:2366): `ssr` as a client lacks the
 /// client's role, and `phone` and `worker` are no members of `web`, whose
 /// Target Profiles declare no role.
 #[test]
@@ -447,7 +447,7 @@ fn each_bound_holds_at_its_count_and_one_less_blocks_its_unit() {
         assert_eq!(exceeded.bound, bound(name), "{limit:?}");
         assert_eq!(exceeded.limit.get(), count - 1, "{limit:?}");
         // A relation's key can stand for several values, so an endpoint
-        // reports the first-over witness (D15:2203).
+        // reports the first-over witness (D15:2204).
         let actual = if matches!(limit, LimitKind::HydrationEndpointBytes) {
             Actual::AtLeast(count)
         } else {

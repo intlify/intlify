@@ -7,14 +7,14 @@
 //!
 //! Design 015's Finding Registry has a table of one disclosure policy for each
 //! evidence kind, which `policy` writes, and one row for each of its codes
-//! (D15:2233, 2276). Revision `"0"` writes the rows from 015's codes, in table
+//! (D15:2234, 2277). Revision `"0"` writes the rows from 015's codes, in table
 //! order, and from the Check Registry: a code's checks are the rows that list
 //! it, in row order; its subject kinds are those rows' kinds, in the order they
 //! first appear; and its reasons are the ones 015's tables give it, in their
 //! order, which are exactly those its checks list. Every blocking code is an
 //! `error`, and `project-profile-locale-non-canonical`, the one code that
-//! blocks nothing, is a `warning` (D15:2229) that suggests the exact canonical
-//! replacement (D15:2308); no other code suggests anything. The four occurrence
+//! blocks nothing, is a `warning` (D15:2230) that suggests the exact canonical
+//! replacement (D15:2309); no other code suggests anything. The four occurrence
 //! Evidence columns come from `occurrence`.
 //!
 //! Construction reads the registry it admitted with the registry
@@ -22,9 +22,9 @@
 //! type cannot read, whose policies are not 015's as `policy` checks them,
 //! whose occurrence Evidence columns are not as `occurrence` checks them, or
 //! whose rows do not relate to the Check Registry as 015 requires: every code
-//! has exactly one row (D15:2276); a code's checks are exactly the rows that
+//! has exactly one row (D15:2277); a code's checks are exactly the rows that
 //! list it, so that check-to-Finding and Finding-to-check relate symmetrically
-//! (D15:2277); and its subject kinds and reasons are exactly those of its
+//! (D15:2278); and its subject kinds and reasons are exactly those of its
 //! checks. A row's severity, blocking state, and suggestion kind are the
 //! registry's values, which the file digest compiled in fixes. Every evaluation
 //! a test runs asserts that a blocking result's code blocks and a notice's does
@@ -67,7 +67,7 @@ pub(crate) const DIGEST: &str =
 
 /// The registry schema's file digest, which the resolver is compiled from.
 pub(crate) const SCHEMA_DIGEST: &str =
-    "sha256:42bc288412afc35c849bd1af7a85179740bbe8f91147f8993c7fa7bf0d1c43ec";
+    "sha256:bc8c5e812b72c58df25d2b8cbe2593ae719dd1bdbe1b275f5d83685b6b1a8ce8";
 
 /// A Finding's severity: `error` for every blocking code, and `warning` for
 /// the one code that blocks nothing.
@@ -126,7 +126,7 @@ pub(crate) struct FindingRow {
 }
 
 /// The registry's body: the disclosure policies, one for each evidence kind,
-/// and the rows (D15:2233).
+/// and the rows (D15:2234).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct FindingRegistry {
@@ -204,7 +204,7 @@ impl FindingRegistry {
 
     /// Whether every code has exactly one row, whose checks are exactly the
     /// rows of `checks` that list the code, and whose subject kinds and
-    /// reasons are exactly those of its checks (D15:2276, 2277).
+    /// reasons are exactly those of its checks (D15:2277, 2278).
     fn is_closed(&self, checks: &CheckRegistry) -> bool {
         let codes: BTreeSet<&str> = self.rows.iter().map(|row| row.code.as_str()).collect();
         codes.len() == self.rows.len()
@@ -264,13 +264,13 @@ pub(crate) fn schema() -> Result<Value, serde_json::Error> {
 }
 
 /// Whether a code blocks: every code but the non-canonical spelling, which
-/// only suggests its canonical form (D15:2229, 2308).
+/// only suggests its canonical form (D15:2230, 2309).
 pub(crate) const fn blocking(code: Code) -> bool {
     !matches!(code, Code::LocaleNonCanonical)
 }
 
 /// A code's severity: an error when it blocks, and otherwise a warning
-/// (D15:2229).
+/// (D15:2230).
 pub(crate) const fn severity(code: Code) -> Severity {
     if blocking(code) {
         Severity::Error
@@ -280,7 +280,7 @@ pub(crate) const fn severity(code: Code) -> Severity {
 }
 
 /// A code's suggestion kind: the non-canonical spelling suggests its exact
-/// canonical replacement (D15:2308), and no other code suggests anything.
+/// canonical replacement (D15:2309), and no other code suggests anything.
 pub(crate) const fn suggestion_kind(code: Code) -> SuggestionKind {
     match code {
         Code::LocaleNonCanonical => SuggestionKind::CanonicalLocaleReplacement,
@@ -375,7 +375,7 @@ mod tests {
 
     /// Every blocking code is an error, and the non-canonical spelling, the
     /// one code that blocks nothing, is a warning that suggests its canonical
-    /// replacement (D15:2229, 2308).
+    /// replacement (D15:2230, 2309).
     #[test]
     fn every_blocking_code_is_an_error_and_only_the_non_canonical_spelling_suggests() {
         for row in registry().rows {
@@ -534,7 +534,7 @@ mod tests {
         }
     }
 
-    /// A code's checks are exactly the rows that list it (D15:2277).
+    /// A code's checks are exactly the rows that list it (D15:2278).
     #[test]
     fn a_codes_checks_and_the_checks_codes_are_symmetric() {
         let code = Code::HydrationRelationInvalid;

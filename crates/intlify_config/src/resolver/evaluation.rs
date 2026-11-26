@@ -11,13 +11,13 @@
 //! may also find a non-blocking result, which suppresses nothing and carries
 //! the suggestion its code makes. The candidates of one key carry equal
 //! details and suggestions, since a key determines its whole payload
-//! (D15:2381).
+//! (D15:2382).
 //!
 //! One evaluation of a unit may find several blocking candidates: Findings
 //! with different codes or reasons, and occurrences of one Finding that a
-//! singleton subject checks independently (D15:2203, 2213-2221). Each
+//! singleton subject checks independently (D15:2204, 2214-2222). Each
 //! candidate also carries what it observed its value through, which becomes
-//! one Finding Occurrence candidate (D15:2385).
+//! one Finding Occurrence candidate (D15:2386).
 
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -126,7 +126,7 @@ impl Phase {
 /// the kind: a key can hold what a rejected input spelled, such as the tuple of
 /// an envelope not admitted or an identifier past its bound, and debug
 /// formatting follows the exclusion that keeps it out of every record
-/// (D15:776, 824, 2697).
+/// (D15:777, 825, 2698).
 #[derive(Clone, PartialEq, Eq)]
 pub(crate) enum Subject {
     /// One slot of the Profile Resolution Specification Input.
@@ -188,7 +188,7 @@ pub(crate) enum Subject {
     SemanticDependency(SemanticGroup),
     /// The diagnostic domain, a singleton: the subject of the terminal
     /// reporting-limit Finding of an exhausted domain, whose reason names the
-    /// domain. No unit is recorded over it (D15:2359, 2408; plan 025
+    /// domain. No unit is recorded over it (D15:2360, 2409; plan 025
     /// decision #227).
     DiagnosticDomain,
 }
@@ -423,7 +423,7 @@ pub(crate) struct Unit {
 
 impl Unit {
     /// This unit over its logical subject: the evaluation unit that every raw
-    /// value with the subject's projection joins as a candidate (D15:2203).
+    /// value with the subject's projection joins as a candidate (D15:2204).
     pub(crate) fn logical(&self) -> Self {
         Self {
             phase: self.phase,
@@ -1065,7 +1065,7 @@ impl Found {
     }
 
     /// One candidate of `blocking` for each raw occurrence that found it,
-    /// each with what it observed (D15:2387), or the one candidate when no
+    /// each with what it observed (D15:2388), or the one candidate when no
     /// occurrence was observed.
     pub(crate) fn each(blocking: Blocking, observed: Vec<Option<Observation>>) -> Self {
         observed
@@ -1076,7 +1076,7 @@ impl Found {
     }
 
     /// One candidate of `blocking` for each occurrence of what repeats, each
-    /// at its own location beside the others' (D15:2410).
+    /// at its own location beside the others' (D15:2411).
     pub(crate) fn repeated(blocking: Blocking, at: &[Option<EvidenceProjection>]) -> Self {
         let observed = at
             .iter()
@@ -1115,7 +1115,7 @@ pub(crate) struct Notice {
 
 impl Notice {
     /// A locale spelled otherwise than its canonical form, which suggests the
-    /// exact canonical spelling in its place (D15:2410).
+    /// exact canonical spelling in its place (D15:2411).
     pub(crate) const fn non_canonical(locale: CanonicalLocale) -> Self {
         Self {
             code: Code::LocaleNonCanonical,
@@ -1157,14 +1157,14 @@ pub(crate) enum Details {
     Shortfall(Shortfall),
     BootstrapLimit(BootstrapLimitExceeded),
     /// The bound that exhausted a diagnostic domain, which the domain's
-    /// terminal reporting-limit Finding names (D15:2359, 2408).
+    /// terminal reporting-limit Finding names (D15:2360, 2409).
     Exhausted(ExhaustedBound),
 }
 
 /// The bound that exhausted a diagnostic domain: a bound of the domain that a
 /// reporting slice exceeded, or an `evidenceMetadata` bound of the capability
 /// that the resolver's own Evidence metadata work exceeded before any slice
-/// was planned (D15:1851, 2359).
+/// was planned (D15:1852, 2360).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ExhaustedBound {
     Domain(BoundId),
@@ -1233,7 +1233,7 @@ pub(crate) struct IssueKey {
 impl IssueKey {
     /// The key of the terminal reporting-limit Finding of the diagnostic
     /// domain `reason` names: the one fixed check over the singleton
-    /// diagnostic domain in `reporting-finalization` (D15:2359, 2408).
+    /// diagnostic domain in `reporting-finalization` (D15:2360, 2409).
     pub(crate) const fn terminal(reason: Reason) -> Self {
         Self {
             unit: Unit {
@@ -1346,19 +1346,19 @@ pub(crate) enum EvaluationInvariant {
     NoticeWithoutEvaluation(Unit),
     /// A resolver bug: candidates report one Finding Key with unequal
     /// details or suggestions. A key derives its payload alone, and 015
-    /// never settles unequal payloads by keeping one (D15:2381).
+    /// never settles unequal payloads by keeping one (D15:2382).
     UnequalPayload(Unit),
     /// A resolver bug: only the decision table, once established, owns
-    /// Coverage Decision Basis and Evidence (D15:1609).
+    /// Coverage Decision Basis and Evidence (D15:1610).
     DecisionsWithoutTable(Unit),
 }
 
 /// The status of every unit recorded so far, the blocking results found with
 /// their details, and the non-blocking ones, each in 015's order whatever order
 /// the units ran in. Each is keyed by the unit over the logical subject, which
-/// the raw values with one projection share as candidates (D15:2203): such a
+/// the raw values with one projection share as candidates (D15:2204): such a
 /// unit is evaluated when its prerequisites admit any candidate, and not
-/// evaluated only when they exclude every one (D15:2184).
+/// evaluated only when they exclude every one (D15:2185).
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct Evaluation {
     statuses: BTreeMap<Unit, Status>,
@@ -1521,7 +1521,7 @@ impl Evaluation {
 
     /// Asserts that a Finding candidate of `unit`, `what` it reports,
     /// carries what it observed, as every candidate does but the terminal
-    /// reporting limit's (D15:2387), which no unit records. Unless a test
+    /// reporting limit's (D15:2388), which no unit records. Unless a test
     /// made the result up or made the unit block.
     #[cfg(test)]
     fn observes(&self, unit: &Unit, observed: bool, what: &str) {
@@ -1606,9 +1606,9 @@ impl Evaluation {
     /// what it inspects whatever the prerequisite gives. With `seen`, the
     /// unit is evaluated, reports them, and whatever depends on it inherits
     /// both their keys and the prerequisite's causes, since each blocking
-    /// Finding suppresses what needs the unit's value (D15:2151, 2365, 2369).
+    /// Finding suppresses what needs the unit's value (D15:2152, 2366, 2370).
     /// Without `seen`, it waits on the prerequisite, rather than pass on what
-    /// it did not inspect (D15:2006). Either way it is recorded as
+    /// it did not inspect (D15:2007). Either way it is recorded as
     /// [`Self::check_found`] records a unit.
     pub(crate) fn check_seen(
         &mut self,
@@ -1714,7 +1714,7 @@ impl Evaluation {
     /// Records the non-blocking result `notice` of a unit `check` evaluated,
     /// under the unit over its logical subject, as one candidate of its
     /// Finding, which becomes one Finding Occurrence candidate when it
-    /// carries what it observed (D15:2385, 2410). It is never a cause:
+    /// carries what it observed (D15:2386, 2411). It is never a cause:
     /// nothing waits on it. A candidate that suggests otherwise than another
     /// under the same key is a resolver bug and is not recorded.
     pub(crate) fn notice(
@@ -1842,7 +1842,7 @@ impl Evaluation {
 
     /// The Finding Key of every candidate, blocking or not, that carried
     /// nothing it observed: no ordinary one may, since each contributes one
-    /// Finding Occurrence candidate (D15:2385).
+    /// Finding Occurrence candidate (D15:2386).
     pub(crate) const fn unobserved(&self) -> &BTreeSet<IssueKey> {
         &self.unobserved
     }
@@ -1850,7 +1850,7 @@ impl Evaluation {
     /// Records each cell's Coverage Decision Basis `basis` and the Coverage
     /// Decision Evidence `decisions` of the decision table `table`, which
     /// owns them, once the table was established: a table that was not
-    /// evaluated keeps neither (D15:1609; plan 025 decision #225).
+    /// evaluated keeps neither (D15:1610; plan 025 decision #225).
     ///
     /// # Errors
     ///
@@ -1872,13 +1872,13 @@ impl Evaluation {
         Ok(())
     }
 
-    /// The Coverage Decision Basis recorded, in cell order (D15:1607).
+    /// The Coverage Decision Basis recorded, in cell order (D15:1608).
     pub(crate) const fn decision_basis(&self) -> &Cells {
         &self.basis
     }
 
     /// The Coverage Decision Evidence recorded, in cell order and then
-    /// matched-domain order (D15:1611).
+    /// matched-domain order (D15:1612).
     pub(crate) fn decision_evidence(&self) -> &[DecisionEvidence] {
         &self.decisions
     }
@@ -2701,7 +2701,7 @@ mod tests {
     /// A check that may find blocking results without its prerequisite is
     /// evaluated with them whatever the prerequisite gives, and what depends
     /// on it waits on both their keys and the prerequisite's causes; without
-    /// them it waits on the prerequisite (D15:2006, 2151, 2365).
+    /// them it waits on the prerequisite (D15:2007, 2152, 2366).
     #[test]
     fn a_check_reports_what_it_saw_whatever_its_prerequisite_gives() {
         use crate::resolver::entry::input;
@@ -3016,7 +3016,7 @@ mod tests {
 
     /// Each notice that carries what it observed is one Finding Occurrence
     /// candidate of its Finding, and one that suggests otherwise records
-    /// nothing (D15:2385, 2410).
+    /// nothing (D15:2386, 2411).
     #[test]
     fn a_notice_carries_what_it_observed_as_one_occurrence_candidate() {
         let mut evaluation = Evaluation::default();
@@ -3111,7 +3111,7 @@ mod tests {
         assert_eq!(evaluation.status(&rejected("zz")), Some(&Status::Evaluated));
     }
 
-    /// D15:2381: the candidates that report one Finding Key give it one
+    /// D15:2382: the candidates that report one Finding Key give it one
     /// payload. Unequal details are a resolver bug, not a payload to pick.
     #[test]
     fn candidates_that_report_one_key_with_unequal_details_are_a_resolver_bug() {
@@ -3135,7 +3135,7 @@ mod tests {
         assert_eq!(evaluation.candidates().count(), 2);
     }
 
-    /// D15:2381 for a suggestion: candidates that suggest one replacement
+    /// D15:2382 for a suggestion: candidates that suggest one replacement
     /// under one key are one notice, and one that suggests another is a
     /// resolver bug.
     #[test]
@@ -3185,7 +3185,7 @@ mod tests {
         all
     }
 
-    /// D15:2383: candidates that share keys with equal payloads give one
+    /// D15:2384: candidates that share keys with equal payloads give one
     /// evaluation, whatever order they arrive in.
     #[test]
     fn candidates_with_equal_payloads_under_one_key_commute() {
@@ -3260,7 +3260,7 @@ mod tests {
         );
     }
 
-    /// D15:2184: a unit over several values evaluates every value its
+    /// D15:2185: a unit over several values evaluates every value its
     /// prerequisites admit, and is not evaluated only when they exclude every
     /// one, with every excluding cause.
     #[test]
@@ -3421,7 +3421,7 @@ mod tests {
 
     /// One evaluation finds two results, each with what it observed: both
     /// are Findings, each observation is an occurrence candidate of its own,
-    /// and what depends on the unit waits on both (D15:2213-2221, 2385).
+    /// and what depends on the unit waits on both (D15:2214-2222, 2386).
     #[test]
     fn one_evaluation_can_find_several_results_each_with_its_observation() {
         let mut evaluation = Evaluation::default();
@@ -3469,7 +3469,7 @@ mod tests {
     }
 
     /// Candidates of one key, each observed through another location, are
-    /// one Finding with an occurrence candidate each (D15:2203, 2385).
+    /// one Finding with an occurrence candidate each (D15:2204, 2386).
     #[test]
     fn candidates_of_one_key_keep_an_observation_each() {
         use crate::resolver::evidence_component::ComponentPath;
@@ -3499,7 +3499,7 @@ mod tests {
     }
 
     /// What repeats is one candidate at each of its occurrences, beside the
-    /// others' (D15:2387, 2410); one observed nowhere is a candidate all the
+    /// others' (D15:2388, 2411); one observed nowhere is a candidate all the
     /// same, and no occurrence leaves the one candidate.
     #[test]
     fn a_repeated_value_is_a_candidate_at_each_occurrence_beside_the_others() {
@@ -3534,7 +3534,7 @@ mod tests {
     /// Only the decision table owns Coverage Decision Basis and Evidence, and
     /// only once it was established: before it is evaluated or when it
     /// waits, and for any other unit, recording them is a resolver bug
-    /// (D15:1609).
+    /// (D15:1610).
     #[test]
     fn only_the_established_table_owns_decision_records() {
         use crate::resolver::coverage::{unit, CoverageSubject};
@@ -3569,7 +3569,7 @@ mod tests {
         assert_eq!(evaluation.decided(&table, Cells::new(), Vec::new()), Ok(()));
     }
 
-    /// D15:2381 within one evaluation: two candidates of one key with unequal
+    /// D15:2382 within one evaluation: two candidates of one key with unequal
     /// details are a resolver bug, and then nothing of the unit is recorded.
     #[test]
     fn unequal_candidates_of_one_evaluation_record_nothing() {
@@ -3600,7 +3600,7 @@ mod tests {
 
     /// A subject's `Debug` names its kind and nothing of its key, whether the
     /// key is an identifier or the tuple of an envelope, so a unit in a record
-    /// or a cursor shows neither (D15:776, 824, 2697).
+    /// or a cursor shows neither (D15:777, 825, 2698).
     #[test]
     fn a_subjects_debug_names_its_kind_and_no_key() {
         let member = FormalMember::new(envelope_of(
