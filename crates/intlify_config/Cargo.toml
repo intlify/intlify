@@ -26,6 +26,9 @@ benchmark = ["dep:blake3", "dep:getrandom", "dep:intlify_measurement", "dep:serd
 # Developer-only generation of the committed 017 vectors and 015 construction
 # artifacts. No codec, reader, or admission becomes public.
 vectors = []
+# Developer-only conformance suite: the committed Suite Index and its schema,
+# written from this crate's values like the construction artifacts.
+conformance = ["vectors"]
 
 [dependencies]
 # Shared 017 token grammars, exact quantities, framing, bounded reading, and
@@ -70,6 +73,10 @@ required-features = ["vectors"]
 [[example]]
 name = "generate_construction_artifacts"
 required-features = ["vectors"]
+
+[[example]]
+name = "generate_conformance_suite"
+required-features = ["conformance"]
 
 [[example]]
 name = "generate_envelope_vectors"

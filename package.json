@@ -43,6 +43,7 @@
     "vectors:bounds:check": "cargo run -q -p intlify_config --features vectors --example generate_bound_vectors -- --check && vp run shared-json-vectors#check:bounds",
     "vectors:snapshot:check": "cargo run -q -p intlify_config --features vectors --example generate_snapshot_vectors -- --check && vp run shared-json-vectors#check:snapshot",
     "construction:check": "cargo run -q -p intlify_config --features vectors --example generate_construction_artifacts -- --check && vp run shared-json-vectors#check:construction && vp run shared-json-vectors#check:authorities && vp run shared-json-vectors#check:registries",
+    "conformance:check": "cargo run -q -p intlify_config --features conformance --example generate_conformance_suite -- --check && vp run shared-json-vectors#check:suite",
     "vectors:pattern:check": "cargo run -q -p intlify_config --features vectors --example generate_pattern_vectors -- --check && vp run shared-json-vectors#check:pattern",
     "vectors:validator-schemas:check": "cargo run -q -p intlify_config --features vectors --example generate_validator_schema_vectors -- --check && vp run shared-json-vectors#check:validator-schemas",
     "vectors:validator-values:check": "cargo run -q -p intlify_config --features vectors --example generate_validator_value_vectors -- --check && vp run shared-json-vectors#check:validator-values",

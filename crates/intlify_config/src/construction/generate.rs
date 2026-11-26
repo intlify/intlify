@@ -84,7 +84,9 @@ pub struct AuthorityPins {
     pub resolver_capability_specification: String,
 }
 
-fn write(value: &Value) -> Result<Vec<u8>, serde_json::Error> {
+/// An artifact's bytes: two-space indentation, members in the order the value
+/// holds them, and one final newline.
+pub(crate) fn write(value: &Value) -> Result<Vec<u8>, serde_json::Error> {
     let mut text = serde_json::to_string_pretty(value)?;
     text.push('\n');
     Ok(text.into_bytes())

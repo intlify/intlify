@@ -1,0 +1,579 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "suiteRevision",
+    "suiteIndexSchema",
+    "resolverConstructionRootPackage",
+    "profileSpecificationSchema",
+    "profileSpecification",
+    "configurationSchemaAuthoritySet",
+    "resolverCapabilitySpecification",
+    "registryPackage"
+  ],
+  "properties": {
+    "suiteRevision": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+    },
+    "suiteIndexSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "revision",
+        "path",
+        "digest"
+      ],
+      "properties": {
+        "identity": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "resolverConstructionRootPackage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "revision",
+        "path",
+        "digest",
+        "canonicalDigest",
+        "members"
+      ],
+      "properties": {
+        "identity": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "canonicalDigest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "members": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "construction-admission-specification",
+            "construction-admission-schema",
+            "authority-envelope-schema-package",
+            "json-schema-meta-schema-package",
+            "cross-authority-rules"
+          ],
+          "properties": {
+            "construction-admission-specification": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "path",
+                "digest"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+                },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                }
+              }
+            },
+            "construction-admission-schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "path",
+                "digest"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+                },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                }
+              }
+            },
+            "authority-envelope-schema-package": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "path",
+                "digest"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+                },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                }
+              }
+            },
+            "json-schema-meta-schema-package": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "path",
+                "digest"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+                },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                }
+              }
+            },
+            "cross-authority-rules": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "path",
+                "digest"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+                },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "profileSpecificationSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "revision",
+        "path",
+        "digest"
+      ],
+      "properties": {
+        "identity": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "profileSpecification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "revision",
+        "path",
+        "digest",
+        "semanticDigest"
+      ],
+      "properties": {
+        "identity": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "semanticDigest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "configurationSchemaAuthoritySet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "revision",
+        "path",
+        "digest",
+        "profileSpecification",
+        "members"
+      ],
+      "properties": {
+        "identity": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "profileSpecification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "identity",
+            "revision",
+            "semanticDigest"
+          ],
+          "properties": {
+            "identity": {
+              "type": "string",
+              "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+            },
+            "revision": {
+              "type": "string",
+              "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+            },
+            "semanticDigest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          }
+        },
+        "members": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "identity",
+              "revision",
+              "dialect",
+              "path",
+              "digest"
+            ],
+            "properties": {
+              "identity": {
+                "type": "string",
+                "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+              },
+              "revision": {
+                "type": "string",
+                "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+              },
+              "dialect": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+              },
+              "digest": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "resolverCapabilitySpecification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "revision",
+        "path",
+        "digest"
+      ],
+      "properties": {
+        "identity": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "registryPackage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "revision",
+        "path",
+        "digest",
+        "members"
+      ],
+      "properties": {
+        "identity": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "members": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "safe-origin-kind-registry-schema",
+            "check-registry-schema",
+            "finding-registry-schema",
+            "safe-origin-kind-registry",
+            "check-registry",
+            "finding-registry"
+          ],
+          "properties": {
+            "safe-origin-kind-registry-schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "identity",
+                "revision",
+                "path",
+                "digest"
+              ],
+              "properties": {
+                "identity": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+                },
+                "revision": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+                },
+                "path": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+                },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                }
+              }
+            },
+            "check-registry-schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "identity",
+                "revision",
+                "path",
+                "digest"
+              ],
+              "properties": {
+                "identity": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+                },
+                "revision": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+                },
+                "path": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+                },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                }
+              }
+            },
+            "finding-registry-schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "identity",
+                "revision",
+                "path",
+                "digest"
+              ],
+              "properties": {
+                "identity": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+                },
+                "revision": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+                },
+                "path": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+                },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                }
+              }
+            },
+            "safe-origin-kind-registry": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "identity",
+                "revision",
+                "path",
+                "digest"
+              ],
+              "properties": {
+                "identity": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+                },
+                "revision": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+                },
+                "path": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+                },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                }
+              }
+            },
+            "check-registry": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "identity",
+                "revision",
+                "path",
+                "digest"
+              ],
+              "properties": {
+                "identity": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+                },
+                "revision": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+                },
+                "path": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+                },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                }
+              }
+            },
+            "finding-registry": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "identity",
+                "revision",
+                "path",
+                "digest"
+              ],
+              "properties": {
+                "identity": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+                },
+                "revision": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+                },
+                "path": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+                },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
