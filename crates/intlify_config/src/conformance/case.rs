@@ -1780,7 +1780,7 @@ mod tests {
         }
     }
 
-    /// The Case Schema adds no default that 015 does not name (D15:3240): no
+    /// The Case Schema adds no default that 015 does not name (D15:3241): no
     /// schema in it has a `default`. A member's name or a constant may spell
     /// `default`, and neither is a schema.
     #[test]

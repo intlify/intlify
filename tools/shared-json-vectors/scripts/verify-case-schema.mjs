@@ -391,7 +391,7 @@ if (source.match(/pub\(crate\) const DIGEST: &str =\s*"(sha256:[\da-f]{64})";/)?
   fail('schema: its file digest is not DIGEST in src/conformance/case.rs')
 }
 
-// The schema adds no default that 015 does not name (D15:3240): no schema in
+// The schema adds no default that 015 does not name (D15:3241): no schema in
 // it has a `default`. A member's name or a constant may spell `default`, and
 // neither is a schema.
 /**

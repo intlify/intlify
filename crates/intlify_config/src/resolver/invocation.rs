@@ -17,7 +17,7 @@
 //!   and parser tokens are `bootstrapOnly.rawInput`'s, a Snapshot's are
 //!   `bootstrapOnly.snapshot`'s, and the five root-value bounds and the
 //!   structural ones are `policyComparable.configurationInput`'s (D15:2130,
-//!   2130, 2675);
+//!   2130, 2676);
 //! - a member on a fact's internal path is classified at its place in the
 //!   resolver's configuration schema under the capability's `policyComparable`
 //!   byte bounds, never a later Policy's, since a key's class is decided only

@@ -4,7 +4,7 @@
 //! 015's admission of one Resolver Invocation Input Set: the Resolver
 //! Construction Identity reference, the Common Invocation Input Set, and
 //! exactly one file or programmatic Entry Admission Input Set (D15:202,
-//! 1106).
+//! 1107).
 //!
 //! The three are admitted in stages of their own: the reference at its
 //! boundary, the common set in its step, and the entry in the step of its
