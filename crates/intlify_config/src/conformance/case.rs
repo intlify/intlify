@@ -37,6 +37,7 @@ use crate::construction::profile::MARKER_REASONS;
 use crate::construction::registry::check::{CHECK_ID_PATTERN, RULE_ID_PATTERN};
 use crate::resolver::dependency::SemanticGroup;
 use crate::resolver::origin::SafeOriginKind;
+use crate::snapshot::SnapshotBound;
 
 use super::index::PATH_PATTERN;
 
@@ -51,7 +52,7 @@ pub(crate) const PATH: &str = "schemas/case-v0.schema.json";
 
 /// The Case Schema's file digest, which the runner pins.
 pub(crate) const DIGEST: &str =
-    "sha256:21339b0c6f0e3a90108d60c7c75f5afcef126c1c6def4d24a01c670733297153";
+    "sha256:a8112fdf3d05623126d8e2ec224e79fb7f204886453d042628686347be26bca4";
 
 /// A case or Handoff Vector ID: `015-` and lowercase kebab-case.
 pub(crate) const CASE_ID_PATTERN: &str = "^015-[a-z0-9]+(?:-[a-z0-9]+)*$";
@@ -80,9 +81,6 @@ const CONSTRUCTION_IDENTITY_PATTERN: &str = "^rci0_[A-Za-z0-9_-]{42}[AEIMQUYcgko
 
 /// A decimal number's text.
 const DECIMAL_PATTERN: &str = "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$";
-
-/// A Snapshot bound's path.
-const SNAPSHOT_BOUND_PATTERN: &str = "^bootstrapOnly\\.snapshot\\.[a-z][A-Za-z0-9]*$";
 
 /// One manifest kind, in the order of the Suite Index's arrays.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -311,14 +309,22 @@ const COMMON_SLOTS: [(SafeOriginKind, &str); 6] = [
     ),
 ];
 
-/// The value boundaries of the entry slots: a file entry's, then a
-/// programmatic entry's, each slot with the kinds of its value, in the order
-/// their failures are listed.
-const ENTRY_SLOTS: [(SafeOriginKind, &[&str]); 4] = [
+/// The value boundaries of a file entry's slots, each with the kinds of its
+/// value. Each entry is admitted in a step of its own, which lists failures
+/// of its own slots only (D15:3164).
+const FILE_ENTRY_SLOTS: [(SafeOriginKind, &[&str]); 2] = [
     (
         SafeOriginKind::ConfigurationFile,
         &["file-source-identity-revision"],
     ),
+    (
+        SafeOriginKind::ProfileSelectorCli,
+        &["external-profile-selector-binding"],
+    ),
+];
+
+/// The value boundaries of a programmatic entry's slots.
+const PROGRAMMATIC_ENTRY_SLOTS: [(SafeOriginKind, &[&str]); 2] = [
     (
         SafeOriginKind::ConfigurationProgrammatic,
         &[
@@ -326,10 +332,6 @@ const ENTRY_SLOTS: [(SafeOriginKind, &[&str]); 4] = [
             "programmatic-entry-snapshot",
             "programmatic-call-site-evidence-input",
         ],
-    ),
-    (
-        SafeOriginKind::ProfileSelectorCli,
-        &["external-profile-selector-binding"],
     ),
     (
         SafeOriginKind::ProfileSelectorProgrammatic,
@@ -545,6 +547,18 @@ fn shared(definitions: &mut Map<String, Value>) {
         "jsonObject".into(),
         closed(&[("json", json!({ "type": "object" }))]),
     );
+    // A value the shared framing carries, which has no numbers: what the
+    // collection boundary's strict decoder yields for a member.
+    definitions.insert(
+        "numberFree".into(),
+        json!({
+            "anyOf": [
+                { "type": ["null", "boolean", "string"] },
+                { "type": "array", "items": definition("numberFree") },
+                { "type": "object", "additionalProperties": definition("numberFree") }
+            ]
+        }),
+    );
 }
 
 /// A Resolver Construction Case: success with its identity, or one closed
@@ -595,12 +609,13 @@ fn snapshot_node(definitions: &mut Map<String, Value>) {
         .iter()
         .copied()
         .filter(|reason| *reason != "bootstrap-limit-exceeded");
+    let bounds = SnapshotBound::ALL.map(SnapshotBound::path);
     let marker = json!({
         "oneOf": [
             closed(&[("reason", strings(ordinary))]),
             closed(&[
                 ("reason", constant("bootstrap-limit-exceeded")),
-                ("boundPath", pattern(SNAPSHOT_BOUND_PATTERN)),
+                ("boundPath", strings(bounds.iter().map(String::as_str))),
                 ("witness", pattern("^[1-9][0-9]*$")),
             ]),
         ]
@@ -676,7 +691,7 @@ fn normalized(kind: &str) -> Value {
         _ if JSON_NORMALIZED.contains(&kind) => definition("jsonObject"),
         "submitted-profile-resolution-artifact-collection" => closed(&[(
             "members",
-            json!({ "type": "array", "items": definition("jsonObject") }),
+            json!({ "type": "array", "items": closed(&[("json", definition("numberFree"))]) }),
         )]),
         "safe-origin-kind" => closed(&[(
             "safeOriginKind",
@@ -760,11 +775,11 @@ fn input_admission(definitions: &mut Map<String, Value>) {
             })
         })
         .collect::<Vec<_>>();
-    let failures = |slots: &[(SafeOriginKind, &[&str])]| {
+    let failures = |list: Value| {
         closed(&[
             ("admitted", json!({ "const": false })),
             ("normalizedInput", json!({ "type": "null" })),
-            ("failures", step_failures(slots)),
+            ("failures", list),
             ("resolverInvoked", json!({ "const": false })),
         ])
     };
@@ -781,7 +796,7 @@ fn input_admission(definitions: &mut Map<String, Value>) {
     kinds.push(json!({
         "properties": {
             "boundaryKind": constant(COMMON_SET),
-            "expected": { "oneOf": [admitted(common_input), failures(&common)] }
+            "expected": { "oneOf": [admitted(common_input), failures(step_failures(&common))] }
         }
     }));
     let configuration_file = closed(&[
@@ -819,10 +834,16 @@ fn input_admission(definitions: &mut Map<String, Value>) {
             ]),
         ]
     });
+    let entry_failures = json!({
+        "anyOf": [
+            step_failures(&FILE_ENTRY_SLOTS),
+            step_failures(&PROGRAMMATIC_ENTRY_SLOTS),
+        ]
+    });
     kinds.push(json!({
         "properties": {
             "boundaryKind": constant(ENTRY_SET),
-            "expected": { "oneOf": [admitted(entry_input), failures(&ENTRY_SLOTS)] }
+            "expected": { "oneOf": [admitted(entry_input), failures(entry_failures)] }
         }
     }));
     let kind = ManifestKind::ResolverInputAdmission;
@@ -871,11 +892,15 @@ fn resolver(definitions: &mut Map<String, Value>) {
         .copied()
         .filter(|group| *group != SemanticGroup::ProfileSpecification)
         .map(SemanticGroup::id);
+    // An equivalence class's change must leave the profile unchanged.
+    let equivalence = RELATION_KINDS
+        .into_iter()
+        .filter(|kind| *kind != "profile-changed");
     let relation = json!({
         "oneOf": [
             closed(&[
                 ("role", constant("equivalence")),
-                ("kind", strings(RELATION_KINDS)),
+                ("kind", strings(equivalence)),
                 ("case", definition("caseId")),
                 ("class", pattern(COVERAGE_ITEM_PATTERN)),
             ]),
@@ -1552,6 +1577,22 @@ mod tests {
             );
             assert!(validators.admits(&manifest), "{kind}");
         }
+        // A collection keeps every member its strict decoder yields, which is
+        // any value without numbers, not only an object.
+        let collection = |members: Value| {
+            admission_case(
+                "submitted-profile-resolution-artifact-collection",
+                admitted(json!({ "members": members })),
+            )
+        };
+        let members = json!([{ "json": null }, { "json": "text" }, { "json": [true, false] }, { "json": { "a": [null] } }]);
+        assert!(validators.admits(&collection(members)));
+        for members in [json!([{ "json": 1 }]), json!([{ "json": { "a": [1] } }])] {
+            assert!(
+                !validators.admits(&collection(members.clone())),
+                "{members}"
+            );
+        }
     }
 
     /// The two admission steps admit their slots' forms, or list failures,
@@ -1682,6 +1723,30 @@ mod tests {
                     "unrepresentable-selector"
                 )]),
                 true,
+            ),
+            (
+                json!([failure(
+                    "profile-selector-programmatic",
+                    "external-profile-selector-binding",
+                    "unrepresentable-selector"
+                )]),
+                true,
+            ),
+            (json!([]), true),
+            (
+                json!([
+                    failure(
+                        "configuration-file",
+                        "file-source-identity-revision",
+                        "missing-source-identity"
+                    ),
+                    failure(
+                        "profile-selector-programmatic",
+                        "external-profile-selector-binding",
+                        "unrepresentable-selector"
+                    )
+                ]),
+                false,
             ),
             (
                 json!([failure(
@@ -1901,8 +1966,9 @@ mod tests {
         };
         let relation = |role: &str, kind: &str, class: &str| json!({ "role": role, "kind": kind, "case": "015-locale-default-other", "class": class });
         for kind in RELATION_KINDS {
-            assert!(
+            assert_eq!(
                 validators.admits(&with(json!([relation("equivalence", kind, "015-COV-114")]))),
+                kind != "profile-changed",
                 "{kind}"
             );
             assert!(
@@ -2024,8 +2090,13 @@ mod tests {
             json!({ "marker": { "reason": "cycle", "witness": "1" } }),
             json!({ "marker": { "reason": "bootstrap-limit-exceeded", "boundPath": "policyComparable.maxNodes", "witness": "1" } }),
             json!({ "marker": { "reason": "bootstrap-limit-exceeded", "boundPath": "bootstrapOnly.snapshot.maxNodes", "witness": "0" } }),
+            json!({ "marker": { "reason": "bootstrap-limit-exceeded", "boundPath": "bootstrapOnly.snapshot.maxEverything", "witness": "1" } }),
         ] {
             assert!(!validators.admits(&with(node.clone())), "{node}");
+        }
+        for bound in SnapshotBound::ALL {
+            let marker = json!({ "marker": { "reason": "bootstrap-limit-exceeded", "boundPath": bound.path(), "witness": "1" } });
+            assert!(validators.admits(&with(marker.clone())), "{marker}");
         }
     }
 

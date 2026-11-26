@@ -186,8 +186,11 @@ const COMMON_SLOTS = [
   ['resource-limit-policy-verification', ['resource-limit-policy-verification-input']],
   ['implementation-capability', ['implementation-capability']]
 ]
-const ENTRY_SLOTS = [
+const FILE_ENTRY_SLOTS = [
   ['configuration-file', ['file-source-identity-revision']],
+  ['profile-selector-cli', ['external-profile-selector-binding']]
+]
+const PROGRAMMATIC_ENTRY_SLOTS = [
   [
     'configuration-programmatic',
     [
@@ -196,7 +199,6 @@ const ENTRY_SLOTS = [
       'programmatic-call-site-evidence-input'
     ]
   ],
-  ['profile-selector-cli', ['external-profile-selector-binding']],
   ['profile-selector-programmatic', ['external-profile-selector-binding']]
 ]
 
@@ -320,18 +322,20 @@ function read(path) {
 }
 
 /**
- * Whether a schema node is a closed object of exactly these members.
+ * Whether a schema node is a closed object of exactly these members: the
+ * required ones, then the optional ones.
  *
  * @param node - The node.
- * @param names - The members, in order.
+ * @param names - The required members, in order.
+ * @param optional - The optional members, in order.
  * @returns Whether it is.
  */
-function closedOf(node, names) {
+function closedOf(node, names, optional = []) {
   return (
     node?.type === 'object' &&
     node.additionalProperties === false &&
     isDeepStrictEqual(node.required, names) &&
-    isDeepStrictEqual(Object.keys(node.properties ?? {}), names)
+    isDeepStrictEqual(Object.keys(node.properties ?? {}), [...names, ...optional])
   )
 }
 
@@ -352,6 +356,7 @@ const { bytes, text, value: schema } = read(SCHEMA_PATH)
 const admission = read('construction/construction-admission-v0.json').value
 const origins = read('registries/safe-origin-kind-v0.json').value.rows.map(row => row.id)
 const profile = read('authorities/project-profile-specification-v0.json').value
+const capability = read('authorities/resolver-capability-v0.json').value
 
 // The bytes and the pin.
 if (bytes.includes(0x0d) || `${JSON.stringify(schema, null, 2)}\n` !== text) {
@@ -453,11 +458,18 @@ for (const [kind, ownReasons] of BOUNDARIES) {
   }
 }
 const own = Object.fromEntries(BOUNDARIES)
-for (const [set, slots] of [
-  ['common-invocation-input-set', COMMON_SLOTS],
-  ['entry-admission-input-set', ENTRY_SLOTS]
-]) {
-  const items = branch(set)?.properties?.expected?.oneOf?.[1]?.properties?.failures?.items?.oneOf
+const lists = []
+const commonList = branch('common-invocation-input-set')?.properties?.expected?.oneOf?.[1]
+lists.push(['common-invocation-input-set', COMMON_SLOTS, commonList?.properties?.failures])
+const entryLists = branch('entry-admission-input-set')?.properties?.expected?.oneOf?.[1]?.properties
+  ?.failures?.anyOf
+if (!Array.isArray(entryLists) || entryLists.length !== 2) {
+  fail('schema: entry-admission-input-set does not list failures of one entry at a time')
+}
+lists.push(['entry-admission-input-set', FILE_ENTRY_SLOTS, entryLists?.[0]])
+lists.push(['entry-admission-input-set', PROGRAMMATIC_ENTRY_SLOTS, entryLists?.[1]])
+for (const [set, slots, list] of lists) {
+  const items = list?.items?.oneOf
   const pairs = new Set()
   for (const item of items ?? []) {
     for (const slot of strings(item?.properties?.slot)) {
@@ -501,9 +513,14 @@ if (
 const relations = resolverCase?.properties?.relations?.items?.oneOf ?? []
 const groups = profile.semanticGroups
 if (
-  !relations.every(relation =>
-    isDeepStrictEqual(strings(relation?.properties?.kind), RELATION_KINDS)
+  relations.length !== 2 ||
+  relations[0]?.properties?.role?.const !== 'equivalence' ||
+  relations[1]?.properties?.role?.const !== 'mutation' ||
+  !isDeepStrictEqual(
+    strings(relations[0]?.properties?.kind),
+    RELATION_KINDS.filter(kind => kind !== 'profile-changed')
   ) ||
+  !isDeepStrictEqual(strings(relations[1]?.properties?.kind), RELATION_KINDS) ||
   !isDeepStrictEqual(
     strings(relations[1]?.properties?.class),
     groups.filter(group => group !== 'profileSpecification')
@@ -553,6 +570,139 @@ if (
   marker?.[1]?.properties?.reason?.const !== 'bootstrap-limit-exceeded'
 ) {
   fail("schema: the Snapshot markers are not the Profile Specification's")
+}
+const snapshotBounds = capability.bootstrapOnly
+  .map(bound => bound.path)
+  .filter(path => path.startsWith('snapshot.'))
+  .map(path => `bootstrapOnly.${String(path)}`)
+if (!isDeepStrictEqual(strings(marker?.[1]?.properties?.boundPath), snapshotBounds)) {
+  fail(
+    "schema: a terminal marker's bound is not one of the Capability Specification's Snapshot bounds"
+  )
+}
+
+// A collection member is any value without numbers.
+const numberFree = { $ref: '#/definitions/numberFree' }
+const collectionInput = branch('submitted-profile-resolution-artifact-collection')?.properties
+  ?.expected?.oneOf?.[0]?.properties?.normalizedInput
+if (
+  !isDeepStrictEqual(definitions.numberFree, {
+    anyOf: [
+      { type: ['null', 'boolean', 'string'] },
+      { type: 'array', items: numberFree },
+      { type: 'object', additionalProperties: numberFree }
+    ]
+  }) ||
+  !closedOf(collectionInput, ['members']) ||
+  !closedOf(collectionInput.properties.members?.items, ['json']) ||
+  !isDeepStrictEqual(collectionInput.properties.members.items.properties.json, numberFree)
+) {
+  fail('schema: a collection member is not a value without numbers')
+}
+
+// Every manifest form, and each of its alternatives, is a closed object with
+// exactly its members.
+const HEADING = ['suiteRevision', 'manifestKind', 'id']
+const PAIRED = ['entryAdmissionInputFixture', 'expectedOutcomeFixture']
+const side = node =>
+  closedOf(node, PAIRED) ||
+  (closedOf(node, ['unpaired']) &&
+    closedOf(node.properties.unpaired, ['reason', 'verificationOwner']))
+const closures = [
+  ['traceability', closedOf(definitions.traceability, ['decisionIds', 'ruleIds', 'checkIds'])],
+  [
+    'resolverConstruction',
+    closedOf(definitions.resolverConstruction, ['caseId', 'identityReference'])
+  ],
+  ['reference', closedOf(definitions.reference, ['path', 'digest'])],
+  [
+    'resolverInputAdmissionCase',
+    closedOf(admissionCase, [
+      ...HEADING,
+      'resolverConstruction',
+      'boundaryKind',
+      'inputFixture',
+      'expected',
+      'verificationOwner',
+      'traceability'
+    ]) &&
+      branches.every(row => {
+        const kind = row?.properties?.boundaryKind?.const
+        const [admitted, other] = row?.properties?.expected?.oneOf ?? []
+        return (
+          isDeepStrictEqual(Object.keys(row ?? {}), ['properties']) &&
+          isDeepStrictEqual(Object.keys(row.properties), ['boundaryKind', 'expected']) &&
+          row.properties.expected.oneOf.length === 2 &&
+          closedOf(admitted, ['admitted', 'normalizedInput', 'resolverInvoked']) &&
+          closedOf(other, [
+            'admitted',
+            'normalizedInput',
+            sets.includes(kind) ? 'failures' : 'failureReason',
+            'resolverInvoked'
+          ])
+        )
+      })
+  ],
+  [
+    'resolverCase',
+    closedOf(
+      resolverCase,
+      [
+        ...HEADING,
+        'resolverConstruction',
+        'commonInvocationInputFixture',
+        'entries',
+        'traceability'
+      ],
+      ['relations']
+    ) &&
+      entries.every(
+        row =>
+          closedOf(row, ['file', 'programmatic']) &&
+          side(row.properties.file) &&
+          side(row.properties.programmatic)
+      ) &&
+      relations.every(relation => closedOf(relation, ['role', 'kind', 'case', 'class']))
+  ],
+  [
+    'handoffVector',
+    closedOf(vector, [
+      ...HEADING,
+      'producerCaseId',
+      'producerProfileFacts',
+      'producerArtifactBindings',
+      'consumerInputs',
+      'expectedRelationship',
+      'verificationOwner',
+      'traceability'
+    ]) &&
+      closedOf(vector.properties.producerArtifactBindings?.items, ['key']) &&
+      closedOf(definitions.exactReference, [
+        'kind',
+        'identity',
+        'revision',
+        'specificationRevision',
+        'semanticDigest'
+      ])
+  ],
+  [
+    'conditionalObligation',
+    rows.every((row, index) =>
+      closedOf(row, [
+        ...HEADING,
+        'activation',
+        'activationState',
+        ...(index % 2 === 0 ? ['notApplicableReason'] : []),
+        'verificationOwner',
+        'traceability'
+      ])
+    )
+  ]
+]
+for (const [name, closedForm] of closures) {
+  if (!closedForm) {
+    fail(`schema: ${name} is not a closed object of exactly its members`)
+  }
 }
 
 if (failures.length > 0) {

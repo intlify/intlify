@@ -152,6 +152,29 @@
         }
       }
     },
+    "numberFree": {
+      "anyOf": [
+        {
+          "type": [
+            "null",
+            "boolean",
+            "string"
+          ]
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/numberFree"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/numberFree"
+          }
+        }
+      ]
+    },
     "resolverConstructionCase": {
       "type": "object",
       "additionalProperties": false,
@@ -472,7 +495,17 @@
                     },
                     "boundPath": {
                       "type": "string",
-                      "pattern": "^bootstrapOnly\\.snapshot\\.[a-z][A-Za-z0-9]*$"
+                      "enum": [
+                        "bootstrapOnly.snapshot.maxNodes",
+                        "bootstrapOnly.snapshot.maxDepth",
+                        "bootstrapOnly.snapshot.maxCollectionEntries",
+                        "bootstrapOnly.snapshot.maxTotalStringBytes",
+                        "bootstrapOnly.snapshot.maxSingleStringBytes",
+                        "bootstrapOnly.snapshot.maxRejectedMarkers",
+                        "bootstrapOnly.snapshot.maxEnvelopeCanonicalBytes",
+                        "bootstrapOnly.snapshot.maxSingleMarkerCanonicalBytes",
+                        "bootstrapOnly.snapshot.maxTraversalUnits"
+                      ]
                     },
                     "witness": {
                       "type": "string",
@@ -846,7 +879,16 @@
                         "members": {
                           "type": "array",
                           "items": {
-                            "$ref": "#/definitions/jsonObject"
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "json"
+                            ],
+                            "properties": {
+                              "json": {
+                                "$ref": "#/definitions/numberFree"
+                              }
+                            }
                           }
                         }
                       }
@@ -1589,7 +1631,16 @@
                             "members": {
                               "type": "array",
                               "items": {
-                                "$ref": "#/definitions/jsonObject"
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "json"
+                                ],
+                                "properties": {
+                                  "json": {
+                                    "$ref": "#/definitions/numberFree"
+                                  }
+                                }
                               }
                             }
                           }
@@ -2107,211 +2158,251 @@
                       "type": "null"
                     },
                     "failures": {
-                      "type": "array",
-                      "items": {
-                        "oneOf": [
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "slot",
-                              "boundaryKind",
-                              "failureReason"
-                            ],
-                            "properties": {
-                              "slot": {
-                                "type": "string",
-                                "enum": [
-                                  "configuration-file",
-                                  "configuration-programmatic",
-                                  "profile-selector-cli",
-                                  "profile-selector-programmatic"
-                                ]
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "slot",
+                                  "boundaryKind",
+                                  "failureReason"
+                                ],
+                                "properties": {
+                                  "slot": {
+                                    "type": "string",
+                                    "enum": [
+                                      "configuration-file",
+                                      "profile-selector-cli"
+                                    ]
+                                  },
+                                  "boundaryKind": {
+                                    "const": "safe-origin-kind"
+                                  },
+                                  "failureReason": {
+                                    "type": "string",
+                                    "enum": [
+                                      "missing-safe-origin-kind",
+                                      "unknown-safe-origin-kind",
+                                      "non-canonical-safe-origin-kind",
+                                      "evidence-kind-incompatible"
+                                    ]
+                                  }
+                                }
                               },
-                              "boundaryKind": {
-                                "const": "safe-origin-kind"
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "slot",
+                                  "boundaryKind",
+                                  "failureReason"
+                                ],
+                                "properties": {
+                                  "slot": {
+                                    "const": "configuration-file"
+                                  },
+                                  "boundaryKind": {
+                                    "const": "file-source-identity-revision"
+                                  },
+                                  "failureReason": {
+                                    "type": "string",
+                                    "enum": [
+                                      "missing-source-identity",
+                                      "missing-source-revision",
+                                      "over-bound-source-identity",
+                                      "over-bound-source-revision",
+                                      "unstable-source-identity",
+                                      "unbound-source-revision",
+                                      "source-snapshot-mismatch"
+                                    ]
+                                  }
+                                }
                               },
-                              "failureReason": {
-                                "type": "string",
-                                "enum": [
-                                  "missing-safe-origin-kind",
-                                  "unknown-safe-origin-kind",
-                                  "non-canonical-safe-origin-kind",
-                                  "evidence-kind-incompatible"
-                                ]
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "slot",
+                                  "boundaryKind",
+                                  "failureReason"
+                                ],
+                                "properties": {
+                                  "slot": {
+                                    "const": "profile-selector-cli"
+                                  },
+                                  "boundaryKind": {
+                                    "const": "external-profile-selector-binding"
+                                  },
+                                  "failureReason": {
+                                    "type": "string",
+                                    "enum": [
+                                      "unsafe-host-inspection",
+                                      "unrepresentable-selector",
+                                      "malformed-normalized-selector"
+                                    ]
+                                  }
+                                }
                               }
-                            }
+                            ]
                           },
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "slot",
-                              "boundaryKind",
-                              "failureReason"
-                            ],
-                            "properties": {
-                              "slot": {
-                                "const": "configuration-file"
+                          "minItems": 0
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "slot",
+                                  "boundaryKind",
+                                  "failureReason"
+                                ],
+                                "properties": {
+                                  "slot": {
+                                    "type": "string",
+                                    "enum": [
+                                      "configuration-programmatic",
+                                      "profile-selector-programmatic"
+                                    ]
+                                  },
+                                  "boundaryKind": {
+                                    "const": "safe-origin-kind"
+                                  },
+                                  "failureReason": {
+                                    "type": "string",
+                                    "enum": [
+                                      "missing-safe-origin-kind",
+                                      "unknown-safe-origin-kind",
+                                      "non-canonical-safe-origin-kind",
+                                      "evidence-kind-incompatible"
+                                    ]
+                                  }
+                                }
                               },
-                              "boundaryKind": {
-                                "const": "file-source-identity-revision"
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "slot",
+                                  "boundaryKind",
+                                  "failureReason"
+                                ],
+                                "properties": {
+                                  "slot": {
+                                    "const": "configuration-programmatic"
+                                  },
+                                  "boundaryKind": {
+                                    "const": "programmatic-entry-identity-revision"
+                                  },
+                                  "failureReason": {
+                                    "type": "string",
+                                    "enum": [
+                                      "missing-entry-identity",
+                                      "missing-entry-revision",
+                                      "over-bound-entry-identity",
+                                      "over-bound-entry-revision",
+                                      "unstable-entry-identity",
+                                      "unbound-entry-revision",
+                                      "snapshot-identity-mismatch"
+                                    ]
+                                  }
+                                }
                               },
-                              "failureReason": {
-                                "type": "string",
-                                "enum": [
-                                  "missing-source-identity",
-                                  "missing-source-revision",
-                                  "over-bound-source-identity",
-                                  "over-bound-source-revision",
-                                  "unstable-source-identity",
-                                  "unbound-source-revision",
-                                  "source-snapshot-mismatch"
-                                ]
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "slot",
+                                  "boundaryKind",
+                                  "failureReason"
+                                ],
+                                "properties": {
+                                  "slot": {
+                                    "const": "configuration-programmatic"
+                                  },
+                                  "boundaryKind": {
+                                    "const": "programmatic-entry-snapshot"
+                                  },
+                                  "failureReason": {
+                                    "type": "string",
+                                    "enum": [
+                                      "missing-snapshot",
+                                      "unsafe-host-inspection",
+                                      "snapshot-envelope-over-bound",
+                                      "malformed-snapshot",
+                                      "snapshot-content-digest-mismatch"
+                                    ]
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "slot",
+                                  "boundaryKind",
+                                  "failureReason"
+                                ],
+                                "properties": {
+                                  "slot": {
+                                    "const": "configuration-programmatic"
+                                  },
+                                  "boundaryKind": {
+                                    "const": "programmatic-call-site-evidence-input"
+                                  },
+                                  "failureReason": {
+                                    "type": "string",
+                                    "enum": [
+                                      "unsafe-host-inspection",
+                                      "over-bound-input",
+                                      "malformed-input",
+                                      "invalid-utf8-source",
+                                      "duplicate-mapping",
+                                      "missing-source-identity",
+                                      "missing-source-revision",
+                                      "unstable-source-identity",
+                                      "unbound-source-revision",
+                                      "source-snapshot-mismatch"
+                                    ]
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "slot",
+                                  "boundaryKind",
+                                  "failureReason"
+                                ],
+                                "properties": {
+                                  "slot": {
+                                    "const": "profile-selector-programmatic"
+                                  },
+                                  "boundaryKind": {
+                                    "const": "external-profile-selector-binding"
+                                  },
+                                  "failureReason": {
+                                    "type": "string",
+                                    "enum": [
+                                      "unsafe-host-inspection",
+                                      "unrepresentable-selector",
+                                      "malformed-normalized-selector"
+                                    ]
+                                  }
+                                }
                               }
-                            }
+                            ]
                           },
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "slot",
-                              "boundaryKind",
-                              "failureReason"
-                            ],
-                            "properties": {
-                              "slot": {
-                                "const": "configuration-programmatic"
-                              },
-                              "boundaryKind": {
-                                "const": "programmatic-entry-identity-revision"
-                              },
-                              "failureReason": {
-                                "type": "string",
-                                "enum": [
-                                  "missing-entry-identity",
-                                  "missing-entry-revision",
-                                  "over-bound-entry-identity",
-                                  "over-bound-entry-revision",
-                                  "unstable-entry-identity",
-                                  "unbound-entry-revision",
-                                  "snapshot-identity-mismatch"
-                                ]
-                              }
-                            }
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "slot",
-                              "boundaryKind",
-                              "failureReason"
-                            ],
-                            "properties": {
-                              "slot": {
-                                "const": "configuration-programmatic"
-                              },
-                              "boundaryKind": {
-                                "const": "programmatic-entry-snapshot"
-                              },
-                              "failureReason": {
-                                "type": "string",
-                                "enum": [
-                                  "missing-snapshot",
-                                  "unsafe-host-inspection",
-                                  "snapshot-envelope-over-bound",
-                                  "malformed-snapshot",
-                                  "snapshot-content-digest-mismatch"
-                                ]
-                              }
-                            }
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "slot",
-                              "boundaryKind",
-                              "failureReason"
-                            ],
-                            "properties": {
-                              "slot": {
-                                "const": "configuration-programmatic"
-                              },
-                              "boundaryKind": {
-                                "const": "programmatic-call-site-evidence-input"
-                              },
-                              "failureReason": {
-                                "type": "string",
-                                "enum": [
-                                  "unsafe-host-inspection",
-                                  "over-bound-input",
-                                  "malformed-input",
-                                  "invalid-utf8-source",
-                                  "duplicate-mapping",
-                                  "missing-source-identity",
-                                  "missing-source-revision",
-                                  "unstable-source-identity",
-                                  "unbound-source-revision",
-                                  "source-snapshot-mismatch"
-                                ]
-                              }
-                            }
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "slot",
-                              "boundaryKind",
-                              "failureReason"
-                            ],
-                            "properties": {
-                              "slot": {
-                                "const": "profile-selector-cli"
-                              },
-                              "boundaryKind": {
-                                "const": "external-profile-selector-binding"
-                              },
-                              "failureReason": {
-                                "type": "string",
-                                "enum": [
-                                  "unsafe-host-inspection",
-                                  "unrepresentable-selector",
-                                  "malformed-normalized-selector"
-                                ]
-                              }
-                            }
-                          },
-                          {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": [
-                              "slot",
-                              "boundaryKind",
-                              "failureReason"
-                            ],
-                            "properties": {
-                              "slot": {
-                                "const": "profile-selector-programmatic"
-                              },
-                              "boundaryKind": {
-                                "const": "external-profile-selector-binding"
-                              },
-                              "failureReason": {
-                                "type": "string",
-                                "enum": [
-                                  "unsafe-host-inspection",
-                                  "unrepresentable-selector",
-                                  "malformed-normalized-selector"
-                                ]
-                              }
-                            }
-                          }
-                        ]
-                      },
-                      "minItems": 0
+                          "minItems": 0
+                        }
+                      ]
                     },
                     "resolverInvoked": {
                       "const": false
@@ -2536,7 +2627,6 @@
                     "type": "string",
                     "enum": [
                       "profile-equal",
-                      "profile-changed",
                       "invocation-stale",
                       "invocation-not-stale",
                       "materialized-input-equal",
