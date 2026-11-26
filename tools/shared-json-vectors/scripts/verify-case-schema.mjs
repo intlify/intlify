@@ -1,0 +1,567 @@
+/**
+ * Check the committed Case Schema against this implementation.
+ *
+ * The Rust crate writes the conformance suite's Case Schema, the closed form
+ * of its five manifest kinds, and pins its file digest. This script shares no
+ * code with it. It reads the schema strictly and checks that it admits
+ * exactly the five kinds, each a closed object of its members, under the
+ * vocabularies of its own copy of design 015's tables: the boundary kinds and
+ * their failure reasons, the slots of the two admission steps, the
+ * verification and handoff owners, the unpaired-entry reasons, the relation
+ * kinds, the conditional obligations, and the artifact kinds. It takes the
+ * construction failure reasons and bounds from the committed
+ * construction-admission body, the Safe Origin Kinds from the committed Safe
+ * Origin Kind Registry, and the semantic groups and Snapshot marker reasons
+ * from the committed Profile Specification, and reads the pinned digest out
+ * of the crate's source. It does not read the design document.
+ */
+
+import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { isDeepStrictEqual } from 'node:util'
+
+import { repeatsMember } from './strict-json.mjs'
+
+const here = dirname(fileURLToPath(import.meta.url))
+const crate = resolve(here, '../../../crates/intlify_config')
+const root = resolve(crate, 'conformance')
+
+const DRAFT_7 = 'http://json-schema.org/draft-07/schema#'
+const SCHEMA_PATH = 'schemas/case-v0.schema.json'
+
+/** The five manifest kinds and their definitions, in the index's order. */
+const KINDS = [
+  ['resolver-construction', 'resolverConstructionCase'],
+  ['resolver-input-admission', 'resolverInputAdmissionCase'],
+  ['resolver', 'resolverCase'],
+  ['handoff-vector', 'handoffVector'],
+  ['conditional-obligation', 'conditionalObligation']
+]
+
+/** Design 015's boundary kinds, each with its failure reasons in row order. */
+const BOUNDARIES = [
+  [
+    'profile-resolution-specification-input',
+    ['missing-input', 'over-bound-member', 'malformed-input', 'duplicate-member', 'unknown-member']
+  ],
+  [
+    'intent-surface-class-vocabulary-artifact',
+    [
+      'missing-input',
+      'over-bound-envelope',
+      'malformed-envelope',
+      'duplicate-member',
+      'unknown-member'
+    ]
+  ],
+  [
+    'locale-canonicalization-data-artifact',
+    [
+      'missing-input',
+      'over-bound-envelope',
+      'malformed-envelope',
+      'duplicate-member',
+      'unknown-member'
+    ]
+  ],
+  [
+    'submitted-profile-resolution-artifact-collection',
+    [
+      'missing-input',
+      'unsafe-host-inspection',
+      'malformed-container',
+      'formal-envelope-over-bound',
+      'unrepresentable-member'
+    ]
+  ],
+  [
+    'resource-limit-policy-verification-input',
+    [
+      'missing-input',
+      'over-bound-input',
+      'malformed-input',
+      'duplicate-member',
+      'unknown-member',
+      'secret-bearing-input',
+      'ambient-authority',
+      'verification-identity-mismatch',
+      'verification-revision-mismatch',
+      'verification-digest-mismatch'
+    ]
+  ],
+  [
+    'safe-origin-kind',
+    [
+      'missing-safe-origin-kind',
+      'unknown-safe-origin-kind',
+      'non-canonical-safe-origin-kind',
+      'evidence-kind-incompatible'
+    ]
+  ],
+  [
+    'external-profile-selector-binding',
+    ['unsafe-host-inspection', 'unrepresentable-selector', 'malformed-normalized-selector']
+  ],
+  [
+    'file-source-identity-revision',
+    [
+      'missing-source-identity',
+      'missing-source-revision',
+      'over-bound-source-identity',
+      'over-bound-source-revision',
+      'unstable-source-identity',
+      'unbound-source-revision',
+      'source-snapshot-mismatch'
+    ]
+  ],
+  [
+    'programmatic-entry-identity-revision',
+    [
+      'missing-entry-identity',
+      'missing-entry-revision',
+      'over-bound-entry-identity',
+      'over-bound-entry-revision',
+      'unstable-entry-identity',
+      'unbound-entry-revision',
+      'snapshot-identity-mismatch'
+    ]
+  ],
+  [
+    'programmatic-entry-snapshot',
+    [
+      'missing-snapshot',
+      'unsafe-host-inspection',
+      'snapshot-envelope-over-bound',
+      'malformed-snapshot',
+      'snapshot-content-digest-mismatch'
+    ]
+  ],
+  [
+    'programmatic-call-site-evidence-input',
+    [
+      'unsafe-host-inspection',
+      'over-bound-input',
+      'malformed-input',
+      'invalid-utf8-source',
+      'duplicate-mapping',
+      'missing-source-identity',
+      'missing-source-revision',
+      'unstable-source-identity',
+      'unbound-source-revision',
+      'source-snapshot-mismatch'
+    ]
+  ],
+  [
+    'implementation-capability',
+    [
+      'missing-capability',
+      'malformed-capability',
+      'capability-specification-identity-mismatch',
+      'capability-specification-revision-mismatch',
+      'incomplete-capability',
+      'non-canonical-bound',
+      'non-positive-bound',
+      'unrepresentable-bound',
+      'below-bootstrap-minimum'
+    ]
+  ],
+  [
+    'resolver-construction-identity-reference',
+    [
+      'missing-construction-identity',
+      'malformed-construction-identity',
+      'construction-identity-mismatch'
+    ]
+  ]
+]
+
+/** The two admission steps' slots, each with the boundary kinds of its value. */
+const COMMON_SLOTS = [
+  ['profile-resolution-specification-input', ['profile-resolution-specification-input']],
+  ['intent-surface-class-vocabulary', ['intent-surface-class-vocabulary-artifact']],
+  ['locale-canonicalization-data', ['locale-canonicalization-data-artifact']],
+  ['profile-resolution-artifact-collection', ['submitted-profile-resolution-artifact-collection']],
+  ['resource-limit-policy-verification', ['resource-limit-policy-verification-input']],
+  ['implementation-capability', ['implementation-capability']]
+]
+const ENTRY_SLOTS = [
+  ['configuration-file', ['file-source-identity-revision']],
+  [
+    'configuration-programmatic',
+    [
+      'programmatic-entry-identity-revision',
+      'programmatic-entry-snapshot',
+      'programmatic-call-site-evidence-input'
+    ]
+  ],
+  ['profile-selector-cli', ['external-profile-selector-binding']],
+  ['profile-selector-programmatic', ['external-profile-selector-binding']]
+]
+
+/** Design 015's verification owners, and those of a Handoff Vector. */
+const OWNERS = [
+  'intlify_config',
+  '016',
+  '019',
+  '020',
+  '021',
+  '022',
+  '023',
+  '024',
+  '025',
+  '026',
+  '027',
+  '029',
+  '030',
+  'product-integration'
+]
+const HANDOFF_OWNERS = ['016', '019', '020', '021', '022', '023', '024', '025', '026', '027', '030']
+
+/** The closed reasons of an unpaired entry, by the side a case runs. */
+const FILE_ONLY = [
+  'raw-json-syntax',
+  'duplicate-object-member',
+  'malformed-encoding',
+  'exact-token-span'
+]
+const PROGRAMMATIC_ONLY = [
+  'programmatic-source-label',
+  'programmatic-call-site',
+  'programmatic-entry-snapshot',
+  'safe-host-inspection'
+]
+
+/** The kinds of a relation between two Resolver Cases. */
+const RELATION_KINDS = [
+  'profile-equal',
+  'profile-changed',
+  'invocation-stale',
+  'invocation-not-stale',
+  'materialized-input-equal',
+  'materialized-input-changed'
+]
+
+/** The conditional obligations: ID, activation, reason, and owner. */
+const OBLIGATIONS = [
+  [
+    '015-XV-001',
+    'second-configuration-schema-revision',
+    'no-second-admitted-configuration-schema-revision',
+    'intlify_config'
+  ],
+  [
+    '015-XV-002',
+    'extension-admitting-canonicalization-specification-revision',
+    'no-extension-admitting-canonicalization-specification-revision',
+    'intlify_config'
+  ],
+  [
+    '015-AD-001',
+    'trusted-local-editor-navigation-adapter',
+    'no-trusted-local-editor-navigation-adapter',
+    'product-integration'
+  ],
+  ['015-AD-002', 'compatibility-conversion-adapter', 'no-compatibility-conversion-adapter', '029'],
+  [
+    '015-AD-003',
+    'baked-canonicalization-provider',
+    'no-baked-canonicalization-provider',
+    'intlify_config'
+  ],
+  ['015-AD-004', 'cli-adapter', 'no-cli-adapter', 'product-integration'],
+  [
+    '015-HV-001',
+    'negotiation-adapter-resource-section',
+    'no-negotiation-adapter-resource-section',
+    '027'
+  ],
+  ['015-HV-002', 'expanded-fallback-probes', 'no-expanded-fallback-probes', '020']
+]
+
+/** The kinds of artifact an exact reference names. */
+const ARTIFACT_KINDS = [
+  'approval-policy',
+  'glossary-set',
+  'provider-routing-policy',
+  'resource-limit-policy',
+  'selection-policy',
+  'source-admission-policy',
+  'target-profile',
+  'trust-policy'
+]
+
+const failures = []
+
+/**
+ * Record a disagreement.
+ *
+ * @param message - What disagrees.
+ */
+function fail(message) {
+  failures.push(message)
+}
+
+/**
+ * Read a committed JSON artifact strictly.
+ *
+ * @param path - Its path below the suite root.
+ * @returns Its bytes and value.
+ */
+function read(path) {
+  const bytes = readFileSync(resolve(root, path))
+  const text = bytes.toString('utf8')
+  const value = JSON.parse(text)
+  if (repeatsMember(text)) {
+    fail(`${path}: repeats a member`)
+  }
+  return { bytes, text, value }
+}
+
+/**
+ * Whether a schema node is a closed object of exactly these members.
+ *
+ * @param node - The node.
+ * @param names - The members, in order.
+ * @returns Whether it is.
+ */
+function closedOf(node, names) {
+  return (
+    node?.type === 'object' &&
+    node.additionalProperties === false &&
+    isDeepStrictEqual(node.required, names) &&
+    isDeepStrictEqual(Object.keys(node.properties ?? {}), names)
+  )
+}
+
+/**
+ * The strings a schema node's `enum` lists, or its `const` as one string.
+ *
+ * @param node - The node.
+ * @returns The strings.
+ */
+function strings(node) {
+  if (typeof node?.const === 'string') {
+    return [node.const]
+  }
+  return node?.enum ?? node?.allOf?.[0]?.enum ?? []
+}
+
+const { bytes, text, value: schema } = read(SCHEMA_PATH)
+const admission = read('construction/construction-admission-v0.json').value
+const origins = read('registries/safe-origin-kind-v0.json').value.rows.map(row => row.id)
+const profile = read('authorities/project-profile-specification-v0.json').value
+
+// The bytes and the pin.
+if (bytes.includes(0x0d) || `${JSON.stringify(schema, null, 2)}\n` !== text) {
+  fail(`${SCHEMA_PATH}: not the bytes two-space indentation writes`)
+}
+const digest = `sha256:${createHash('sha256').update(bytes).digest('hex')}`
+const source = readFileSync(resolve(crate, 'src/conformance/case.rs'), 'utf8')
+if (source.match(/pub\(crate\) const DIGEST: &str =\s*"(sha256:[\da-f]{64})";/)?.[1] !== digest) {
+  fail('schema: its file digest is not DIGEST in src/conformance/case.rs')
+}
+
+// The root admits exactly the five kinds.
+const definitions = schema.definitions ?? {}
+if (
+  !isDeepStrictEqual(Object.keys(schema), ['$schema', 'oneOf', 'definitions']) ||
+  schema.$schema !== DRAFT_7 ||
+  !isDeepStrictEqual(
+    schema.oneOf,
+    KINDS.map(([, name]) => ({ $ref: `#/definitions/${name}` }))
+  )
+) {
+  fail('schema: its root does not admit exactly the five manifest kinds')
+}
+for (const [kind, name] of KINDS) {
+  const node = definitions[name]
+  const rows = node?.properties === undefined ? (node?.oneOf ?? []) : [node]
+  for (const row of rows) {
+    if (
+      row?.properties?.manifestKind?.const !== kind ||
+      row.properties.suiteRevision?.const !== '0'
+    ) {
+      fail(`schema: ${name} is not a revision "0" ${kind} manifest`)
+    }
+  }
+}
+
+// A construction case: success, a closed reason, or the input limit with its
+// bound.
+const construction = definitions.resolverConstructionCase
+const [success, failure, limit] = construction?.properties?.expected?.oneOf ?? []
+const reasons = [...new Set(admission.failurePrecedence.map(row => row.reason))]
+if (
+  !closedOf(construction, [
+    'suiteRevision',
+    'manifestKind',
+    'id',
+    'constructionInputFixture',
+    'expected',
+    'traceability'
+  ]) ||
+  !closedOf(success, ['constructed', 'resolverConstructionIdentity', 'resolverInvoked']) ||
+  !closedOf(failure, [
+    'constructed',
+    'resolverConstructionIdentity',
+    'failureReason',
+    'resolverInvoked'
+  ]) ||
+  !closedOf(limit, [
+    'constructed',
+    'resolverConstructionIdentity',
+    'failureReason',
+    'failureDetails',
+    'resolverInvoked'
+  ])
+) {
+  fail('schema: a construction case is not closed to its three expectations')
+}
+if (!isDeepStrictEqual(new Set(strings(failure?.properties?.failureReason)), new Set(reasons))) {
+  fail("schema: the construction reasons are not the construction-admission body's")
+}
+if (
+  !isDeepStrictEqual(
+    strings(limit?.properties?.failureDetails?.properties?.boundId),
+    admission.bounds.map(bound => bound.id)
+  )
+) {
+  fail("schema: the construction bounds are not the construction-admission body's")
+}
+
+// An admission case: each boundary kind with its own reasons, and the two
+// steps with failures of their own slots.
+const admissionCase = definitions.resolverInputAdmissionCase
+const branches = admissionCase?.oneOf ?? []
+const branch = kind => branches.find(row => row?.properties?.boundaryKind?.const === kind)
+const sets = ['common-invocation-input-set', 'entry-admission-input-set']
+if (
+  !isDeepStrictEqual(strings(admissionCase?.properties?.boundaryKind), [
+    ...BOUNDARIES.map(([kind]) => kind),
+    ...sets
+  ]) ||
+  branches.length !== BOUNDARIES.length + sets.length
+) {
+  fail('schema: the admission case does not close its boundary kinds')
+}
+for (const [kind, ownReasons] of BOUNDARIES) {
+  const refused = branch(kind)?.properties?.expected?.oneOf?.[1]
+  if (!isDeepStrictEqual(strings(refused?.properties?.failureReason), ownReasons)) {
+    fail(`schema: ${String(kind)} is not refused with exactly its row's reasons`)
+  }
+}
+const own = Object.fromEntries(BOUNDARIES)
+for (const [set, slots] of [
+  ['common-invocation-input-set', COMMON_SLOTS],
+  ['entry-admission-input-set', ENTRY_SLOTS]
+]) {
+  const items = branch(set)?.properties?.expected?.oneOf?.[1]?.properties?.failures?.items?.oneOf
+  const pairs = new Set()
+  for (const item of items ?? []) {
+    for (const slot of strings(item?.properties?.slot)) {
+      const kind = item.properties.boundaryKind?.const
+      const itemReasons = strings(item.properties.failureReason)
+      if (!isDeepStrictEqual(itemReasons, own[kind])) {
+        fail(`schema: ${String(set)} lists ${String(kind)} with other reasons`)
+      }
+      pairs.add(`${slot} ${kind}`)
+    }
+  }
+  const expected = new Set(
+    slots.flatMap(([slot, kinds]) => [
+      `${slot} safe-origin-kind`,
+      ...kinds.map(kind => `${slot} ${kind}`)
+    ])
+  )
+  if (!isDeepStrictEqual(pairs, expected)) {
+    fail(`schema: ${String(set)} does not list failures of exactly its own slots`)
+  }
+}
+const admittedOrigin = branch('safe-origin-kind')?.properties?.expected?.oneOf?.[0]?.properties
+if (
+  !isDeepStrictEqual(strings(admittedOrigin?.normalizedInput?.properties?.safeOriginKind), origins)
+) {
+  fail("schema: an admitted Safe Origin Kind is not one of the registry's")
+}
+
+// A Resolver Case: paired entries, or one unpaired with a reason of the side
+// the case runs; and its relations.
+const resolverCase = definitions.resolverCase
+const entries = resolverCase?.properties?.entries?.oneOf ?? []
+const unpaired = node => strings(node?.properties?.unpaired?.properties?.reason)
+if (
+  entries.length !== 3 ||
+  !isDeepStrictEqual(unpaired(entries[1]?.properties?.programmatic), FILE_ONLY) ||
+  !isDeepStrictEqual(unpaired(entries[2]?.properties?.file), PROGRAMMATIC_ONLY)
+) {
+  fail('schema: a Resolver Case does not close its unpaired entries')
+}
+const relations = resolverCase?.properties?.relations?.items?.oneOf ?? []
+const groups = profile.semanticGroups
+if (
+  !relations.every(relation =>
+    isDeepStrictEqual(strings(relation?.properties?.kind), RELATION_KINDS)
+  ) ||
+  !isDeepStrictEqual(
+    strings(relations[1]?.properties?.class),
+    groups.filter(group => group !== 'profileSpecification')
+  )
+) {
+  fail('schema: a relation is not closed to its kinds and mutable groups')
+}
+
+// A Handoff Vector and its owners, and the verification owners.
+const vector = definitions.handoffVector
+if (
+  !isDeepStrictEqual(strings(vector?.properties?.verificationOwner), HANDOFF_OWNERS) ||
+  !isDeepStrictEqual(strings(vector?.properties?.producerProfileFacts?.propertyNames), groups) ||
+  !isDeepStrictEqual(strings(definitions.exactReference?.properties?.kind), ARTIFACT_KINDS)
+) {
+  fail('schema: a Handoff Vector is not closed to its owners, groups, and artifact kinds')
+}
+if (!isDeepStrictEqual(strings(definitions.verificationOwner), OWNERS)) {
+  fail("schema: the verification owners are not design 015's")
+}
+
+// A conditional obligation is one row of the table, inactive with its reason
+// or active without it.
+const rows = definitions.conditionalObligation?.oneOf ?? []
+const states = rows.map(row => [
+  row?.properties?.id?.const,
+  row?.properties?.activation?.const,
+  row?.properties?.activationState?.const,
+  row?.properties?.notApplicableReason?.const ?? null,
+  row?.properties?.verificationOwner?.const
+])
+const table = OBLIGATIONS.flatMap(([id, activation, reason, owner]) => [
+  [id, activation, 'inactive', reason, owner],
+  [id, activation, 'active', null, owner]
+])
+if (!isDeepStrictEqual(states, table)) {
+  fail("schema: the conditional obligations are not design 015's eight rows")
+}
+
+// An admitted Snapshot's markers.
+const marker = definitions.snapshotNode?.oneOf?.[6]?.properties?.marker?.oneOf
+if (
+  !isDeepStrictEqual(
+    strings(marker?.[0]?.properties?.reason),
+    profile.snapshot.markerReasons.filter(reason => reason !== 'bootstrap-limit-exceeded')
+  ) ||
+  marker?.[1]?.properties?.reason?.const !== 'bootstrap-limit-exceeded'
+) {
+  fail("schema: the Snapshot markers are not the Profile Specification's")
+}
+
+if (failures.length > 0) {
+  for (const message of failures) {
+    console.error(message)
+  }
+  process.exit(1)
+}
+
+console.log(
+  `case schema agrees: ${KINDS.length} manifest kinds, ${BOUNDARIES.length} boundary kinds with ${BOUNDARIES.reduce((sum, [, row]) => sum + row.length, 0)} reasons, ${reasons.length} construction reasons, ${OBLIGATIONS.length} obligations`
+)

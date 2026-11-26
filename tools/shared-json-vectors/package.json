@@ -7,6 +7,7 @@
     "check": "node scripts/verify.mjs",
     "check:authorities": "node scripts/verify-authorities.mjs",
     "check:bounds": "node scripts/verify-bounds.mjs",
+    "check:case-schema": "node scripts/verify-case-schema.mjs",
     "check:construction": "node scripts/verify-construction.mjs",
     "check:envelope": "node scripts/verify-envelope.mjs",
     "check:framing": "node scripts/verify-framing.mjs",
