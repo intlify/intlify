@@ -1,15 +1,17 @@
 // @license MIT
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
-//! Write the conformance suite's Suite Index and its schema.
+//! Write the conformance suite's Suite Index, its schema, and the Case
+//! Schema.
 //!
 //! The index pins each construction root member, authority, and Registry
 //! Package member by the file digest of the bytes this crate writes, so it is
 //! rewritten whenever one of them is: rerun this after
 //! `generate_construction_artifacts`. A file digest covers every byte, so
 //! `--check` compares the exact bytes, and the files are kept out of the
-//! repository formatter. `--write` also prints the schema's file digest, which
-//! the runner pins in `src/conformance/index.rs`.
+//! repository formatter. `--write` also prints the two schemas' file digests,
+//! which the runner pins in `src/conformance/index.rs` and
+//! `src/conformance/case.rs`.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -28,9 +30,13 @@ fn main() -> ExitCode {
     };
     let support = (|| {
         use intlify_config::conformance_support as support;
-        Ok::<_, serde_json::Error>((support::artifacts()?, support::schema_digest()?))
+        Ok::<_, serde_json::Error>((
+            support::artifacts()?,
+            support::schema_digest()?,
+            support::case_schema_digest()?,
+        ))
     })();
-    let (artifacts, schema_digest) = match support {
+    let (artifacts, schema_digest, case_schema_digest) = match support {
         Ok(support) => support,
         Err(error) => {
             eprintln!("the suite index could not be written: {error}");
@@ -62,6 +68,7 @@ fn main() -> ExitCode {
     }
     if write {
         println!("pinned Suite Index Schema digest: {schema_digest}");
+        println!("pinned Case Schema digest: {case_schema_digest}");
     }
     if stale {
         ExitCode::FAILURE

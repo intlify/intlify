@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url'
 import { isDeepStrictEqual } from 'node:util'
 
 import { digest as semanticDigest } from './framing.mjs'
+import { repeatsMember } from './strict-json.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const crate = resolve(here, '../../../crates/intlify_config')
@@ -45,7 +46,13 @@ const MEMBERS = [
   'profileSpecification',
   'configurationSchemaAuthoritySet',
   'resolverCapabilitySpecification',
-  'registryPackage'
+  'caseSchema',
+  'registryPackage',
+  'resolverConstructionCases',
+  'resolverInputAdmissionCases',
+  'resolverCases',
+  'handoffVectors',
+  'conditionalObligations'
 ]
 
 /** The Root Package's five roles, in their fixed order. */
@@ -103,6 +110,10 @@ const SHAPES = {
     identity: 'intlify-project-profile-resolver-capability',
     members: ENTRY
   },
+  caseSchema: {
+    identity: 'intlify-project-profile-conformance-case',
+    members: ENTRY
+  },
   registryPackage: {
     identity: 'intlify-project-profile-resolver-registry-package',
     members: [...ENTRY, 'members'],
@@ -111,8 +122,29 @@ const SHAPES = {
   }
 }
 
+/** A case or Handoff Vector ID, and a conditional obligation ID. */
+const CASE_ID_PATTERN = '^015-[a-z0-9]+(?:-[a-z0-9]+)*$'
+const OBLIGATION_ID_PATTERN = '^015-(?:XV|AD|HV)-[0-9]{3}$'
+
+/** The same ID forms, as this script's own regular expressions. */
+const CASE_ID = /^015-[\da-z]+(?:-[\da-z]+)*$/
+const OBLIGATION_ID = /^015-(?:XV|AD|HV)-\d{3}$/
+
+/**
+ * Each manifest array, with the `manifestKind` of the manifests it lists and
+ * the form of their IDs.
+ */
+const ARRAYS = {
+  resolverConstructionCases: ['resolver-construction', CASE_ID_PATTERN, CASE_ID],
+  resolverInputAdmissionCases: ['resolver-input-admission', CASE_ID_PATTERN, CASE_ID],
+  resolverCases: ['resolver', CASE_ID_PATTERN, CASE_ID],
+  handoffVectors: ['handoff-vector', CASE_ID_PATTERN, CASE_ID],
+  conditionalObligations: ['conditional-obligation', OBLIGATION_ID_PATTERN, OBLIGATION_ID]
+}
+
 /** Where each digest the index declares is pinned in the crate's source. */
 const PINS = [
+  ['src/conformance/case.rs', 'DIGEST', '/caseSchema/digest'],
   ['src/conformance/index.rs', 'SCHEMA_DIGEST', '/suiteIndexSchema/digest'],
   ['src/construction/root.rs', 'DIGEST', '/resolverConstructionRootPackage/digest'],
   [
@@ -226,50 +258,6 @@ function readBytes(file, shown) {
     fail(`${shown}: unreadable (${error.code ?? error.message})`)
     return undefined
   }
-}
-
-/**
- * Whether a JSON text repeats a member name within one object, which
- * `JSON.parse` hides by keeping the last value. The text is valid JSON, and
- * names compare as decoded strings.
- *
- * @param text - The JSON text.
- * @returns Whether a member repeats.
- */
-function repeatsMember(text) {
-  const open = []
-  let name = false
-  for (let at = 0; at < text.length; at += 1) {
-    const character = text[at]
-    if (character === '"') {
-      let end = at + 1
-      while (text[end] !== '"') {
-        end += text[end] === '\\' ? 2 : 1
-      }
-      const names = open.at(-1)
-      if (name && names instanceof Set) {
-        const decoded = JSON.parse(text.slice(at, end + 1))
-        if (names.has(decoded)) {
-          return true
-        }
-        names.add(decoded)
-        name = false
-      }
-      at = end
-    } else if (character === '{') {
-      open.push(new Set())
-      name = true
-    } else if (character === '[') {
-      open.push(null)
-      name = false
-    } else if (character === '}' || character === ']') {
-      open.pop()
-      name = false
-    } else if (character === ',') {
-      name = open.at(-1) instanceof Set
-    }
-  }
-  return false
 }
 
 /**
@@ -495,6 +483,18 @@ for (const [member, shape] of Object.entries(SHAPES)) {
   }
 }
 
+for (const [member, [, idPattern]] of Object.entries(ARRAYS)) {
+  const node = top.properties?.[member]
+  if (!isDeepStrictEqual(Object.keys(node ?? {}), ['type', 'items']) || node.type !== 'array') {
+    fail(`schema: ${member} is not an array of references`)
+    continue
+  }
+  closes(node.items, ['id', 'path', 'digest'], `${member}/*`)
+  if (!isDeepStrictEqual(node.items?.properties?.id, { type: 'string', pattern: idPattern })) {
+    fail(`schema: ${member}/*/id is not the ID form of its kind`)
+  }
+}
+
 // The index holds exactly its own copy's members, roles, identities, and
 // revisions, and every path names a file with the declared digest.
 if (!isDeepStrictEqual(Object.keys(index.value), MEMBERS)) {
@@ -577,6 +577,46 @@ if (
   fail('index: the mapped schema is not intlify-configuration-schema at revision "0" in Draft 7')
 }
 
+// Each manifest is listed once, each array in ascending unsigned byte order,
+// and has the ID that lists it and the kind of its array.
+const seen = new Set()
+let manifests = 0
+for (const [member, [kind, , id]] of Object.entries(ARRAYS)) {
+  const listed = index.value[member]
+  if (!Array.isArray(listed)) {
+    fail(`index: ${member} is not an array`)
+    continue
+  }
+  let previous
+  for (const entry of listed) {
+    if (
+      !isDeepStrictEqual(Object.keys(entry ?? {}), ['id', 'path', 'digest']) ||
+      typeof entry.id !== 'string' ||
+      !id.test(entry.id)
+    ) {
+      fail(`index: ${member} lists an entry that is no reference of its kind`)
+      continue
+    }
+    if (
+      previous !== undefined &&
+      Buffer.compare(Buffer.from(previous), Buffer.from(entry.id)) >= 0
+    ) {
+      fail(`index: ${member} lists ${entry.id} out of ascending byte order`)
+    }
+    if (seen.has(entry.id)) {
+      fail(`index: ${entry.id} is listed twice`)
+    }
+    seen.add(entry.id)
+    previous = entry.id
+    manifests += 1
+    names(entry, `${member}/${entry.id}`)
+    const manifest = named(entry)
+    if (manifest?.id !== entry.id || manifest?.manifestKind !== kind) {
+      fail(`index: ${entry.path} is not the ${kind} manifest ${entry.id}`)
+    }
+  }
+}
+
 // The containers list the digests the index declares for their members.
 const without = (entry, name) =>
   Object.fromEntries(Object.entries(entry ?? {}).filter(([key]) => key !== name))
@@ -628,5 +668,5 @@ for (const [module, name, pointer] of PINS) {
 finish()
 
 console.log(
-  `conformance suite index agrees: ${MEMBERS.length} members, ${bodies} bodies, ${objects} closed schema objects, ${PINS.length} pinned digests`
+  `conformance suite index agrees: ${MEMBERS.length} members, ${bodies} bodies of which ${manifests} manifests, ${objects} closed schema objects, ${PINS.length} pinned digests`
 )

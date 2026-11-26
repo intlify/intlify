@@ -19,15 +19,21 @@
 //!    index's to say, so no path is compared but the schema's, which is
 //!    fixed; and the Profile Specification is pinned by its semantic digest,
 //!    so its file digest is not compared either;
-//! 4. the closure: each body the index names has the file digest the index
-//!    declares for it, and the Profile Specification's body has the semantic
-//!    digest the index declares.
+//! 4. that every manifest is listed once: each array lists its IDs in
+//!    ascending unsigned byte order, and no ID occurs in two arrays
+//!    (D15:3031);
+//! 5. the closure: each body the index names has the file digest the index
+//!    declares for it, the Profile Specification's body has the semantic
+//!    digest the index declares, and each manifest is strict UTF-8 JSON, valid
+//!    against the Case Schema, with the `id` that lists it and the
+//!    `manifestKind` of its array.
 //!
 //! An artifact whose file digest is the one this crate pins has fixed
 //! contents, so the Root Package's member list, the Configuration Schema
 //! Authority Set's Profile Specification, and the Registry Package's container
 //! need no reading of their own.
 
+use std::collections::BTreeSet;
 use std::fmt;
 use std::path::Path;
 
@@ -41,6 +47,7 @@ use crate::construction::validator::schema::Schema;
 use crate::construction::{authority_set, capability, profile};
 use crate::model::CONFIGURATION_SCHEMA_VERSION;
 
+use super::case::{self, ManifestKind};
 use super::index::{
     Member, SCHEMA_DIGEST, SCHEMA_IDENTITY, SCHEMA_PATH, SCHEMA_REVISION, SUITE_REVISION,
 };
@@ -58,13 +65,14 @@ pub enum HarnessFailure {
     DigestMismatch(String),
     /// The file is not strict UTF-8 JSON.
     Malformed(String),
-    /// The index is not valid against the Suite Index Schema: it lacks a
-    /// member, leaving a body it must list unlisted, holds one too many, or
-    /// spells a value outside its form.
+    /// The index is not valid against the Suite Index Schema, or a manifest
+    /// against the Case Schema: it lacks a member, leaving a body it must list
+    /// unlisted, holds one too many, or spells a value outside its form.
     SchemaInvalid(String),
     /// The member is not revision `"0"`'s: it pins another artifact, its
-    /// roles are out of order, or the Profile Specification's body does not
-    /// have the semantic digest it declares.
+    /// roles are out of order, the Profile Specification's body does not have
+    /// the semantic digest it declares, or a manifest it lists is out of
+    /// order, listed twice, or has another `id` or `manifestKind`.
     NotRevisionZero(Member),
 }
 
@@ -80,10 +88,7 @@ impl fmt::Display for HarnessFailure {
             }
             Self::Malformed(path) => write!(formatter, "{path} is not strict UTF-8 JSON"),
             Self::SchemaInvalid(path) => {
-                write!(
-                    formatter,
-                    "{path} is not valid against the Suite Index Schema"
-                )
+                write!(formatter, "{path} is not valid against its schema")
             }
             Self::NotRevisionZero(member) => write!(
                 formatter,
@@ -114,14 +119,24 @@ pub fn open(index: &Path) -> Result<Opened, HarnessFailure> {
     };
     let schema = trust_root(root)?;
     let value = read_index(index, &schema)?;
-    for member in Member::ALL {
+    let pinned = Member::ALL
+        .into_iter()
+        .filter(|member| member.manifests().is_none());
+    for member in pinned {
         revision_zero(member, &value[member.name()])?;
     }
-    let mut verified = vec![(SCHEMA_PATH.to_owned(), SCHEMA_DIGEST.to_owned())];
+    listed_once(&value)?;
+    let mut closure = Closure {
+        root,
+        verified: vec![(SCHEMA_PATH.to_owned(), SCHEMA_DIGEST.to_owned())],
+        case_schema: None,
+    };
     for member in Member::ALL {
-        closure(root, member, &value[member.name()], &mut verified)?;
+        closure.verify(member, &value[member.name()])?;
     }
-    Ok(Opened { verified })
+    Ok(Opened {
+        verified: closure.verified,
+    })
 }
 
 /// Read a body below the suite root, refusing a path that passes through a
@@ -148,8 +163,13 @@ fn trust_root(root: &Path) -> Result<Schema, HarnessFailure> {
     if file_digest(&bytes).as_str() != SCHEMA_DIGEST {
         return Err(HarnessFailure::DigestMismatch(SCHEMA_PATH.to_owned()));
     }
-    let document = strict_json(&bytes).expect("the pinned Suite Index Schema is strict JSON");
-    Ok(Schema::compile(&document).expect("the pinned Suite Index Schema compiles"))
+    Ok(compile(&bytes))
+}
+
+/// Read a schema whose bytes are the ones the runner pins.
+fn compile(bytes: &[u8]) -> Schema {
+    let document = strict_json(bytes).expect("a pinned schema is strict JSON");
+    Schema::compile(&document).expect("a pinned schema compiles")
 }
 
 /// Read the index, valid against the schema.
@@ -189,6 +209,39 @@ fn revision_zero(member: Member, value: &Value) -> Result<(), HarnessFailure> {
     } else {
         Err(HarnessFailure::NotRevisionZero(member))
     }
+}
+
+/// Check that every manifest ID is listed once: each array in ascending
+/// unsigned byte order, and no ID in two arrays.
+fn listed_once(value: &Value) -> Result<(), HarnessFailure> {
+    let mut seen = BTreeSet::new();
+    let arrays = Member::ALL
+        .into_iter()
+        .filter(|member| member.manifests().is_some());
+    for member in arrays {
+        let mut previous = None;
+        for entry in entries(&value[member.name()]) {
+            let id = text(&entry["id"]);
+            if previous.is_some_and(|previous| previous >= id) || !seen.insert(id) {
+                return Err(HarnessFailure::NotRevisionZero(member));
+            }
+            previous = Some(id);
+        }
+    }
+    Ok(())
+}
+
+/// The entries a member names: each item of an array, or the member and each
+/// of its roles or mapped schemas.
+fn entries(value: &Value) -> Vec<&Value> {
+    if let Value::Array(items) = value {
+        return items.iter().collect();
+    }
+    let mut entries = vec![value];
+    if let Some(members) = value.get("members").and_then(Value::as_object) {
+        entries.extend(members.values());
+    }
+    entries
 }
 
 /// Remove every `path` member, at any depth.
@@ -280,6 +333,11 @@ fn canonical(member: Member) -> Value {
             &components.resolver_capability_specification,
             capability::DIGEST,
         ),
+        Member::CaseSchema => json!({
+            "identity": case::IDENTITY,
+            "revision": case::REVISION,
+            "digest": case::DIGEST,
+        }),
         Member::RegistryPackage => {
             let members = RegistryRole::ALL
                 .into_iter()
@@ -299,37 +357,74 @@ fn canonical(member: Member) -> Value {
             package["members"] = Value::Object(members);
             package
         }
+        Member::ResolverConstructionCases
+        | Member::ResolverInputAdmissionCases
+        | Member::ResolverCases
+        | Member::HandoffVectors
+        | Member::ConditionalObligations => {
+            unreachable!("a manifest array pins no artifact of this crate")
+        }
     }
 }
 
-/// Verify each body a member names, and the Profile Specification's semantic
-/// digest.
-fn closure(
-    root: &Path,
-    member: Member,
-    value: &Value,
-    verified: &mut Vec<(String, String)>,
-) -> Result<(), HarnessFailure> {
-    if matches!(member, Member::SuiteRevision | Member::SuiteIndexSchema) {
-        return Ok(());
+/// The closure as the runner verifies it: the bodies verified so far, and the
+/// Case Schema once its body is.
+struct Closure<'a> {
+    root: &'a Path,
+    verified: Vec<(String, String)>,
+    case_schema: Option<Schema>,
+}
+
+impl Closure<'_> {
+    /// Verify each body a member names: its file digest, the Profile
+    /// Specification's semantic digest, and each manifest.
+    fn verify(&mut self, member: Member, value: &Value) -> Result<(), HarnessFailure> {
+        if matches!(member, Member::SuiteRevision | Member::SuiteIndexSchema) {
+            return Ok(());
+        }
+        for entry in entries(value) {
+            let path = text(&entry["path"]);
+            let digest = text(&entry["digest"]);
+            let bytes = read(self.root, path)?;
+            if file_digest(&bytes).as_str() != digest {
+                return Err(HarnessFailure::DigestMismatch(path.to_owned()));
+            }
+            if member == Member::ProfileSpecification {
+                semantic(path, &bytes, text(&entry["semanticDigest"]))?;
+            } else if member == Member::CaseSchema {
+                self.case_schema = Some(compile(&bytes));
+            } else if let Some(kind) = member.manifests() {
+                self.manifest(member, kind, entry, &bytes)?;
+            }
+            self.verified.push((path.to_owned(), digest.to_owned()));
+        }
+        Ok(())
     }
-    let mut entries = vec![value];
-    if let Some(members) = value.get("members").and_then(Value::as_object) {
-        entries.extend(members.values());
-    }
-    for entry in entries {
+
+    /// Check a manifest: strict UTF-8 JSON, valid against the Case Schema,
+    /// with the `id` of the entry that lists it and the kind of its array.
+    fn manifest(
+        &self,
+        member: Member,
+        kind: ManifestKind,
+        entry: &Value,
+        bytes: &[u8],
+    ) -> Result<(), HarnessFailure> {
         let path = text(&entry["path"]);
-        let digest = text(&entry["digest"]);
-        let bytes = read(root, path)?;
-        if file_digest(&bytes).as_str() != digest {
-            return Err(HarnessFailure::DigestMismatch(path.to_owned()));
+        let manifest =
+            strict_json(bytes).ok_or_else(|| HarnessFailure::Malformed(path.to_owned()))?;
+        let schema = self
+            .case_schema
+            .as_ref()
+            .expect("the Case Schema is verified before the manifests");
+        if !schema.validate(&manifest).valid {
+            return Err(HarnessFailure::SchemaInvalid(path.to_owned()));
         }
-        if member == Member::ProfileSpecification {
-            semantic(path, &bytes, text(&entry["semanticDigest"]))?;
+        if manifest["id"] != entry["id"] || manifest["manifestKind"] != kind.name() {
+            return Err(HarnessFailure::NotRevisionZero(member));
         }
-        verified.push((path.to_owned(), digest.to_owned()));
+        Ok(())
     }
-    Ok(())
 }
 
 /// A member the schema makes a string.
@@ -362,7 +457,7 @@ mod tests {
 
     /// Every body the committed suite holds, in the order the runner verifies
     /// them.
-    const BODIES: [&str; 19] = [
+    const BODIES: [&str; 20] = [
         "schemas/suite-index-v0.schema.json",
         "construction/root-package-v0.json",
         "construction/construction-admission-v0.json",
@@ -375,6 +470,7 @@ mod tests {
         "authorities/configuration-schema-authority-set-v0.json",
         "authorities/configuration-v0.schema.json",
         "authorities/resolver-capability-v0.json",
+        "schemas/case-v0.schema.json",
         "registries/package-v0.json",
         "registries/safe-origin-kind-v0.schema.json",
         "registries/check-v0.schema.json",
@@ -707,6 +803,9 @@ mod tests {
                 other_digest(),
                 Member::ResolverCapabilitySpecification,
             ),
+            ("/caseSchema/identity", json!("other"), Member::CaseSchema),
+            ("/caseSchema/revision", json!("1"), Member::CaseSchema),
+            ("/caseSchema/digest", other_digest(), Member::CaseSchema),
             ("/registryPackage/identity", json!("other"), package),
             ("/registryPackage/revision", json!("1"), package),
             ("/registryPackage/digest", other_digest(), package),
@@ -744,6 +843,207 @@ mod tests {
             mapped.insert("1".to_owned(), schema);
         });
         assert_eq!(suite.open(), Err(HarnessFailure::NotRevisionZero(set)));
+    }
+
+    /// A conditional obligation's manifest, inactive, for row `row` of the
+    /// obligation table.
+    fn obligation(row: usize) -> Value {
+        let (id, activation, reason, owner) = case::OBLIGATIONS[row];
+        json!({
+            "suiteRevision": "0",
+            "manifestKind": "conditional-obligation",
+            "id": id,
+            "activation": activation,
+            "activationState": "inactive",
+            "notApplicableReason": reason,
+            "verificationOwner": owner,
+            "traceability": { "decisionIds": ["015-051"], "ruleIds": [], "checkIds": [] }
+        })
+    }
+
+    /// A Resolver Construction Case's manifest with this ID.
+    fn construction_case(id: &str) -> Value {
+        json!({
+            "suiteRevision": "0",
+            "manifestKind": "resolver-construction",
+            "id": id,
+            "constructionInputFixture": {
+                "path": "fixtures/construction/a.json",
+                "digest": format!("sha256:{}", "0".repeat(64))
+            },
+            "expected": {
+                "constructed": false,
+                "resolverConstructionIdentity": null,
+                "failureReason": "registry-member-digest-mismatch",
+                "resolverInvoked": false
+            },
+            "traceability": { "decisionIds": ["015-086"], "ruleIds": [], "checkIds": [] }
+        })
+    }
+
+    /// A refused Resolver Input Admission Case's manifest with this ID.
+    fn admission_case(id: &str) -> Value {
+        json!({
+            "suiteRevision": "0",
+            "manifestKind": "resolver-input-admission",
+            "id": id,
+            "resolverConstruction": {
+                "caseId": "015-a",
+                "identityReference": format!("rci0_{}", "A".repeat(43))
+            },
+            "boundaryKind": "safe-origin-kind",
+            "inputFixture": {
+                "path": "fixtures/input-admission/a.json",
+                "digest": format!("sha256:{}", "0".repeat(64))
+            },
+            "expected": {
+                "admitted": false,
+                "normalizedInput": null,
+                "failureReason": "unknown-safe-origin-kind",
+                "resolverInvoked": false
+            },
+            "verificationOwner": "intlify_config",
+            "traceability": { "decisionIds": ["015-086"], "ruleIds": [], "checkIds": [] }
+        })
+    }
+
+    impl Suite {
+        /// Write each manifest's bytes below `cases/` and list it in the
+        /// member's array, in the order given.
+        fn list(&self, member: Member, manifests: &[(&str, Vec<u8>)]) {
+            let entries = manifests
+                .iter()
+                .map(|(id, bytes)| {
+                    let path = format!("cases/{}/{id}.json", member.name());
+                    self.write(&path, bytes);
+                    json!({ "id": id, "path": path, "digest": file_digest(bytes).as_str() })
+                })
+                .collect::<Vec<_>>();
+            self.change_index(|index| index[member.name()] = Value::Array(entries));
+        }
+    }
+
+    fn bytes(manifest: &Value) -> Vec<u8> {
+        generate::write(manifest).unwrap()
+    }
+
+    #[test]
+    fn listed_manifests_open_and_are_verified() {
+        let suite = Suite::new();
+        suite.list(
+            Member::ResolverConstructionCases,
+            &[(
+                "015-construction-a",
+                bytes(&construction_case("015-construction-a")),
+            )],
+        );
+        suite.list(
+            Member::ConditionalObligations,
+            &[
+                ("015-XV-001", bytes(&obligation(0))),
+                ("015-XV-002", bytes(&obligation(1))),
+            ],
+        );
+        let verified = suite.open().unwrap().verified;
+        let paths = verified
+            .iter()
+            .skip(BODIES.len())
+            .map(|(path, _)| path.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            paths,
+            [
+                "cases/resolverConstructionCases/015-construction-a.json",
+                "cases/conditionalObligations/015-XV-001.json",
+                "cases/conditionalObligations/015-XV-002.json",
+            ]
+        );
+    }
+
+    /// Each array lists its IDs once, in ascending unsigned byte order, and
+    /// no ID occurs in two arrays; the index is refused before any manifest
+    /// is read.
+    #[test]
+    fn manifests_are_listed_once_in_ascending_order() {
+        let obligations = Member::ConditionalObligations;
+        let suite = Suite::new();
+        suite.list(
+            obligations,
+            &[("015-XV-002", b"{".to_vec()), ("015-XV-001", b"{".to_vec())],
+        );
+        assert_eq!(
+            suite.open(),
+            Err(HarnessFailure::NotRevisionZero(obligations))
+        );
+        let suite = Suite::new();
+        suite.list(
+            obligations,
+            &[("015-XV-001", b"{".to_vec()), ("015-XV-001", b"{".to_vec())],
+        );
+        assert_eq!(
+            suite.open(),
+            Err(HarnessFailure::NotRevisionZero(obligations))
+        );
+        // Two manifests, each of its own array's kind, may not share an ID.
+        let admissions = Member::ResolverInputAdmissionCases;
+        for (id, failure) in [
+            ("015-b", None),
+            ("015-a", Some(HarnessFailure::NotRevisionZero(admissions))),
+        ] {
+            let suite = Suite::new();
+            suite.list(
+                Member::ResolverConstructionCases,
+                &[("015-a", bytes(&construction_case("015-a")))],
+            );
+            suite.list(admissions, &[(id, bytes(&admission_case(id)))]);
+            assert_eq!(suite.open().err(), failure, "{id}");
+        }
+    }
+
+    /// A listed manifest is a body like any other, strict UTF-8 JSON, valid
+    /// against the Case Schema, and has the `id` that lists it and the kind
+    /// of its array.
+    #[test]
+    fn a_listed_manifest_passes_the_case_schema_and_its_listing() {
+        let cases = Member::ResolverConstructionCases;
+        let path = "cases/resolverConstructionCases/015-a.json";
+        let open = |member: Member, manifest: Vec<u8>| {
+            let suite = Suite::new();
+            suite.list(member, &[("015-a", manifest)]);
+            suite.open()
+        };
+        assert!(open(cases, bytes(&construction_case("015-a"))).is_ok());
+        assert_eq!(
+            open(cases, b"{\"id\": \"015-a\", \"id\": \"015-a\"}".to_vec()),
+            Err(HarnessFailure::Malformed(path.to_owned()))
+        );
+        let mut unknown = construction_case("015-a");
+        unknown["unknown"] = json!("unknown");
+        assert_eq!(
+            open(cases, bytes(&unknown)),
+            Err(HarnessFailure::SchemaInvalid(path.to_owned()))
+        );
+        assert_eq!(
+            open(cases, bytes(&construction_case("015-b"))),
+            Err(HarnessFailure::NotRevisionZero(cases))
+        );
+        assert_eq!(
+            open(Member::ResolverCases, bytes(&construction_case("015-a"))),
+            Err(HarnessFailure::NotRevisionZero(Member::ResolverCases))
+        );
+        let suite = Suite::new();
+        suite.list(cases, &[("015-a", bytes(&construction_case("015-a")))]);
+        suite.remove(path);
+        assert_eq!(suite.open(), Err(HarnessFailure::Missing(path.to_owned())));
+        let suite = Suite::new();
+        suite.list(cases, &[("015-a", bytes(&construction_case("015-a")))]);
+        let mut changed = suite.read(path);
+        changed.push(b'\n');
+        suite.write(path, &changed);
+        assert_eq!(
+            suite.open(),
+            Err(HarnessFailure::DigestMismatch(path.to_owned()))
+        );
     }
 
     #[test]
@@ -904,7 +1204,7 @@ mod tests {
             ),
             (
                 HarnessFailure::SchemaInvalid(path),
-                "registries/check-v0.json is not valid against the Suite Index Schema",
+                "registries/check-v0.json is not valid against its schema",
             ),
             (
                 HarnessFailure::NotRevisionZero(Member::RegistryPackage),
