@@ -217,4 +217,71 @@ mod tests {
             }
         }
     }
+
+    /// A module's code without the top-level items behind `#[cfg(test)]`,
+    /// wherever they are: rustfmt ends each at a line in column 0 that closes
+    /// a block or ends with `;`.
+    fn code_outside_tests(text: &str) -> String {
+        let mut code = String::new();
+        let mut lines = text.lines();
+        while let Some(line) = lines.next() {
+            if line != "#[cfg(test)]" {
+                code.push_str(line);
+                code.push('\n');
+                continue;
+            }
+            for item in lines.by_ref() {
+                let top = !item.starts_with([' ', '\t']);
+                if top && !item.starts_with("#[") && (item.ends_with(';') || item == "}") {
+                    break;
+                }
+            }
+        }
+        code
+    }
+
+    /// Nothing a resolution runs through discovers its inputs: beside the
+    /// resolver, no module it calls reads a file, reaches the network, the
+    /// environment, or another process, or looks a name up, so equivalent
+    /// declarations resolve through the collection their caller already
+    /// acquired (D15:3635). Construction embeds the one built-in package its
+    /// implementation fixes (D15:912) and acquires nothing when it runs. The
+    /// benchmark harness, test modules, fixtures, and vectors are no part of a
+    /// resolution.
+    #[test]
+    fn no_module_a_resolution_runs_through_discovers_anything() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut files = Vec::new();
+        sources(&root, &mut files);
+        let compiled_in = ["include_bytes!", "include_str!", "env!"];
+        let outside = ["benchmark", "minimum_tests", "fixtures", "profile_fixtures"];
+        let mut scanned = 0;
+        for file in &files {
+            let parts: Vec<&str> = file
+                .strip_prefix(&root)
+                .unwrap()
+                .iter()
+                .map(|part| part.to_str().unwrap().trim_end_matches(".rs"))
+                .collect();
+            if outside.contains(&parts[0])
+                || parts.contains(&"vectors")
+                || parts[parts.len() - 1].ends_with("tests")
+            {
+                continue;
+            }
+            let code = code_outside_tests(&std::fs::read_to_string(file).unwrap());
+            for forbidden in ACQUIRES.iter().chain(&NAME_WORK) {
+                if parts[0] == "construction" && compiled_in.contains(forbidden) {
+                    continue;
+                }
+                assert!(
+                    !code.contains(forbidden),
+                    "{} uses `{forbidden}`",
+                    file.display()
+                );
+            }
+            scanned += 1;
+        }
+        assert!(scanned >= 130, "{scanned}");
+    }
 }

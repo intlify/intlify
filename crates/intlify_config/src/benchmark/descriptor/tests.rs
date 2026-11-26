@@ -1256,3 +1256,42 @@ fn each_method_decodes_as_its_own_shape_and_a_mixed_one_as_neither() {
     mixed["clock"] = duration["clock"].clone();
     assert!(serde_json::from_value::<Method>(mixed).is_err());
 }
+
+/// Every interval leaves out what 015 keeps outside component intervals:
+/// fixture generation and input acquisition, timer or allocator setup,
+/// checksum observation and result validation, reporting, and teardown
+/// (D15:2824). Each duration and memory boundary names a marker for each and
+/// includes none of them.
+#[test]
+fn every_interval_excludes_the_work_015_keeps_outside_it() {
+    let outside = |setup: &'static str| {
+        [
+            "fixture-and-input-acquisition",
+            setup,
+            "semantic-observation-and-validation",
+            "reporting",
+            "output-destruction-and-teardown",
+        ]
+    };
+    for operation in Operation::ALL {
+        let mut boundaries = vec![(
+            Boundary::for_operation(operation),
+            outside("clock-and-collector-setup"),
+        )];
+        if let Some(memory) = Boundary::for_memory(operation) {
+            boundaries.push((memory, outside("observer-and-collector-setup")));
+        }
+        for (boundary, markers) in boundaries {
+            for marker in markers {
+                assert!(
+                    boundary.excluded_markers.iter().any(|each| each == marker),
+                    "{operation:?} {marker}"
+                );
+                assert!(
+                    !boundary.included_markers.iter().any(|each| each == marker),
+                    "{operation:?} {marker}"
+                );
+            }
+        }
+    }
+}
