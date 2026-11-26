@@ -1,0 +1,34 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-locale-data-missing-input",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "locale-canonicalization-data-artifact",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-locale-data-missing-input.json",
+    "digest": "sha256:acf7231bb6c00f30c2e698da4e2ca334bf357ee98f71e1cbbc925a4f6fec27f8"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failureReason": "missing-input",
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-121"
+    ],
+    "ruleIds": [
+      "015.input-admission.locale-canonicalization-data-artifact.missing-input"
+    ],
+    "checkIds": []
+  }
+}

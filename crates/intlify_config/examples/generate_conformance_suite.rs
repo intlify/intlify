@@ -2,7 +2,8 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! Write the conformance suite's Suite Index, its schema, the Case Schema,
-//! and the construction cases' manifests, fixtures, and changed bodies.
+//! the construction cases' manifests, fixtures, and changed bodies, and the
+//! input admission cases' manifests, fixtures, and raw inputs.
 //!
 //! The index pins each construction root member, authority, and Registry
 //! Package member by the file digest of the bytes this crate writes, so it is

@@ -213,7 +213,7 @@ where
 
 /// The vocabulary's limits: the capability's `inputBoundary` bounds on it
 /// (D15:1806, 1808-1811).
-const fn vocabulary_limits(bounds: &InputBoundaryLimits) -> VocabularyLimits {
+pub(crate) const fn vocabulary_limits(bounds: &InputBoundaryLimits) -> VocabularyLimits {
     VocabularyLimits {
         artifact_bytes: bounds.max_vocabulary_bytes.get(),
         depth: bounds.max_depth.get(),
@@ -225,7 +225,7 @@ const fn vocabulary_limits(bounds: &InputBoundaryLimits) -> VocabularyLimits {
 
 /// The collection's limits: the capability's `inputBoundary` bounds on its
 /// raw bytes (D15:1806, 1813-1814).
-const fn collection_limits(bounds: &InputBoundaryLimits) -> CollectionLimits {
+pub(crate) const fn collection_limits(bounds: &InputBoundaryLimits) -> CollectionLimits {
     CollectionLimits {
         member_bytes: bounds.max_collection_member_bytes.get(),
         total_bytes: bounds.max_collection_total_bytes.get(),

@@ -1,0 +1,35 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-vocabulary-unknown-member",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "intent-surface-class-vocabulary-artifact",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-vocabulary-unknown-member.json",
+    "digest": "sha256:5165a4940b806e9f600a5b31806f5ec6b9cc40906a8f159f33e1bd35846db0fe"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failureReason": "unknown-member",
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-099",
+      "015-138"
+    ],
+    "ruleIds": [
+      "015.input-admission.intent-surface-class-vocabulary-artifact.unknown-member"
+    ],
+    "checkIds": []
+  }
+}

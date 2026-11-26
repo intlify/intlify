@@ -333,6 +333,13 @@ impl IntactVocabulary {
 }
 
 impl FormalVocabulary {
+    /// The artifact the boundary admitted, which the conformance harness
+    /// writes as the admitted value (D15:3258).
+    #[cfg(any(test, feature = "conformance"))]
+    pub(crate) const fn artifact(&self) -> &IntentSurfaceClassVocabularyArtifact {
+        &self.0
+    }
+
     /// 017 steps 3 to 7: the integrity, each member an `IdentityToken`, no
     /// member twice, the members sorted, and then the semantic digest.
     pub(crate) fn admit(&self) -> Result<IntactVocabulary, BodyFailure> {

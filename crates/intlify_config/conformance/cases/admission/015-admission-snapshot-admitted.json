@@ -1,0 +1,56 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-snapshot-admitted",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "programmatic-entry-snapshot",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-snapshot-admitted.json",
+    "digest": "sha256:58e232463a30a55ed119bb2fa0230b917d7baac0706f3be2cdbf8b71a5693595"
+  },
+  "expected": {
+    "admitted": true,
+    "normalizedInput": {
+      "snapshot": {
+        "array": [
+          {
+            "null": null
+          },
+          {
+            "boolean": true
+          },
+          {
+            "number": "2"
+          },
+          {
+            "string": "s"
+          }
+        ]
+      },
+      "digest": "sha256:ac1426325964671111e209299acd4ba10b58de811fcdbdb9891b1f1a210e7daa"
+    },
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-146",
+      "015-200"
+    ],
+    "ruleIds": [
+      "015.input-admission.programmatic-entry-snapshot.missing-snapshot",
+      "015.input-admission.programmatic-entry-snapshot.unsafe-host-inspection",
+      "015.input-admission.programmatic-entry-snapshot.snapshot-envelope-over-bound",
+      "015.input-admission.programmatic-entry-snapshot.malformed-snapshot",
+      "015.input-admission.programmatic-entry-snapshot.snapshot-content-digest-mismatch"
+    ],
+    "checkIds": []
+  }
+}

@@ -905,7 +905,12 @@ impl ConfirmedPolicy {
 
 /// Finite fixture bounds, each a distinct value counting up from `first` in
 /// 015's canonical order. Never a product default.
-#[cfg(any(test, feature = "benchmark", feature = "dev-example"))]
+#[cfg(any(
+    test,
+    feature = "benchmark",
+    feature = "conformance",
+    feature = "dev-example"
+))]
 pub(crate) fn fixture_limits(first: u64) -> ResolutionLimits {
     let mut next = first;
     let mut bound = || {

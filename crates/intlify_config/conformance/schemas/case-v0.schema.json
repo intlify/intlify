@@ -743,6 +743,580 @@
         }
       ]
     },
+    "locatorCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "variant",
+        "payload",
+        "nonSecret"
+      ],
+      "properties": {
+        "variant": {
+          "type": "string"
+        },
+        "payload": {
+          "type": "string"
+        },
+        "nonSecret": {
+          "type": "boolean"
+        }
+      }
+    },
+    "specificationInputFixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability"
+      ],
+      "properties": {
+        "capability": {
+          "$ref": "#/definitions/json"
+        },
+        "input": {
+          "$ref": "#/definitions/bytesInput"
+        }
+      }
+    },
+    "vocabularyInputFixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability"
+      ],
+      "properties": {
+        "capability": {
+          "$ref": "#/definitions/json"
+        },
+        "input": {
+          "$ref": "#/definitions/bytesInput"
+        }
+      }
+    },
+    "canonicalizationDataInputFixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability"
+      ],
+      "properties": {
+        "capability": {
+          "$ref": "#/definitions/json"
+        },
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "manifest",
+            "payloads"
+          ],
+          "properties": {
+            "manifest": {
+              "$ref": "#/definitions/bytesInput"
+            },
+            "payloads": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/reference"
+              }
+            }
+          }
+        }
+      }
+    },
+    "collectionInputFixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability"
+      ],
+      "properties": {
+        "capability": {
+          "$ref": "#/definitions/json"
+        },
+        "input": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "members"
+              ],
+              "properties": {
+                "members": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/bytesInput"
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "container"
+              ],
+              "properties": {
+                "container": {
+                  "const": "malformed"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "hostInspection"
+              ],
+              "properties": {
+                "hostInspection": {
+                  "const": "unsafe"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "verificationInputFixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assertion",
+        "capability"
+      ],
+      "properties": {
+        "assertion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "identity",
+            "revision",
+            "semanticDigest"
+          ],
+          "properties": {
+            "identity": {
+              "type": "string",
+              "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+            },
+            "revision": {
+              "type": "string",
+              "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+            },
+            "semanticDigest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          }
+        },
+        "capability": {
+          "$ref": "#/definitions/json"
+        },
+        "input": {
+          "$ref": "#/definitions/bytesInput"
+        }
+      }
+    },
+    "originInputFixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "slot"
+      ],
+      "properties": {
+        "slot": {
+          "type": "string",
+          "enum": [
+            "configuration-file",
+            "configuration-programmatic",
+            "profile-selector-cli",
+            "profile-selector-programmatic",
+            "profile-resolution-specification-input",
+            "intent-surface-class-vocabulary",
+            "locale-canonicalization-data",
+            "profile-resolution-artifact-collection",
+            "resource-limit-policy-verification",
+            "implementation-capability"
+          ]
+        },
+        "candidate": {}
+      }
+    },
+    "selectorInputFixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability",
+        "input"
+      ],
+      "properties": {
+        "capability": {
+          "$ref": "#/definitions/json"
+        },
+        "input": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "report"
+              ],
+              "properties": {
+                "report": {
+                  "const": "absent"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "report",
+                "value"
+              ],
+              "properties": {
+                "report": {
+                  "const": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "report"
+              ],
+              "properties": {
+                "report": {
+                  "const": "over-limit-string"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "report",
+                "type"
+              ],
+              "properties": {
+                "report": {
+                  "const": "invalid-type"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "null",
+                    "boolean",
+                    "number",
+                    "array",
+                    "object"
+                  ]
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "report"
+              ],
+              "properties": {
+                "report": {
+                  "const": "unrepresentable"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "report"
+              ],
+              "properties": {
+                "report": {
+                  "const": "unsafe"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "fileSourceInputFixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability",
+        "input"
+      ],
+      "properties": {
+        "capability": {
+          "$ref": "#/definitions/json"
+        },
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "nonSecret",
+            "bytes"
+          ],
+          "properties": {
+            "nonSecret": {
+              "type": "boolean"
+            },
+            "bytes": {
+              "$ref": "#/definitions/bytesInput"
+            },
+            "identity": {
+              "type": "string"
+            },
+            "revision": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "entrySourceInputFixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability",
+        "input"
+      ],
+      "properties": {
+        "capability": {
+          "$ref": "#/definitions/json"
+        },
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "nonSecret",
+            "snapshot"
+          ],
+          "properties": {
+            "nonSecret": {
+              "type": "boolean"
+            },
+            "snapshot": {
+              "$ref": "#/definitions/snapshot"
+            },
+            "identity": {
+              "type": "string"
+            },
+            "revision": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "snapshotInputFixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability"
+      ],
+      "properties": {
+        "capability": {
+          "$ref": "#/definitions/json"
+        },
+        "input": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "snapshot",
+                "digest"
+              ],
+              "properties": {
+                "snapshot": {
+                  "type": "object"
+                },
+                "digest": {
+                  "type": "string"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "hostInspection"
+              ],
+              "properties": {
+                "hostInspection": {
+                  "const": "unsafe"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "callSiteInputFixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability",
+        "input"
+      ],
+      "properties": {
+        "capability": {
+          "$ref": "#/definitions/json"
+        },
+        "input": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "nonSecret",
+                "source",
+                "mappings"
+              ],
+              "properties": {
+                "nonSecret": {
+                  "type": "boolean"
+                },
+                "source": {
+                  "$ref": "#/definitions/bytesInput"
+                },
+                "mappings": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "path",
+                      "role",
+                      "span"
+                    ],
+                    "properties": {
+                      "path": {
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "key"
+                              ],
+                              "properties": {
+                                "key": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "keyUtf16"
+                              ],
+                              "properties": {
+                                "keyUtf16": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 65535
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "index"
+                              ],
+                              "properties": {
+                                "index": {
+                                  "type": "number"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      "role": {
+                        "type": "string"
+                      },
+                      "span": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "start",
+                          "end"
+                        ],
+                        "properties": {
+                          "start": {
+                            "type": "number"
+                          },
+                          "end": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "identity": {
+                  "type": "string"
+                },
+                "revision": {
+                  "type": "string"
+                },
+                "locator": {
+                  "$ref": "#/definitions/locatorCandidate"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "hostInspection"
+              ],
+              "properties": {
+                "hostInspection": {
+                  "const": "unsafe"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "capabilityInputFixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "input": {
+          "$ref": "#/definitions/json"
+        }
+      }
+    },
+    "constructionIdentityInputFixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "input": {
+          "$ref": "#/definitions/json"
+        }
+      }
+    },
     "resolverInputAdmissionCase": {
       "type": "object",
       "additionalProperties": false,

@@ -1,0 +1,102 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-call-site-admitted",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "programmatic-call-site-evidence-input",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-call-site-admitted.json",
+    "digest": "sha256:9d014f32afb4f39c107726efbaf3c66446a7d04a7543e55d1c56a3621aeff962"
+  },
+  "expected": {
+    "admitted": true,
+    "normalizedInput": {
+      "json": {
+        "identity": "intlify-call-site.v0:storefront/app.ts",
+        "locator": {
+          "safe-label": "app.ts"
+        },
+        "mappings": [
+          {
+            "path": [],
+            "role": "node",
+            "span": {
+              "end": 38,
+              "start": 13
+            }
+          },
+          {
+            "path": [
+              {
+                "key": "profiles"
+              }
+            ],
+            "role": "member-key",
+            "span": {
+              "end": 23,
+              "start": 15
+            }
+          },
+          {
+            "path": [
+              {
+                "key": "profiles"
+              }
+            ],
+            "role": "member-value",
+            "span": {
+              "end": 36,
+              "start": 25
+            }
+          },
+          {
+            "path": [
+              {
+                "key": "profiles"
+              },
+              {
+                "key": "app"
+              }
+            ],
+            "role": "member-value",
+            "span": {
+              "end": 34,
+              "start": 32
+            }
+          }
+        ],
+        "nonSecret": false,
+        "revision": "sha256:cce9511720b93089d1cc228ba37453adc6325618bb012c46ebad55190bffb3a0",
+        "source": "defineConfig({ profiles: { app: {} } }) // 設定\n"
+      }
+    },
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-123",
+      "015-204"
+    ],
+    "ruleIds": [
+      "015.input-admission.programmatic-call-site-evidence-input.unsafe-host-inspection",
+      "015.input-admission.programmatic-call-site-evidence-input.over-bound-input",
+      "015.input-admission.programmatic-call-site-evidence-input.malformed-input",
+      "015.input-admission.programmatic-call-site-evidence-input.invalid-utf8-source",
+      "015.input-admission.programmatic-call-site-evidence-input.duplicate-mapping",
+      "015.input-admission.programmatic-call-site-evidence-input.missing-source-identity",
+      "015.input-admission.programmatic-call-site-evidence-input.missing-source-revision",
+      "015.input-admission.programmatic-call-site-evidence-input.unstable-source-identity",
+      "015.input-admission.programmatic-call-site-evidence-input.unbound-source-revision",
+      "015.input-admission.programmatic-call-site-evidence-input.source-snapshot-mismatch"
+    ],
+    "checkIds": []
+  }
+}

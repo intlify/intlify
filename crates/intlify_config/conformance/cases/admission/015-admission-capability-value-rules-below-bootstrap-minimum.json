@@ -1,0 +1,35 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-capability-value-rules-below-bootstrap-minimum",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "implementation-capability",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-capability-value-rules-below-bootstrap-minimum.json",
+    "digest": "sha256:21961ee1b3a99a465affa5a7482cf4a446a18c37a420d5c5beef520f1aca8405"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failureReason": "below-bootstrap-minimum",
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-101",
+      "015-110"
+    ],
+    "ruleIds": [
+      "015.input-admission.implementation-capability.below-bootstrap-minimum"
+    ],
+    "checkIds": []
+  }
+}

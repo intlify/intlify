@@ -1,0 +1,164 @@
+{
+  "capability": {
+    "json": {
+      "specification": {
+        "identity": "intlify-project-profile-resolver-capability",
+        "revision": "0"
+      },
+      "policyComparable": {
+        "configurationInput": {
+          "maxNodes": "1",
+          "maxDepth": "2",
+          "maxCollectionEntries": "3",
+          "maxTotalStringBytes": "4",
+          "maxSingleStringBytes": "5",
+          "maxProfiles": "6",
+          "maxProfileIdBytes": "1048576",
+          "maxStructuralAnalysisUnits": "8"
+        },
+        "localeResolution": {
+          "maxLocaleIdentifierBytes": "9",
+          "maxLocaleOccurrences": "10",
+          "maxRequestedLocales": "11",
+          "maxNegotiationAliases": "12",
+          "maxFallbackSources": "13",
+          "maxFallbackCandidatesPerSource": "14",
+          "maxCoverageRules": "15",
+          "maxCoverageLocaleSelectorOccurrences": "16",
+          "maxCoverageSurfaceSelectorOccurrences": "17",
+          "maxCoverageDecisionCells": "18",
+          "maxCoverageRuleCellComparisons": "19"
+        },
+        "artifactAdmission": {
+          "maxArtifacts": "20",
+          "maxPolicyArtifacts": "21",
+          "maxTargetProfileArtifacts": "22",
+          "maxArtifactReferences": "23",
+          "maxSingleArtifactCanonicalBytes": "24",
+          "maxTotalArtifactCanonicalBytes": "25",
+          "maxSingleReferenceCanonicalBytes": "26",
+          "maxTotalReferenceCanonicalBytes": "27"
+        },
+        "targetGrouping": {
+          "maxTargetProfiles": "28",
+          "maxTargetIdBytes": "29",
+          "maxDeploymentGroups": "30",
+          "maxGroupIdBytes": "31",
+          "maxMembersPerGroup": "32",
+          "maxMembershipOccurrences": "33",
+          "maxHydrationRelations": "34"
+        },
+        "diagnostics": {
+          "entry": {
+            "maxFindingOccurrences": "35",
+            "maxFindings": "36",
+            "maxRelatedEvidencePerOccurrenceGroup": "37",
+            "maxRelatedEvidenceOccurrences": "38",
+            "maxSingleEvidenceBytes": "39",
+            "maxTotalEvidenceBytes": "40",
+            "maxEvaluationStatusEntries": "41",
+            "maxSuppressionCausesPerStatus": "42",
+            "maxSuppressionCauseOccurrences": "43",
+            "maxRecords": "44",
+            "maxTotalCanonicalBytes": "45"
+          },
+          "shared": {
+            "maxFindingOccurrences": "46",
+            "maxFindings": "47",
+            "maxEvaluationStatusEntries": "48",
+            "maxSuppressionCausesPerStatus": "49",
+            "maxSuppressionCauseOccurrences": "50",
+            "maxRecords": "51",
+            "maxTotalCanonicalBytes": "52"
+          }
+        }
+      },
+      "bootstrapOnly": {
+        "rawInput": {
+          "maxFileBytes": "1",
+          "maxParserTokens": "1"
+        },
+        "snapshot": {
+          "maxNodes": "1048576",
+          "maxDepth": "1048576",
+          "maxCollectionEntries": "1048576",
+          "maxTotalStringBytes": "1048576",
+          "maxSingleStringBytes": "1048576",
+          "maxRejectedMarkers": "1048576",
+          "maxEnvelopeCanonicalBytes": "1048576",
+          "maxSingleMarkerCanonicalBytes": "1048576",
+          "maxTraversalUnits": "1048576"
+        },
+        "inputBoundary": {
+          "maxDepth": "1048576",
+          "maxSpecificationInputBytes": "1048576",
+          "maxVocabularyBytes": "1048576",
+          "maxVocabularyMembers": "1048576",
+          "maxVocabularyMemberBytes": "1048576",
+          "maxVocabularyTotalMemberBytes": "1048576",
+          "maxLocaleDataManifestBytes": "1048576",
+          "maxCollectionMemberBytes": "1048576",
+          "maxCollectionTotalBytes": "1048576",
+          "maxVerificationInputBytes": "1048576",
+          "maxVerificationPins": "1048576"
+        },
+        "artifactBootstrap": {
+          "maxEnvelopeDepth": "18446744073709551614",
+          "maxDecodedAllocationBytes": "18446744073709551614",
+          "maxMetadataScanUnits": "18446744073709551614",
+          "maxValidationWorkUnits": "18446744073709551614"
+        },
+        "localeData": {
+          "maxPayloads": "1048576",
+          "maxPayloadBytes": "1048576",
+          "maxMarkerBytes": "1048576",
+          "maxValidityGroups": "1048576",
+          "maxCodes": "1048576",
+          "maxExtensionKeys": "1048576",
+          "maxTypes": "1048576",
+          "maxCorrections": "1048576",
+          "maxValidationWorkUnits": "1048576"
+        },
+        "evidenceMetadata": {
+          "maxSourceIdentityBytes": "1048576",
+          "maxSourceRevisionBytes": "1048576",
+          "maxLocatorBytes": "1048576",
+          "maxCallSiteSourceBytes": "1048576",
+          "maxCallSiteMappings": "1048576",
+          "maxLogicalPathSegments": "1048576",
+          "maxLogicalPathCanonicalBytes": "1048576",
+          "maxSubjectOccurrences": "1048576",
+          "maxTokenInputs": "1048576",
+          "maxCollisionComparisons": "1048576",
+          "maxMetadataWorkUnits": "1048576"
+        },
+        "mandatoryReserve": {
+          "maxOutcomeEnvelopeSlots": "1",
+          "maxConstructionIdentitySlots": "1",
+          "maxEntryTerminalFindingSlots": "1",
+          "maxEntryTerminalStatusSlots": "1",
+          "maxSharedTerminalFindingSlots": "1",
+          "maxSharedTerminalStatusSlots": "1",
+          "maxSharedUnavailableCauseSlots": "1",
+          "maxCanonicalBytes": "65536"
+        }
+      }
+    }
+  },
+  "input": {
+    "manifest": {
+      "path": "fixtures/admission/015-admission-locale-data-unknown-member/input.manifest.json",
+      "digest": "sha256:f7fee2623688c6ccaddcaf313ea87157cca1da6344c4c12ace10370cace6719e"
+    },
+    "payloads": {
+      "conformance.json": {
+        "path": "fixtures/admission/locale-data/conformance.json",
+        "digest": "sha256:ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+      },
+      "unnamed.json": {
+        "path": "fixtures/admission/locale-data/unnamed.json",
+        "digest": "sha256:37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+      }
+    }
+  }
+}

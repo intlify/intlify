@@ -1,0 +1,74 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-specification-admitted",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "profile-resolution-specification-input",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-specification-admitted.json",
+    "digest": "sha256:d61919dc6d74363dbdae522806dd733d18962179cf97e721941f8c22e05f8a4d"
+  },
+  "expected": {
+    "admitted": true,
+    "normalizedInput": {
+      "json": {
+        "coverage": {
+          "identity": "intlify-localization-coverage",
+          "revision": "0"
+        },
+        "delivery-graph": {
+          "identity": "intlify-delivery-graph",
+          "revision": "0"
+        },
+        "delivery-placement": {
+          "identity": "intlify-delivery-placement",
+          "revision": "0"
+        },
+        "intent-surface-class-vocabulary": {
+          "identity": "storefront-surfaces",
+          "revision": "1",
+          "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+        },
+        "locale-canonicalization": {
+          "identity": "intlify-locale-canonicalization",
+          "revision": "0"
+        },
+        "locale-negotiation": {
+          "identity": "intlify-locale-negotiation",
+          "revision": "0"
+        },
+        "message-locale-fallback": {
+          "identity": "intlify-message-locale-fallback",
+          "revision": "0"
+        },
+        "project-profile": {
+          "identity": "intlify-project-profile",
+          "revision": "0"
+        }
+      }
+    },
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-087",
+      "015-165"
+    ],
+    "ruleIds": [
+      "015.input-admission.profile-resolution-specification-input.missing-input",
+      "015.input-admission.profile-resolution-specification-input.over-bound-member",
+      "015.input-admission.profile-resolution-specification-input.malformed-input",
+      "015.input-admission.profile-resolution-specification-input.duplicate-member",
+      "015.input-admission.profile-resolution-specification-input.unknown-member"
+    ],
+    "checkIds": []
+  }
+}

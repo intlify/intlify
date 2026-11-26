@@ -26,18 +26,31 @@
 //!    declares for it, the Profile Specification's body has the semantic
 //!    digest the index declares, and each manifest is strict UTF-8 JSON, valid
 //!    against the Case Schema, with the `id` that lists it and the
-//!    `manifestKind` of its array; then each fixture a construction case
-//!    names has the digest the case declares for it, is strict UTF-8 JSON of
-//!    the form the Case Schema gives it, and every body it references has the
-//!    digest the fixture declares (D15:3247). A body two references name is
-//!    read once, and both must declare its digest.
+//!    `manifestKind` of its array; then each fixture a construction case or
+//!    an input admission case names has the digest the case declares for it,
+//!    is strict UTF-8 JSON of the form the Case Schema gives it, the latter
+//!    its boundary kind's, and every body it references has the digest the
+//!    fixture declares (D15:3247). A body two references name is read once,
+//!    and both must declare its digest;
+//! 6. that each input admission case of a boundary kind can run: the
+//!    construction case it names is listed, constructs, and has the identity
+//!    the case states, and the harness admits the capability value of a
+//!    boundary that reads capability bounds and, under it, the programmatic
+//!    pair's canonical Snapshot (D15:3158, 3162, 3252). The two admission
+//!    steps' kinds are verified as manifests but not run yet.
+//!
+//! Steps 5 and 6 go entry by entry: an entry's body, its manifest and
+//! fixture, and an input admission case's construction are checked before
+//! the next entry's body is read.
 //!
 //! A suite that opened runs its cases from what it verified, and reads no
 //! file again ([`Opened::run`]). A construction case constructs from its
 //! fixture's input under the built-in construction root
-//! ([`super::construction`]); the case passes when what construction does is
-//! what the case expects. A case that does not pass is a conformance
-//! failure of the implementation, not a harness failure.
+//! ([`super::construction`]), and an input admission case evaluates its
+//! boundary on its fixture's input under the construction it names
+//! ([`super::admission`]); the case passes when what construction or the
+//! boundary does is what the case expects. A case that does not pass is a
+//! conformance failure of the implementation, not a harness failure.
 //!
 //! An artifact whose file digest is the one this crate pins has fixed
 //! contents, so the Root Package's member list, the Configuration Schema
@@ -58,8 +71,9 @@ use crate::construction::validator::schema::Schema;
 use crate::construction::{authority_set, capability, profile};
 use crate::model::CONFIGURATION_SCHEMA_VERSION;
 
-use super::case::{self, ManifestKind};
-use super::construction;
+use super::admission;
+use super::case::{self, ManifestKind, ADMISSION_FIXTURES};
+use super::construction::{self, Constructed};
 use super::fixture::{references, Bodies};
 use super::index::{
     Member, SCHEMA_DIGEST, SCHEMA_IDENTITY, SCHEMA_PATH, SCHEMA_REVISION, SUITE_REVISION,
@@ -89,6 +103,12 @@ pub enum HarnessFailure {
     /// the semantic digest it declares, or a manifest it lists is out of
     /// order, listed twice, or has another `id` or `manifestKind`.
     NotRevisionZero(Member),
+    /// The Resolver Input Admission Case with this ID cannot run: its
+    /// `resolverConstruction` names no construction case the suite lists, one
+    /// that does not construct, or another identity than the one constructed,
+    /// or the capability value or the canonical Snapshot the harness admits
+    /// before the boundary is refused (D15:3158, 3162).
+    InvalidCase(String),
 }
 
 impl fmt::Display for HarnessFailure {
@@ -110,6 +130,7 @@ impl fmt::Display for HarnessFailure {
                 "the index's {} is not revision \"0\"'s",
                 member.name()
             ),
+            Self::InvalidCase(id) => write!(formatter, "case {id} cannot run"),
         }
     }
 }
@@ -127,6 +148,9 @@ pub struct Opened {
     bodies: Bodies,
     /// Each construction case, in the order of its array.
     construction: Vec<ListedCase>,
+    /// Each input admission case of a boundary kind, in the order of its
+    /// array.
+    admission: Vec<AdmissionCase>,
 }
 
 /// A case the suite lists: its ID, its fixture, and what it expects.
@@ -135,6 +159,15 @@ struct ListedCase {
     id: String,
     fixture: Value,
     expected: Value,
+}
+
+/// An input admission case the suite lists: the case, its boundary kind, and
+/// what its boundary is evaluated against.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AdmissionCase {
+    case: ListedCase,
+    kind: &'static str,
+    constructed: Constructed,
 }
 
 /// One case run: what it expects, and what the implementation did, in the
@@ -158,14 +191,22 @@ impl Opened {
     /// Run each case, in the order of the index's arrays.
     #[must_use]
     pub fn run(&self) -> Vec<Outcome> {
-        self.construction
-            .iter()
-            .map(|case| Outcome {
-                id: case.id.clone(),
-                expected: case.expected.clone(),
-                actual: construction::outcome(&construction::input(&case.fixture, &self.bodies)),
-            })
-            .collect()
+        let construction = self.construction.iter().map(|case| Outcome {
+            id: case.id.clone(),
+            expected: case.expected.clone(),
+            actual: construction::outcome(&construction::input(&case.fixture, &self.bodies)),
+        });
+        let admission = self.admission.iter().map(|admission| Outcome {
+            id: admission.case.id.clone(),
+            expected: admission.case.expected.clone(),
+            actual: admission::outcome(
+                admission.kind,
+                &admission.case.fixture,
+                &self.bodies,
+                &admission.constructed,
+            ),
+        });
+        construction.chain(admission).collect()
     }
 }
 
@@ -194,6 +235,8 @@ pub fn open(index: &Path) -> Result<Opened, HarnessFailure> {
         case_schema: None,
         fixture_schemas: BTreeMap::new(),
         construction: Vec::new(),
+        constructions: BTreeMap::new(),
+        admission: Vec::new(),
     };
     for member in Member::ALL {
         closure.verify(member, &value[member.name()])?;
@@ -202,6 +245,7 @@ pub fn open(index: &Path) -> Result<Opened, HarnessFailure> {
         verified: closure.verified,
         bodies: closure.bodies,
         construction: closure.construction,
+        admission: closure.admission,
     })
 }
 
@@ -443,6 +487,9 @@ struct Closure<'a> {
     case_schema: Option<(Schema, Value)>,
     fixture_schemas: BTreeMap<&'static str, Schema>,
     construction: Vec<ListedCase>,
+    /// What each construction case an admission case names constructs, once.
+    constructions: BTreeMap<String, Option<Constructed>>,
+    admission: Vec<AdmissionCase>,
 }
 
 impl Closure<'_> {
@@ -524,7 +571,8 @@ impl Closure<'_> {
 
     /// Check a manifest: strict UTF-8 JSON, valid against the Case Schema,
     /// with the `id` of the entry that lists it and the kind of its array;
-    /// and list a construction case with its fixture.
+    /// and list a construction case, or an input admission case, with its
+    /// fixture.
     fn manifest(
         &mut self,
         member: Member,
@@ -556,7 +604,60 @@ impl Closure<'_> {
                 expected: manifest["expected"].clone(),
             });
         }
+        if kind == ManifestKind::ResolverInputAdmission {
+            self.admission_case(&manifest)?;
+        }
         Ok(())
+    }
+
+    /// List an input admission case of a boundary kind with its fixture, once
+    /// its construction is established and the parts the harness admits
+    /// before the boundary are admitted (D15:3158). The two steps' kinds are
+    /// not run yet.
+    fn admission_case(&mut self, manifest: &Value) -> Result<(), HarnessFailure> {
+        let boundary = text(&manifest["boundaryKind"]);
+        let Some((kind, definition)) = ADMISSION_FIXTURES
+            .into_iter()
+            .find(|(name, _)| *name == boundary)
+        else {
+            return Ok(());
+        };
+        let id = text(&manifest["id"]).to_owned();
+        let fixture = self.fixture(&manifest["inputFixture"], definition)?;
+        let constructed = self
+            .constructed(&manifest["resolverConstruction"])
+            .filter(|constructed| admission::prepared(kind, &fixture, constructed))
+            .ok_or_else(|| HarnessFailure::InvalidCase(id.clone()))?;
+        self.admission.push(AdmissionCase {
+            case: ListedCase {
+                id,
+                fixture,
+                expected: manifest["expected"].clone(),
+            },
+            kind,
+            constructed,
+        });
+        Ok(())
+    }
+
+    /// What the construction case that `reference` names constructs, when the
+    /// suite lists that case, it constructs, and with the identity `reference`
+    /// states. Each case is constructed once.
+    fn constructed(&mut self, reference: &Value) -> Option<Constructed> {
+        let id = text(&reference["caseId"]);
+        if !self.constructions.contains_key(id) {
+            let constructed = self
+                .construction
+                .iter()
+                .find(|case| case.id == id)
+                .and_then(|case| {
+                    construction::constructed(&construction::input(&case.fixture, &self.bodies))
+                });
+            self.constructions.insert(id.to_owned(), constructed);
+        }
+        self.constructions[id].clone().filter(|constructed| {
+            constructed.identity.text() == text(&reference["identityReference"])
+        })
     }
 }
 
@@ -585,6 +686,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
+    use crate::conformance::admission_cases;
     use crate::conformance::construction_cases::{self, CONSTRUCTED};
     use crate::conformance::index::PATH;
     use crate::construction::generate;
@@ -1011,10 +1113,11 @@ mod tests {
 
     /// The paths of the files the committed cases add to the suite.
     fn written_cases() -> BTreeSet<String> {
-        construction_cases::cases()
-            .unwrap()
-            .files
+        let construction = construction_cases::cases().unwrap().files;
+        let admission = admission_cases::cases().unwrap().files;
+        construction
             .into_iter()
+            .chain(admission)
             .map(|file| file.path)
             .collect()
     }
@@ -1041,20 +1144,26 @@ mod tests {
         })
     }
 
-    /// A refused Resolver Input Admission Case's manifest with this ID.
-    fn admission_case(id: &str) -> Value {
+    /// Where [`Suite::admission_fixture`] writes the fixture of
+    /// [`admission_case`].
+    const ADMISSION_FIXTURE: &str = "fixtures/input-admission/a.json";
+
+    /// A refused Resolver Input Admission Case's manifest with this ID, of
+    /// the `safe-origin-kind` fixture at [`ADMISSION_FIXTURE`], under the
+    /// construction case `015-a` with the construction vector's identity.
+    fn admission_case(id: &str, fixture: &[u8]) -> Value {
         json!({
             "suiteRevision": "0",
             "manifestKind": "resolver-input-admission",
             "id": id,
             "resolverConstruction": {
                 "caseId": "015-a",
-                "identityReference": format!("rci0_{}", "A".repeat(43))
+                "identityReference": construction_cases::identity().unwrap()
             },
             "boundaryKind": "safe-origin-kind",
             "inputFixture": {
-                "path": "fixtures/input-admission/a.json",
-                "digest": format!("sha256:{}", "0".repeat(64))
+                "path": ADMISSION_FIXTURE,
+                "digest": file_digest(fixture).as_str()
             },
             "expected": {
                 "admitted": false,
@@ -1069,7 +1178,9 @@ mod tests {
 
     impl Suite {
         /// Write each manifest's bytes below `cases/` and list it in the
-        /// member's array, in the order given.
+        /// member's array, in the order given. Listing construction cases
+        /// lists no input admission case, since each committed one names a
+        /// committed construction case.
         fn list(&self, member: Member, manifests: &[(&str, Vec<u8>)]) {
             let entries = manifests
                 .iter()
@@ -1079,7 +1190,20 @@ mod tests {
                     json!({ "id": id, "path": path, "digest": file_digest(bytes).as_str() })
                 })
                 .collect::<Vec<_>>();
-            self.change_index(|index| index[member.name()] = Value::Array(entries));
+            self.change_index(|index| {
+                index[member.name()] = Value::Array(entries);
+                if member == Member::ResolverConstructionCases {
+                    index[Member::ResolverInputAdmissionCases.name()] = json!([]);
+                }
+            });
+        }
+
+        /// Write the `safe-origin-kind` fixture of [`admission_case`], and
+        /// return its bytes.
+        fn admission_fixture(&self) -> Vec<u8> {
+            let fixture = bytes(&json!({ "slot": "configuration-file", "candidate": "x" }));
+            self.write(ADMISSION_FIXTURE, &fixture);
+            fixture
         }
     }
 
@@ -1156,7 +1280,8 @@ mod tests {
                 Member::ResolverConstructionCases,
                 &[("015-a", bytes(&construction_case("015-a")))],
             );
-            suite.list(admissions, &[(id, bytes(&admission_case(id)))]);
+            let fixture = suite.admission_fixture();
+            suite.list(admissions, &[(id, bytes(&admission_case(id, &fixture)))]);
             assert_eq!(suite.open().err(), failure, "{id}");
         }
     }
@@ -1378,6 +1503,10 @@ mod tests {
                 HarnessFailure::NotRevisionZero(Member::RegistryPackage),
                 "the index's registryPackage is not revision \"0\"'s",
             ),
+            (
+                HarnessFailure::InvalidCase("015-a".to_owned()),
+                "case 015-a cannot run",
+            ),
         ] {
             assert_eq!(failure.to_string(), message);
         }
@@ -1388,10 +1517,11 @@ mod tests {
     #[test]
     fn the_committed_cases_run_and_pass() {
         let outcomes = open(&committed().join(PATH)).unwrap().run();
-        let listed = construction_cases::cases()
-            .unwrap()
-            .listing
+        let construction = construction_cases::cases().unwrap().listing;
+        let admission = admission_cases::cases().unwrap().listing;
+        let listed = construction
             .iter()
+            .chain(&admission)
             .map(|entry| entry["id"].as_str().unwrap().to_owned())
             .collect::<Vec<_>>();
         let ids = outcomes
@@ -1502,5 +1632,182 @@ mod tests {
             }),
             Err(HarnessFailure::DigestMismatch(FIXTURE.to_owned()))
         );
+    }
+
+    /// A suite whose only cases are one construction case `015-a` of the
+    /// committed fixture at `construction`, and the input admission case
+    /// `015-b` of the fixture `fixture`, its manifest changed by `change`.
+    fn admission_suite(construction: &str, fixture: &Value, change: impl Fn(&mut Value)) -> Suite {
+        let suite = Suite::new();
+        let mut construction_manifest = construction_case("015-a");
+        let construction_bytes = std::fs::read(committed().join(construction)).unwrap();
+        construction_manifest["constructionInputFixture"] = json!({
+            "path": construction,
+            "digest": file_digest(&construction_bytes).as_str(),
+        });
+        suite.list(
+            Member::ResolverConstructionCases,
+            &[("015-a", bytes(&construction_manifest))],
+        );
+        let fixture = bytes(fixture);
+        suite.write(ADMISSION_FIXTURE, &fixture);
+        let mut manifest = admission_case("015-b", &fixture);
+        change(&mut manifest);
+        suite.list(
+            Member::ResolverInputAdmissionCases,
+            &[("015-b", bytes(&manifest))],
+        );
+        suite
+    }
+
+    /// An input admission case runs under the construction case it names,
+    /// once the suite lists that case, it constructs, and with the identity
+    /// the case states; a case without it cannot run, rather than expecting
+    /// a boundary's failure (D15:3158).
+    #[test]
+    fn an_admission_case_runs_under_an_established_construction_only() {
+        let origin = json!({ "slot": "configuration-file", "candidate": "configuration-file" });
+        let invalid = Err(HarnessFailure::InvalidCase("015-b".to_owned()));
+        let outcomes = admission_suite(FIXTURE, &origin, |_| {})
+            .open()
+            .unwrap()
+            .run();
+        assert_eq!(outcomes.len(), 2);
+        assert_eq!(outcomes[1].id, "015-b");
+        assert_eq!(
+            outcomes[1].actual["normalizedInput"],
+            json!({ "safeOriginKind": "configuration-file" })
+        );
+        let unlisted = admission_suite(FIXTURE, &origin, |manifest| {
+            manifest["resolverConstruction"]["caseId"] = json!("015-c");
+        });
+        assert_eq!(unlisted.open(), invalid);
+        let mut other = construction_cases::identity().unwrap().into_bytes();
+        other[5] = if other[5] == b'A' { b'B' } else { b'A' };
+        let other = String::from_utf8(other).unwrap();
+        let another = admission_suite(FIXTURE, &origin, |manifest| {
+            manifest["resolverConstruction"]["identityReference"] = json!(other);
+        });
+        assert_eq!(another.open(), invalid);
+        let refused = "fixtures/construction/015-construction-registry-package-missing.json";
+        assert_eq!(admission_suite(refused, &origin, |_| {}).open(), invalid);
+    }
+
+    /// A case whose capability value, or whose programmatic pair's canonical
+    /// Snapshot, the harness refuses before the boundary cannot run
+    /// (D15:3162, 3252).
+    #[test]
+    fn an_admission_case_whose_prepared_part_is_refused_cannot_run() {
+        let invalid = Err(HarnessFailure::InvalidCase("015-b".to_owned()));
+        let kind = |name: &'static str| {
+            move |manifest: &mut Value| {
+                manifest["boundaryKind"] = json!(name);
+                manifest["expected"]["failureReason"] = json!(match name {
+                    "external-profile-selector-binding" => "unsafe-host-inspection",
+                    _ => "missing-entry-identity",
+                });
+            }
+        };
+        let selector = |capability: Value| json!({ "capability": { "json": capability }, "input": { "report": "unsafe" } });
+        let suite = admission_suite(
+            FIXTURE,
+            &selector(admission_cases::capability()),
+            kind("external-profile-selector-binding"),
+        );
+        assert!(suite.open().is_ok());
+        let suite = admission_suite(
+            FIXTURE,
+            &selector(json!({})),
+            kind("external-profile-selector-binding"),
+        );
+        assert_eq!(suite.open(), invalid);
+        let entry = |digest: String| {
+            json!({
+                "capability": { "json": admission_cases::capability() },
+                "input": {
+                    "nonSecret": true,
+                    "snapshot": { "snapshot": { "null": null }, "digest": digest },
+                },
+            })
+        };
+        let null = "sha256:1dcd2e02d5702083fb37800e12fca137b28d2b85ccddc89f378a06638607db7e";
+        let suite = admission_suite(
+            FIXTURE,
+            &entry(null.to_owned()),
+            kind("programmatic-entry-identity-revision"),
+        );
+        assert!(suite.open().is_ok());
+        let suite = admission_suite(
+            FIXTURE,
+            &entry(format!("sha256:{}", "0".repeat(64))),
+            kind("programmatic-entry-identity-revision"),
+        );
+        assert_eq!(suite.open(), invalid);
+    }
+
+    /// An input admission case's fixture is verified before any case runs:
+    /// it has its declared digest and is strict UTF-8 JSON of its boundary
+    /// kind's form, and each body it references has the digest it declares.
+    #[test]
+    fn an_admission_fixture_is_verified_before_any_case_runs() {
+        let open_with = |fixture: &Value| admission_suite(FIXTURE, fixture, |_| {}).open();
+        assert!(open_with(&json!({ "slot": "configuration-file" })).is_ok());
+        assert_eq!(
+            open_with(&json!({ "slot": "configuration-file", "unknown": 1 })),
+            Err(HarnessFailure::SchemaInvalid(ADMISSION_FIXTURE.to_owned()))
+        );
+        let suite = admission_suite(FIXTURE, &json!({ "slot": "configuration-file" }), |_| {});
+        suite.write(ADMISSION_FIXTURE, b"{");
+        assert_eq!(
+            suite.open(),
+            Err(HarnessFailure::DigestMismatch(ADMISSION_FIXTURE.to_owned()))
+        );
+        let suite = admission_suite(
+            FIXTURE,
+            &json!({ "slot": "configuration-file" }),
+            |manifest| {
+                manifest["inputFixture"]["digest"] = json!(file_digest(b"{").as_str());
+            },
+        );
+        suite.write(ADMISSION_FIXTURE, b"{");
+        assert_eq!(
+            suite.open(),
+            Err(HarnessFailure::Malformed(ADMISSION_FIXTURE.to_owned()))
+        );
+        let reference = |digest: &str| {
+            json!({
+                "capability": { "json": admission_cases::capability() },
+                "input": { "path": PATH, "digest": digest },
+            })
+        };
+        let index_digest = |suite: &Suite| file_digest(&suite.read(PATH)).as_str().to_owned();
+        let probe = Suite::new();
+        let digest = index_digest(&probe);
+        let suite = admission_suite(FIXTURE, &reference(&digest), |manifest| {
+            manifest["boundaryKind"] = json!("profile-resolution-specification-input");
+            manifest["expected"]["failureReason"] = json!("malformed-input");
+        });
+        assert_eq!(
+            suite.open(),
+            Err(HarnessFailure::DigestMismatch(PATH.to_owned()))
+        );
+    }
+
+    /// The two admission steps' kinds are verified as manifests but not run
+    /// yet.
+    #[test]
+    fn a_step_case_is_not_run_yet() {
+        let suite = admission_suite(FIXTURE, &json!({}), |manifest| {
+            manifest["boundaryKind"] = json!("common-invocation-input-set");
+            manifest["expected"] = json!({
+                "admitted": false,
+                "normalizedInput": null,
+                "failures": [],
+                "resolverInvoked": false,
+            });
+        });
+        let outcomes = suite.open().unwrap().run();
+        assert_eq!(outcomes.len(), 1);
+        assert_eq!(outcomes[0].id, "015-a");
     }
 }

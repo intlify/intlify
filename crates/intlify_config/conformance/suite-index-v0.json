@@ -78,7 +78,7 @@
     "identity": "intlify-project-profile-conformance-case",
     "revision": "0",
     "path": "schemas/case-v0.schema.json",
-    "digest": "sha256:d01599c8f072903a8d9a058cf05b26da1007c39a58c601ab81bb3dcc708884ee"
+    "digest": "sha256:fee287f3d7200b62cd162011e25f61795c89c9a2bd861f5f834272e959748cbc"
   },
   "registryPackage": {
     "identity": "intlify-project-profile-resolver-registry-package",
@@ -346,7 +346,533 @@
       "digest": "sha256:05455a4558eb154099cf9f2406b618a18fdb1c8b85a28a3b0c398d026276c598"
     }
   ],
-  "resolverInputAdmissionCases": [],
+  "resolverInputAdmissionCases": [
+    {
+      "id": "015-admission-call-site-admitted",
+      "path": "cases/admission/015-admission-call-site-admitted.json",
+      "digest": "sha256:8e21b3fe57b4218e7fdbfbdf561bd1dc83fcf05da261fbe572cf81442cf30fc6"
+    },
+    {
+      "id": "015-admission-call-site-assertion-comparison",
+      "path": "cases/admission/015-admission-call-site-assertion-comparison.json",
+      "digest": "sha256:42e20813a79b7f4831b71353305df0949657d4bffa482050acc2b50b1beda896"
+    },
+    {
+      "id": "015-admission-call-site-closed-shape-invalid-utf8-source",
+      "path": "cases/admission/015-admission-call-site-closed-shape-invalid-utf8-source.json",
+      "digest": "sha256:6d248e04fecebd8beff4ee47b0ea1f94f5587c1b80e7727f70044ea5fa1cf5bb"
+    },
+    {
+      "id": "015-admission-call-site-closed-shape-malformed-input",
+      "path": "cases/admission/015-admission-call-site-closed-shape-malformed-input.json",
+      "digest": "sha256:df2f5e1fa2f76554c0dbae8ce7125135240dbb9d16a05a24e92d6612d99806a2"
+    },
+    {
+      "id": "015-admission-call-site-count-bounds",
+      "path": "cases/admission/015-admission-call-site-count-bounds.json",
+      "digest": "sha256:c3d6bf1de2a8a8680243298a68cb0da15435fcd3f97f0ec61823de9b2f4f4a9e"
+    },
+    {
+      "id": "015-admission-call-site-raw-bounds",
+      "path": "cases/admission/015-admission-call-site-raw-bounds.json",
+      "digest": "sha256:a1f65ebc295077f609788c8418efe36024eee9746079f9a87f95b8a44187e182"
+    },
+    {
+      "id": "015-admission-call-site-repeated-member",
+      "path": "cases/admission/015-admission-call-site-repeated-member.json",
+      "digest": "sha256:e6832caf9a89a32d949d1cee49f436d607dd5be0441b162eea624e9b05cc8ac5"
+    },
+    {
+      "id": "015-admission-call-site-unsafe-host-inspection",
+      "path": "cases/admission/015-admission-call-site-unsafe-host-inspection.json",
+      "digest": "sha256:4a51404991c15f3604c31d8efc1794bf92faa19ecea403a47fbec00e064ea674"
+    },
+    {
+      "id": "015-admission-call-site-value-rules-missing-source-identity",
+      "path": "cases/admission/015-admission-call-site-value-rules-missing-source-identity.json",
+      "digest": "sha256:d3b849ff415a9dff4793128b7ca6e7797b5d442fad2150240488d99568b721aa"
+    },
+    {
+      "id": "015-admission-call-site-value-rules-missing-source-revision",
+      "path": "cases/admission/015-admission-call-site-value-rules-missing-source-revision.json",
+      "digest": "sha256:155551dfcfdc5294d55ad0b3130ce966776b8418d429b4c068df96c188ab71d1"
+    },
+    {
+      "id": "015-admission-call-site-value-rules-unbound-source-revision",
+      "path": "cases/admission/015-admission-call-site-value-rules-unbound-source-revision.json",
+      "digest": "sha256:ef69ff52a89e31200460c4d9d64db82ac4ec3aed3be92bc8210910c6b648d7ec"
+    },
+    {
+      "id": "015-admission-call-site-value-rules-unstable-source-identity",
+      "path": "cases/admission/015-admission-call-site-value-rules-unstable-source-identity.json",
+      "digest": "sha256:26dc8a4f5bb565bff180bf2abce97d1d8ee1da9c36a2f76b27c5fde770863ef1"
+    },
+    {
+      "id": "015-admission-capability-admitted",
+      "path": "cases/admission/015-admission-capability-admitted.json",
+      "digest": "sha256:c6a8ee58b28f17555370d6fd2002cdcd37ab4d90b501b790c679baa7337e6ee6"
+    },
+    {
+      "id": "015-admission-capability-assertion-comparison-capability-specification-identity-mismatch",
+      "path": "cases/admission/015-admission-capability-assertion-comparison-capability-specification-identity-mismatch.json",
+      "digest": "sha256:d5db95fdd34e45abe5f5306d2af09a5c4880d44a826de3d796d298a4b1e913f6"
+    },
+    {
+      "id": "015-admission-capability-assertion-comparison-capability-specification-revision-mismatch",
+      "path": "cases/admission/015-admission-capability-assertion-comparison-capability-specification-revision-mismatch.json",
+      "digest": "sha256:6c939d031235fa0a905492c639093dbef881e4c51e08d980987d8a1ce1bf65c8"
+    },
+    {
+      "id": "015-admission-capability-closed-shape",
+      "path": "cases/admission/015-admission-capability-closed-shape.json",
+      "digest": "sha256:833566d4f9a05378c5ed164c37d7e244b372ad8515ea532c09a459ca97012994"
+    },
+    {
+      "id": "015-admission-capability-missing-input",
+      "path": "cases/admission/015-admission-capability-missing-input.json",
+      "digest": "sha256:3939cdc4e3596e7062a96ca905f983c11df336575dd094fbc1cf3099b0ddd343"
+    },
+    {
+      "id": "015-admission-capability-value-rules-below-bootstrap-minimum",
+      "path": "cases/admission/015-admission-capability-value-rules-below-bootstrap-minimum.json",
+      "digest": "sha256:cf76b0cb5f84c630a8ea0e08b64d4b54751efd8e536f2aabf2d35d90da01de60"
+    },
+    {
+      "id": "015-admission-capability-value-rules-incomplete-capability",
+      "path": "cases/admission/015-admission-capability-value-rules-incomplete-capability.json",
+      "digest": "sha256:91836b1c9d72a34911906cf83a20c1a4c75e0a3231a81ad6deaed6100978a188"
+    },
+    {
+      "id": "015-admission-capability-value-rules-malformed-capability",
+      "path": "cases/admission/015-admission-capability-value-rules-malformed-capability.json",
+      "digest": "sha256:ba67cd3e2391407251075383befb3fb2fdb3d95c3271c777e49b5fb762035d00"
+    },
+    {
+      "id": "015-admission-capability-value-rules-non-canonical-bound",
+      "path": "cases/admission/015-admission-capability-value-rules-non-canonical-bound.json",
+      "digest": "sha256:9223494dae609902a00afe542095acecf9ebf5c5ef1bf52a27cf8cee17a23261"
+    },
+    {
+      "id": "015-admission-capability-value-rules-non-positive-bound",
+      "path": "cases/admission/015-admission-capability-value-rules-non-positive-bound.json",
+      "digest": "sha256:3a7fbd36e687307587434524eafadb18a515bbc8735976e3679dd6c2326e7479"
+    },
+    {
+      "id": "015-admission-capability-value-rules-unrepresentable-bound",
+      "path": "cases/admission/015-admission-capability-value-rules-unrepresentable-bound.json",
+      "digest": "sha256:b9b6f7f845906c7c2c0c8463195a4a5f0863c09f6fa2b8261524942a2505bb19"
+    },
+    {
+      "id": "015-admission-collection-admitted",
+      "path": "cases/admission/015-admission-collection-admitted.json",
+      "digest": "sha256:10ba40b24f47c3f3239718130de50a8355258eb7bb6a32cb11030a9bc3ff115b"
+    },
+    {
+      "id": "015-admission-collection-container-form",
+      "path": "cases/admission/015-admission-collection-container-form.json",
+      "digest": "sha256:615f69d3c72b696d0e991733386bfc85d1d1fd3c6a7a6cfa76de251360b8e892"
+    },
+    {
+      "id": "015-admission-collection-missing-input",
+      "path": "cases/admission/015-admission-collection-missing-input.json",
+      "digest": "sha256:4b90e3e0ffe2050496ee728684078fb4da74ec7c22a6079b5b2ff969199e1444"
+    },
+    {
+      "id": "015-admission-collection-raw-bounds",
+      "path": "cases/admission/015-admission-collection-raw-bounds.json",
+      "digest": "sha256:473c2104fc3bcd72bb7c6515feeef7648fc76ea634138367a82cc526feb5b6f2"
+    },
+    {
+      "id": "015-admission-collection-strict-syntax",
+      "path": "cases/admission/015-admission-collection-strict-syntax.json",
+      "digest": "sha256:a65ba7f6b168b98c129fa78ad2f13d8cd5c94f271b320d8e50dfbf5427f4aff7"
+    },
+    {
+      "id": "015-admission-collection-unsafe-host-inspection",
+      "path": "cases/admission/015-admission-collection-unsafe-host-inspection.json",
+      "digest": "sha256:6545b0f180124e96a3649671035205d5c47b17a36ca521e6f59b7f27d93adea1"
+    },
+    {
+      "id": "015-admission-collection-value-rules",
+      "path": "cases/admission/015-admission-collection-value-rules.json",
+      "digest": "sha256:9da12f439d9ec73fb62635c6a1e3e2f2983b519412e7059be46304798638550d"
+    },
+    {
+      "id": "015-admission-construction-identity-admitted",
+      "path": "cases/admission/015-admission-construction-identity-admitted.json",
+      "digest": "sha256:6da538359d54b31779eff569d4bfd80fe9524f1ceb9b435eb2c5c5095b213faa"
+    },
+    {
+      "id": "015-admission-construction-identity-assertion-comparison",
+      "path": "cases/admission/015-admission-construction-identity-assertion-comparison.json",
+      "digest": "sha256:099cc43aa316f4a8ddf46bf3ac74ff9c90196a01492af65ed8ab422b8a46acf1"
+    },
+    {
+      "id": "015-admission-construction-identity-closed-shape",
+      "path": "cases/admission/015-admission-construction-identity-closed-shape.json",
+      "digest": "sha256:6882e9fd334ec4bfaa62cf6ab65686cd5ae574149cec7b3efa784e7d76b71ed4"
+    },
+    {
+      "id": "015-admission-construction-identity-missing-input",
+      "path": "cases/admission/015-admission-construction-identity-missing-input.json",
+      "digest": "sha256:82da813ec0759b7185478c40ba7360467339e7f6d2ef80886532f1e82cda4465"
+    },
+    {
+      "id": "015-admission-construction-identity-value-rules",
+      "path": "cases/admission/015-admission-construction-identity-value-rules.json",
+      "digest": "sha256:b5784153148b367ee68c739032e2212fda8d69d9c1d6af4f7df02e31f7835f42"
+    },
+    {
+      "id": "015-admission-entry-source-admitted",
+      "path": "cases/admission/015-admission-entry-source-admitted.json",
+      "digest": "sha256:0647bfa093123f379409371923de1b47b79a3f526c1cae8f38dc16779436a7f2"
+    },
+    {
+      "id": "015-admission-entry-source-assertion-comparison",
+      "path": "cases/admission/015-admission-entry-source-assertion-comparison.json",
+      "digest": "sha256:47041e543ba5266ba338ffa4abc68750c0ab3bcfcf42dac431cb198f10888b9d"
+    },
+    {
+      "id": "015-admission-entry-source-missing-input-missing-entry-identity",
+      "path": "cases/admission/015-admission-entry-source-missing-input-missing-entry-identity.json",
+      "digest": "sha256:febbf958132d076f97a6acfece7255510988374c3bc540a219b0ab4b4a74bae6"
+    },
+    {
+      "id": "015-admission-entry-source-missing-input-missing-entry-revision",
+      "path": "cases/admission/015-admission-entry-source-missing-input-missing-entry-revision.json",
+      "digest": "sha256:b2fd43ec2396266bfb0c0156b6631c318a8d204d04fff6e41be884882eabbea5"
+    },
+    {
+      "id": "015-admission-entry-source-raw-bounds-over-bound-entry-identity",
+      "path": "cases/admission/015-admission-entry-source-raw-bounds-over-bound-entry-identity.json",
+      "digest": "sha256:56322e0b851ee356a267079391f4246a49084a8f43601e1f28b208e1b3883fa2"
+    },
+    {
+      "id": "015-admission-entry-source-raw-bounds-over-bound-entry-revision",
+      "path": "cases/admission/015-admission-entry-source-raw-bounds-over-bound-entry-revision.json",
+      "digest": "sha256:6e53ccd0b5090ed88b04d06d8d2b51d7568bd83d47101ee238bb5f3f822d77bf"
+    },
+    {
+      "id": "015-admission-entry-source-value-rules-unbound-entry-revision",
+      "path": "cases/admission/015-admission-entry-source-value-rules-unbound-entry-revision.json",
+      "digest": "sha256:e9b280189e2dd2460cc0eaecfd5880925ce9c6b40a134217dad5d5e2d0ca44e1"
+    },
+    {
+      "id": "015-admission-entry-source-value-rules-unstable-entry-identity",
+      "path": "cases/admission/015-admission-entry-source-value-rules-unstable-entry-identity.json",
+      "digest": "sha256:0b82cf364daa6b3743e005118e569dd38a39c153778ca5fb230fc369dddcc094"
+    },
+    {
+      "id": "015-admission-file-source-admitted",
+      "path": "cases/admission/015-admission-file-source-admitted.json",
+      "digest": "sha256:74ba98b66b4675cc15d19cb4f270349069d331604c498f5a1d5c50d5ed14270a"
+    },
+    {
+      "id": "015-admission-file-source-assertion-comparison",
+      "path": "cases/admission/015-admission-file-source-assertion-comparison.json",
+      "digest": "sha256:03aa1b4ec8d10957aacdb017f0dea9bfbb8461fbdbdc724f10c87f8dd432a1c1"
+    },
+    {
+      "id": "015-admission-file-source-missing-input-missing-source-identity",
+      "path": "cases/admission/015-admission-file-source-missing-input-missing-source-identity.json",
+      "digest": "sha256:a51ab6be6f7cc5f70ac68923a8ab29f84267e47d293d366fa57bfd4df0f6c16c"
+    },
+    {
+      "id": "015-admission-file-source-missing-input-missing-source-revision",
+      "path": "cases/admission/015-admission-file-source-missing-input-missing-source-revision.json",
+      "digest": "sha256:2a9bee765076ca7b5bb8bde419519b31188f0900e810276e7f69d4d9e8df2f83"
+    },
+    {
+      "id": "015-admission-file-source-raw-bounds-over-bound-source-identity",
+      "path": "cases/admission/015-admission-file-source-raw-bounds-over-bound-source-identity.json",
+      "digest": "sha256:552b92fcd50495ee93241c90bdbb3b4f892adbb78dfcebdaf5e0ffc0f04dfaa9"
+    },
+    {
+      "id": "015-admission-file-source-raw-bounds-over-bound-source-revision",
+      "path": "cases/admission/015-admission-file-source-raw-bounds-over-bound-source-revision.json",
+      "digest": "sha256:d5fb8e1003d3a220aff379d441be54cbaf4240e082430cf4c58d9594ca3f5468"
+    },
+    {
+      "id": "015-admission-file-source-value-rules-unbound-source-revision",
+      "path": "cases/admission/015-admission-file-source-value-rules-unbound-source-revision.json",
+      "digest": "sha256:46d9e09f1160302c00b9ca14fb34e17719dae38e75636a4293985575c5152d0c"
+    },
+    {
+      "id": "015-admission-file-source-value-rules-unstable-source-identity",
+      "path": "cases/admission/015-admission-file-source-value-rules-unstable-source-identity.json",
+      "digest": "sha256:ac143ff8ec429051ed840ec806df458f951205ce415e834140fac6fcacf1b828"
+    },
+    {
+      "id": "015-admission-locale-data-admitted",
+      "path": "cases/admission/015-admission-locale-data-admitted.json",
+      "digest": "sha256:2edba1f2f0f603994008c28ae48cd02ec94de1077f8593ce959ce70f12c6e01a"
+    },
+    {
+      "id": "015-admission-locale-data-closed-shape",
+      "path": "cases/admission/015-admission-locale-data-closed-shape.json",
+      "digest": "sha256:efb7cdea3a2f8b9d82b801d7a3d90d2a966968752e72188616ed4832a66d2647"
+    },
+    {
+      "id": "015-admission-locale-data-missing-input",
+      "path": "cases/admission/015-admission-locale-data-missing-input.json",
+      "digest": "sha256:3199e420e891d68bb9af8215ed0a2cc9a8f1e2bbc54b60ac07e2cd41ce96d7f4"
+    },
+    {
+      "id": "015-admission-locale-data-raw-bounds",
+      "path": "cases/admission/015-admission-locale-data-raw-bounds.json",
+      "digest": "sha256:40743108c374246e3598d5e6f95b71c73cc7fd48d16a1f72fc63b744055f1269"
+    },
+    {
+      "id": "015-admission-locale-data-repeated-member",
+      "path": "cases/admission/015-admission-locale-data-repeated-member.json",
+      "digest": "sha256:132880a7137f7ae3c84853cb56791069277bfebb8415a93152b365ecf58c17f5"
+    },
+    {
+      "id": "015-admission-locale-data-strict-syntax",
+      "path": "cases/admission/015-admission-locale-data-strict-syntax.json",
+      "digest": "sha256:117a70548b0c0992111d8e27d911190154bd9c7568a01d42b9170bc71d6a2063"
+    },
+    {
+      "id": "015-admission-locale-data-unknown-member",
+      "path": "cases/admission/015-admission-locale-data-unknown-member.json",
+      "digest": "sha256:5a7668cc18155dd71ac6edec276a029dd3c2470bbf5d7dcd322c7a0b97d596c0"
+    },
+    {
+      "id": "015-admission-origin-admitted",
+      "path": "cases/admission/015-admission-origin-admitted.json",
+      "digest": "sha256:ef775301d5c9b8379e11c4c319149e7dfc99e0145d38d9db1eebf7b23a487e3a"
+    },
+    {
+      "id": "015-admission-origin-assertion-comparison",
+      "path": "cases/admission/015-admission-origin-assertion-comparison.json",
+      "digest": "sha256:32d85e29608429616aba40c55e24c6c19498eb91d4e8c3764a4c024e2fb1d1e4"
+    },
+    {
+      "id": "015-admission-origin-closed-shape",
+      "path": "cases/admission/015-admission-origin-closed-shape.json",
+      "digest": "sha256:b07a1885adc019315430fcbac1a2f0d2108192830dacf25d2ca395ed6d57d15c"
+    },
+    {
+      "id": "015-admission-origin-missing-input",
+      "path": "cases/admission/015-admission-origin-missing-input.json",
+      "digest": "sha256:0a799bede5b0ef5d726e711555bdeecb08c14e05101664fdc4ea8e93a48ec122"
+    },
+    {
+      "id": "015-admission-origin-value-rules-non-canonical-safe-origin-kind",
+      "path": "cases/admission/015-admission-origin-value-rules-non-canonical-safe-origin-kind.json",
+      "digest": "sha256:1af30d355241b1d080d66176a7cb588ec414af5fb6dc51a38b11d2d4510bccb3"
+    },
+    {
+      "id": "015-admission-origin-value-rules-unknown-safe-origin-kind",
+      "path": "cases/admission/015-admission-origin-value-rules-unknown-safe-origin-kind.json",
+      "digest": "sha256:3aed59502943fbc95b550b20ed5c6f5ea47dacd28ca3070a262c3180ff8d4440"
+    },
+    {
+      "id": "015-admission-selector-admitted",
+      "path": "cases/admission/015-admission-selector-admitted.json",
+      "digest": "sha256:e36e9e9806e04b30e7675922214727f0723ab5a63011adfa35c23a39e5aea15b"
+    },
+    {
+      "id": "015-admission-selector-closed-shape",
+      "path": "cases/admission/015-admission-selector-closed-shape.json",
+      "digest": "sha256:94e5595f09ca788e9f0063da36a1405a3d8e05dc387ff3fdd238b030c25901c6"
+    },
+    {
+      "id": "015-admission-selector-unsafe-host-inspection",
+      "path": "cases/admission/015-admission-selector-unsafe-host-inspection.json",
+      "digest": "sha256:c1e5f820537cfe82340ffb90863249bcde16a9d646d443d4443ee74949e3b699"
+    },
+    {
+      "id": "015-admission-selector-value-rules",
+      "path": "cases/admission/015-admission-selector-value-rules.json",
+      "digest": "sha256:d3e8da39babb256d4824aaecb3264256a72a4200717134ff7c06b96b109fed5d"
+    },
+    {
+      "id": "015-admission-snapshot-admitted",
+      "path": "cases/admission/015-admission-snapshot-admitted.json",
+      "digest": "sha256:f8ef354f52095d93cea2cf3ed38ef020c1b1d20a030f27aae00e3523451f2e58"
+    },
+    {
+      "id": "015-admission-snapshot-assertion-comparison",
+      "path": "cases/admission/015-admission-snapshot-assertion-comparison.json",
+      "digest": "sha256:ecc751a637b3584bba70b15051d94f5b0938ff808adb204a692470b7b8642ea7"
+    },
+    {
+      "id": "015-admission-snapshot-closed-shape",
+      "path": "cases/admission/015-admission-snapshot-closed-shape.json",
+      "digest": "sha256:5a7c2dfd2c20ce29697447a567240dfa494561f3bcd3239b7ed586bf7eb33963"
+    },
+    {
+      "id": "015-admission-snapshot-missing-input",
+      "path": "cases/admission/015-admission-snapshot-missing-input.json",
+      "digest": "sha256:91093d479cea8f40f23fa9e02a3d9752b0a08a6dfac293ac4a05e87e67d5fc54"
+    },
+    {
+      "id": "015-admission-snapshot-raw-bounds",
+      "path": "cases/admission/015-admission-snapshot-raw-bounds.json",
+      "digest": "sha256:fbf46832b0ddb31de6e783f2b75e57a21717c1dab407aebf9bec8dbd2e0f2c60"
+    },
+    {
+      "id": "015-admission-snapshot-unsafe-host-inspection",
+      "path": "cases/admission/015-admission-snapshot-unsafe-host-inspection.json",
+      "digest": "sha256:25e38707d2da5d39ea3e31289e3b681ca1795aca94ed88df7580372cd5e4a362"
+    },
+    {
+      "id": "015-admission-snapshot-value-rules",
+      "path": "cases/admission/015-admission-snapshot-value-rules.json",
+      "digest": "sha256:b06f36c128da2187c727fc0e9ecaa1b087874f8940be4f91a980910d627e88ce"
+    },
+    {
+      "id": "015-admission-specification-admitted",
+      "path": "cases/admission/015-admission-specification-admitted.json",
+      "digest": "sha256:65bb5e114d4ae3edefd75021a2a356cf57cb4fe023b1f16a83d701cdc8e00843"
+    },
+    {
+      "id": "015-admission-specification-closed-shape",
+      "path": "cases/admission/015-admission-specification-closed-shape.json",
+      "digest": "sha256:11128f49d5b8d863e8fbe4be4201b203538dc7f0f3bd718bd22b8ab438bab4cc"
+    },
+    {
+      "id": "015-admission-specification-missing-input",
+      "path": "cases/admission/015-admission-specification-missing-input.json",
+      "digest": "sha256:e560cf9ea35e37383e4d4142c218e5493d6c65e2a80e7d9858acbca90789fa63"
+    },
+    {
+      "id": "015-admission-specification-raw-bounds",
+      "path": "cases/admission/015-admission-specification-raw-bounds.json",
+      "digest": "sha256:24622602096cb12230e85afc1e6c5f97f37f62ad005fb36b779da88d38c0ecf9"
+    },
+    {
+      "id": "015-admission-specification-repeated-member",
+      "path": "cases/admission/015-admission-specification-repeated-member.json",
+      "digest": "sha256:25a8a29b2a92155bfd0a4bc1d3b92d86eb3b5d70aaf10cf82ddb524eaa41683f"
+    },
+    {
+      "id": "015-admission-specification-strict-syntax",
+      "path": "cases/admission/015-admission-specification-strict-syntax.json",
+      "digest": "sha256:f0877b0ee815649beca0d5e83832ef00d1c5c7aef34b50466cc06e0044908a3c"
+    },
+    {
+      "id": "015-admission-specification-unknown-member",
+      "path": "cases/admission/015-admission-specification-unknown-member.json",
+      "digest": "sha256:bf6fcee258f177d699c7d0d9c3f7be5a25cbb4172c666858cee847562ff5ab50"
+    },
+    {
+      "id": "015-admission-specification-value-rules",
+      "path": "cases/admission/015-admission-specification-value-rules.json",
+      "digest": "sha256:bb4fdcc8d38fd00fc0a8fdc8a0bd95359f6054b64cd601ee0fd7833cde0f99eb"
+    },
+    {
+      "id": "015-admission-verification-admitted",
+      "path": "cases/admission/015-admission-verification-admitted.json",
+      "digest": "sha256:ca61c51f9d0ad9822e97a73000fe7e20b395248940818aad4f83c6bfae77694e"
+    },
+    {
+      "id": "015-admission-verification-assertion-comparison-verification-digest-mismatch",
+      "path": "cases/admission/015-admission-verification-assertion-comparison-verification-digest-mismatch.json",
+      "digest": "sha256:909c2e28c0d6279a27188bed3db550393ac481bbc08442204d6babbc6e9595d1"
+    },
+    {
+      "id": "015-admission-verification-assertion-comparison-verification-identity-mismatch",
+      "path": "cases/admission/015-admission-verification-assertion-comparison-verification-identity-mismatch.json",
+      "digest": "sha256:1589afac572ae43acaef11ee2ad074ad1d9ab1f2a7073c8ea6c50d08f5673c9b"
+    },
+    {
+      "id": "015-admission-verification-assertion-comparison-verification-revision-mismatch",
+      "path": "cases/admission/015-admission-verification-assertion-comparison-verification-revision-mismatch.json",
+      "digest": "sha256:7b8dbd0ddd85b6b5c087591814f096f196722c45b1eb8851a07413c4c0789e7d"
+    },
+    {
+      "id": "015-admission-verification-closed-shape",
+      "path": "cases/admission/015-admission-verification-closed-shape.json",
+      "digest": "sha256:070273fea3e59a8730e3793759b5dfb9119f2f02c7cf880f3a5b2111889a3a3b"
+    },
+    {
+      "id": "015-admission-verification-count-bounds",
+      "path": "cases/admission/015-admission-verification-count-bounds.json",
+      "digest": "sha256:658dd031007a1d0a23f2ad6bc76cc078aba27c9beb29804a5af84a48274740e4"
+    },
+    {
+      "id": "015-admission-verification-missing-input",
+      "path": "cases/admission/015-admission-verification-missing-input.json",
+      "digest": "sha256:54e7ee6f600464dbf844735090ac903240a6f67ed2498d98fbb62982a17900af"
+    },
+    {
+      "id": "015-admission-verification-raw-bounds",
+      "path": "cases/admission/015-admission-verification-raw-bounds.json",
+      "digest": "sha256:f6daa478e415bcf0833e19e845c73028ff270e754c6bf3eb9945bbe976c6e9e5"
+    },
+    {
+      "id": "015-admission-verification-repeated-member",
+      "path": "cases/admission/015-admission-verification-repeated-member.json",
+      "digest": "sha256:1eb05865fb2ffda5d19038a5645737b151c72030838c1e6e4d0e6d0358a6b2a8"
+    },
+    {
+      "id": "015-admission-verification-reserved-members-ambient-authority",
+      "path": "cases/admission/015-admission-verification-reserved-members-ambient-authority.json",
+      "digest": "sha256:dbfeb2f9442eb8791917f446e4bfa838d9a8887d989b4e29aefd9205adb60626"
+    },
+    {
+      "id": "015-admission-verification-reserved-members-secret-bearing-input",
+      "path": "cases/admission/015-admission-verification-reserved-members-secret-bearing-input.json",
+      "digest": "sha256:e5d1d5a323781ac98eba2828a0d5eed19e623f83999026e8ee3fdad255dc398f"
+    },
+    {
+      "id": "015-admission-verification-strict-syntax",
+      "path": "cases/admission/015-admission-verification-strict-syntax.json",
+      "digest": "sha256:d67a3cb49ccc9e964e7b39528e790e4cf551d8cfa3f7f3f082e94b98950616ac"
+    },
+    {
+      "id": "015-admission-verification-unknown-member",
+      "path": "cases/admission/015-admission-verification-unknown-member.json",
+      "digest": "sha256:9188ed557d9744ad8d24ba138cf1ae98d60ae61340ff9835b54593739bbdf304"
+    },
+    {
+      "id": "015-admission-verification-value-rules",
+      "path": "cases/admission/015-admission-verification-value-rules.json",
+      "digest": "sha256:dd884948fe603f18e3692d94f6b02fa066efc07987bf6e6adaec4748a0e2a2c8"
+    },
+    {
+      "id": "015-admission-vocabulary-admitted",
+      "path": "cases/admission/015-admission-vocabulary-admitted.json",
+      "digest": "sha256:4afecfb042744253ad3d706648dfa41deb0ff0a40ab6405efa7dba49c0b96df1"
+    },
+    {
+      "id": "015-admission-vocabulary-closed-shape",
+      "path": "cases/admission/015-admission-vocabulary-closed-shape.json",
+      "digest": "sha256:522a81b375e80f40414f164dbb8c4c7633d4f79c24fbcbb1e221d79e31de3e89"
+    },
+    {
+      "id": "015-admission-vocabulary-count-bounds",
+      "path": "cases/admission/015-admission-vocabulary-count-bounds.json",
+      "digest": "sha256:272dfd7bf636284b0feb71ac2a1429db0f5afc77170cf0d115cac0b67edc645d"
+    },
+    {
+      "id": "015-admission-vocabulary-missing-input",
+      "path": "cases/admission/015-admission-vocabulary-missing-input.json",
+      "digest": "sha256:5a9a926bfeff6725a60a541eceee24429d74a7b8beae6bdec953891b5d572545"
+    },
+    {
+      "id": "015-admission-vocabulary-raw-bounds",
+      "path": "cases/admission/015-admission-vocabulary-raw-bounds.json",
+      "digest": "sha256:4a4110214daf3534f0763bd45283010803b7a2ba86eb7543bb8c005504d24d4f"
+    },
+    {
+      "id": "015-admission-vocabulary-repeated-member",
+      "path": "cases/admission/015-admission-vocabulary-repeated-member.json",
+      "digest": "sha256:76dadb8c9b2e470770cc96f90002741951ae76885d68090b4d32a27cff11c817"
+    },
+    {
+      "id": "015-admission-vocabulary-strict-syntax",
+      "path": "cases/admission/015-admission-vocabulary-strict-syntax.json",
+      "digest": "sha256:5ca5b1d918b8e0735580f23758a89dc418ad7411f0fd55cbca61d861cbad518a"
+    },
+    {
+      "id": "015-admission-vocabulary-unknown-member",
+      "path": "cases/admission/015-admission-vocabulary-unknown-member.json",
+      "digest": "sha256:e94aae4679348f350be89e270aa59f12dc14ba931ec1cb91e0281362dce9e15b"
+    }
+  ],
   "resolverCases": [],
   "handoffVectors": [],
   "conditionalObligations": []

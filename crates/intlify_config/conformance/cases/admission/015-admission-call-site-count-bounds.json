@@ -1,0 +1,35 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-call-site-count-bounds",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "programmatic-call-site-evidence-input",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-call-site-count-bounds.json",
+    "digest": "sha256:43c2269be1b60a54b51749a08c3e83479e3b61a1181c9d9e2b735303581fc616"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failureReason": "over-bound-input",
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-123",
+      "015-204"
+    ],
+    "ruleIds": [
+      "015.input-admission.programmatic-call-site-evidence-input.over-bound-input"
+    ],
+    "checkIds": []
+  }
+}

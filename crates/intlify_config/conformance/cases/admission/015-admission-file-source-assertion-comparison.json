@@ -1,0 +1,35 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-file-source-assertion-comparison",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "file-source-identity-revision",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-file-source-assertion-comparison.json",
+    "digest": "sha256:e17c02ad4dfba7b1aba24496ecc51cfca8584394c1ae8ee21c682ca114eed19c"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failureReason": "source-snapshot-mismatch",
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-080",
+      "015-149"
+    ],
+    "ruleIds": [
+      "015.input-admission.file-source-identity-revision.source-snapshot-mismatch"
+    ],
+    "checkIds": []
+  }
+}

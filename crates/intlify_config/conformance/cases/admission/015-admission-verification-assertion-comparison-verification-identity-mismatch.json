@@ -1,0 +1,35 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-verification-assertion-comparison-verification-identity-mismatch",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "resource-limit-policy-verification-input",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-verification-assertion-comparison-verification-identity-mismatch.json",
+    "digest": "sha256:8f0e4ef8dcd4d03a6cf181d23097caf44ec571233f7a3b315e19d9f6b05fdd3c"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failureReason": "verification-identity-mismatch",
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-120",
+      "015-121"
+    ],
+    "ruleIds": [
+      "015.input-admission.resource-limit-policy-verification-input.verification-identity-mismatch"
+    ],
+    "checkIds": []
+  }
+}

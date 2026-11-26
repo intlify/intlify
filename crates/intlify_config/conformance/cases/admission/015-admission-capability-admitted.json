@@ -1,0 +1,187 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-capability-admitted",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "implementation-capability",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-capability-admitted.json",
+    "digest": "sha256:26aacbfdddae03eff61b87f0c9b47d74ea442346d9928278b9e8d8c8ddc54356"
+  },
+  "expected": {
+    "admitted": true,
+    "normalizedInput": {
+      "json": {
+        "specification": {
+          "identity": "intlify-project-profile-resolver-capability",
+          "revision": "0"
+        },
+        "policyComparable": {
+          "configurationInput": {
+            "maxNodes": "1",
+            "maxDepth": "2",
+            "maxCollectionEntries": "3",
+            "maxTotalStringBytes": "4",
+            "maxSingleStringBytes": "5",
+            "maxProfiles": "6",
+            "maxProfileIdBytes": "1048576",
+            "maxStructuralAnalysisUnits": "8"
+          },
+          "localeResolution": {
+            "maxLocaleIdentifierBytes": "9",
+            "maxLocaleOccurrences": "10",
+            "maxRequestedLocales": "11",
+            "maxNegotiationAliases": "12",
+            "maxFallbackSources": "13",
+            "maxFallbackCandidatesPerSource": "14",
+            "maxCoverageRules": "15",
+            "maxCoverageLocaleSelectorOccurrences": "16",
+            "maxCoverageSurfaceSelectorOccurrences": "17",
+            "maxCoverageDecisionCells": "18",
+            "maxCoverageRuleCellComparisons": "19"
+          },
+          "artifactAdmission": {
+            "maxArtifacts": "20",
+            "maxPolicyArtifacts": "21",
+            "maxTargetProfileArtifacts": "22",
+            "maxArtifactReferences": "23",
+            "maxSingleArtifactCanonicalBytes": "24",
+            "maxTotalArtifactCanonicalBytes": "25",
+            "maxSingleReferenceCanonicalBytes": "26",
+            "maxTotalReferenceCanonicalBytes": "27"
+          },
+          "targetGrouping": {
+            "maxTargetProfiles": "28",
+            "maxTargetIdBytes": "29",
+            "maxDeploymentGroups": "30",
+            "maxGroupIdBytes": "31",
+            "maxMembersPerGroup": "32",
+            "maxMembershipOccurrences": "33",
+            "maxHydrationRelations": "34"
+          },
+          "diagnostics": {
+            "entry": {
+              "maxFindingOccurrences": "35",
+              "maxFindings": "36",
+              "maxRelatedEvidencePerOccurrenceGroup": "37",
+              "maxRelatedEvidenceOccurrences": "38",
+              "maxSingleEvidenceBytes": "39",
+              "maxTotalEvidenceBytes": "40",
+              "maxEvaluationStatusEntries": "41",
+              "maxSuppressionCausesPerStatus": "42",
+              "maxSuppressionCauseOccurrences": "43",
+              "maxRecords": "44",
+              "maxTotalCanonicalBytes": "45"
+            },
+            "shared": {
+              "maxFindingOccurrences": "46",
+              "maxFindings": "47",
+              "maxEvaluationStatusEntries": "48",
+              "maxSuppressionCausesPerStatus": "49",
+              "maxSuppressionCauseOccurrences": "50",
+              "maxRecords": "51",
+              "maxTotalCanonicalBytes": "52"
+            }
+          }
+        },
+        "bootstrapOnly": {
+          "rawInput": {
+            "maxFileBytes": "1",
+            "maxParserTokens": "1"
+          },
+          "snapshot": {
+            "maxNodes": "1048576",
+            "maxDepth": "1048576",
+            "maxCollectionEntries": "1048576",
+            "maxTotalStringBytes": "1048576",
+            "maxSingleStringBytes": "1048576",
+            "maxRejectedMarkers": "1048576",
+            "maxEnvelopeCanonicalBytes": "1048576",
+            "maxSingleMarkerCanonicalBytes": "1048576",
+            "maxTraversalUnits": "1048576"
+          },
+          "inputBoundary": {
+            "maxDepth": "1048576",
+            "maxSpecificationInputBytes": "1048576",
+            "maxVocabularyBytes": "1048576",
+            "maxVocabularyMembers": "1048576",
+            "maxVocabularyMemberBytes": "1048576",
+            "maxVocabularyTotalMemberBytes": "1048576",
+            "maxLocaleDataManifestBytes": "1048576",
+            "maxCollectionMemberBytes": "1048576",
+            "maxCollectionTotalBytes": "1048576",
+            "maxVerificationInputBytes": "1048576",
+            "maxVerificationPins": "1048576"
+          },
+          "artifactBootstrap": {
+            "maxEnvelopeDepth": "18446744073709551614",
+            "maxDecodedAllocationBytes": "18446744073709551614",
+            "maxMetadataScanUnits": "18446744073709551614",
+            "maxValidationWorkUnits": "18446744073709551614"
+          },
+          "localeData": {
+            "maxPayloads": "1048576",
+            "maxPayloadBytes": "1048576",
+            "maxMarkerBytes": "1048576",
+            "maxValidityGroups": "1048576",
+            "maxCodes": "1048576",
+            "maxExtensionKeys": "1048576",
+            "maxTypes": "1048576",
+            "maxCorrections": "1048576",
+            "maxValidationWorkUnits": "1048576"
+          },
+          "evidenceMetadata": {
+            "maxSourceIdentityBytes": "1048576",
+            "maxSourceRevisionBytes": "1048576",
+            "maxLocatorBytes": "1048576",
+            "maxCallSiteSourceBytes": "1048576",
+            "maxCallSiteMappings": "1048576",
+            "maxLogicalPathSegments": "1048576",
+            "maxLogicalPathCanonicalBytes": "1048576",
+            "maxSubjectOccurrences": "1048576",
+            "maxTokenInputs": "1048576",
+            "maxCollisionComparisons": "1048576",
+            "maxMetadataWorkUnits": "1048576"
+          },
+          "mandatoryReserve": {
+            "maxOutcomeEnvelopeSlots": "1",
+            "maxConstructionIdentitySlots": "1",
+            "maxEntryTerminalFindingSlots": "1",
+            "maxEntryTerminalStatusSlots": "1",
+            "maxSharedTerminalFindingSlots": "1",
+            "maxSharedTerminalStatusSlots": "1",
+            "maxSharedUnavailableCauseSlots": "1",
+            "maxCanonicalBytes": "65536"
+          }
+        }
+      }
+    },
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-101",
+      "015-110"
+    ],
+    "ruleIds": [
+      "015.input-admission.implementation-capability.missing-capability",
+      "015.input-admission.implementation-capability.malformed-capability",
+      "015.input-admission.implementation-capability.capability-specification-identity-mismatch",
+      "015.input-admission.implementation-capability.capability-specification-revision-mismatch",
+      "015.input-admission.implementation-capability.incomplete-capability",
+      "015.input-admission.implementation-capability.non-canonical-bound",
+      "015.input-admission.implementation-capability.non-positive-bound",
+      "015.input-admission.implementation-capability.unrepresentable-bound",
+      "015.input-admission.implementation-capability.below-bootstrap-minimum"
+    ],
+    "checkIds": []
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-entry-source-value-rules-unbound-entry-revision",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "programmatic-entry-identity-revision",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-entry-source-value-rules-unbound-entry-revision.json",
+    "digest": "sha256:5e37eed318e2b3bbb3130c5983d9128dd6104b41c72a52aa3872f9aa6364416f"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failureReason": "unbound-entry-revision",
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-123",
+      "015-149"
+    ],
+    "ruleIds": [
+      "015.input-admission.programmatic-entry-identity-revision.unbound-entry-revision"
+    ],
+    "checkIds": []
+  }
+}

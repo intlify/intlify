@@ -1,0 +1,35 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-vocabulary-raw-bounds",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "intent-surface-class-vocabulary-artifact",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-vocabulary-raw-bounds.json",
+    "digest": "sha256:6883bf314b3592691d68ca750e7b0dccb7215ef457c9222021140045f97092d1"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failureReason": "over-bound-envelope",
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-099",
+      "015-138"
+    ],
+    "ruleIds": [
+      "015.input-admission.intent-surface-class-vocabulary-artifact.over-bound-envelope"
+    ],
+    "checkIds": []
+  }
+}

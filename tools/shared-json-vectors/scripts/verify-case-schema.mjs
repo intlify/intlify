@@ -17,8 +17,10 @@
  * `failurePrecedence`: each boundary kind's rows take the positions of the
  * general order without going back and list the reasons of its row in that
  * row's order, and the construction rows are referenced by the Root Package
- * member and the file digest the committed Suite Index declares for it. It
- * does not read the design document.
+ * member and the file digest the committed Suite Index declares for it, and
+ * the input fixture of each boundary kind: a closed object of exactly its
+ * members, the capability value beside the input of a boundary that reads
+ * capability bounds. It does not read the design document.
  */
 
 import { createHash } from 'node:crypto'
@@ -810,6 +812,159 @@ const closures = [
     )
   ]
 ]
+// The input fixtures of the boundary kinds: a boundary that reads capability
+// bounds holds the decoded capability value beside its input, an omitted
+// input or candidate is an absent one, the selector's report and the
+// call-site input are always present, and the collection, Snapshot, and
+// call-site inputs may be an unsafe host inspection.
+const ref = name => ({ $ref: `#/definitions/${name}` })
+const inputOf = name => definitions[name]?.properties?.input
+const holdsCapability = name =>
+  isDeepStrictEqual(definitions[name]?.properties?.capability, ref('json'))
+const reading = (name, form) =>
+  closedOf(definitions[name], ['capability'], ['input']) &&
+  holdsCapability(name) &&
+  form(inputOf(name))
+const always = (name, form) =>
+  closedOf(definitions[name], ['capability', 'input']) &&
+  holdsCapability(name) &&
+  form(inputOf(name))
+const unsafeHost = node =>
+  closedOf(node, ['hostInspection']) && node.properties.hostInspection.const === 'unsafe'
+const raw = node => isDeepStrictEqual(node, ref('bytesInput'))
+const REPORTS = [
+  ['absent'],
+  ['string', 'value'],
+  ['over-limit-string'],
+  ['invalid-type', 'type'],
+  ['unrepresentable'],
+  ['unsafe']
+]
+const reports = inputOf('selectorInputFixture')?.oneOf ?? []
+const collectionForms = inputOf('collectionInputFixture')?.oneOf ?? []
+const snapshotForms = inputOf('snapshotInputFixture')?.oneOf ?? []
+const [sidecar, sidecarUnsafe] = inputOf('callSiteInputFixture')?.oneOf ?? []
+const mapping = sidecar?.properties?.mappings?.items
+const edges = mapping?.properties?.path?.items?.oneOf ?? []
+const originFixture = definitions.originInputFixture
+const verificationFixture = definitions.verificationInputFixture
+closures.push(
+  ['specificationInputFixture', reading('specificationInputFixture', raw)],
+  ['vocabularyInputFixture', reading('vocabularyInputFixture', raw)],
+  [
+    'canonicalizationDataInputFixture',
+    reading(
+      'canonicalizationDataInputFixture',
+      node =>
+        closedOf(node, ['manifest', 'payloads']) &&
+        raw(node.properties.manifest) &&
+        isDeepStrictEqual(node.properties.payloads, {
+          type: 'object',
+          additionalProperties: ref('reference')
+        })
+    )
+  ],
+  [
+    'collectionInputFixture',
+    reading(
+      'collectionInputFixture',
+      () =>
+        collectionForms.length === 3 &&
+        closedOf(collectionForms[0], ['members']) &&
+        isDeepStrictEqual(collectionForms[0].properties.members, {
+          type: 'array',
+          items: ref('bytesInput')
+        }) &&
+        closedOf(collectionForms[1], ['container']) &&
+        collectionForms[1].properties.container.const === 'malformed' &&
+        unsafeHost(collectionForms[2])
+    )
+  ],
+  [
+    'verificationInputFixture',
+    closedOf(verificationFixture, ['assertion', 'capability'], ['input']) &&
+      holdsCapability('verificationInputFixture') &&
+      closedOf(verificationFixture.properties.assertion, [
+        'identity',
+        'revision',
+        'semanticDigest'
+      ]) &&
+      raw(inputOf('verificationInputFixture'))
+  ],
+  [
+    'originInputFixture',
+    closedOf(originFixture, ['slot'], ['candidate']) &&
+      isDeepStrictEqual(strings(originFixture.properties.slot), origins) &&
+      isDeepStrictEqual(originFixture.properties.candidate, {})
+  ],
+  [
+    'selectorInputFixture',
+    always(
+      'selectorInputFixture',
+      () =>
+        reports.length === REPORTS.length &&
+        reports.every(
+          (node, index) =>
+            closedOf(node, ['report', ...REPORTS[index].slice(1)]) &&
+            node.properties.report.const === REPORTS[index][0]
+        )
+    )
+  ],
+  [
+    'fileSourceInputFixture',
+    always(
+      'fileSourceInputFixture',
+      node =>
+        closedOf(node, ['nonSecret', 'bytes'], ['identity', 'revision']) &&
+        raw(node.properties.bytes)
+    )
+  ],
+  [
+    'entrySourceInputFixture',
+    always(
+      'entrySourceInputFixture',
+      node =>
+        closedOf(node, ['nonSecret', 'snapshot'], ['identity', 'revision']) &&
+        isDeepStrictEqual(node.properties.snapshot, ref('snapshot'))
+    )
+  ],
+  [
+    'snapshotInputFixture',
+    reading(
+      'snapshotInputFixture',
+      () =>
+        snapshotForms.length === 2 &&
+        closedOf(snapshotForms[0], ['snapshot', 'digest']) &&
+        unsafeHost(snapshotForms[1])
+    )
+  ],
+  [
+    'callSiteInputFixture',
+    always(
+      'callSiteInputFixture',
+      () =>
+        closedOf(
+          sidecar,
+          ['nonSecret', 'source', 'mappings'],
+          ['identity', 'revision', 'locator']
+        ) &&
+        raw(sidecar.properties.source) &&
+        isDeepStrictEqual(sidecar.properties.locator, ref('locatorCandidate')) &&
+        closedOf(mapping, ['path', 'role', 'span']) &&
+        closedOf(mapping.properties.span, ['start', 'end']) &&
+        edges.length === 3 &&
+        closedOf(edges[0], ['key']) &&
+        closedOf(edges[1], ['keyUtf16']) &&
+        closedOf(edges[2], ['index']) &&
+        unsafeHost(sidecarUnsafe)
+    )
+  ],
+  ['locatorCandidate', closedOf(definitions.locatorCandidate, ['variant', 'payload', 'nonSecret'])],
+  ...['capabilityInputFixture', 'constructionIdentityInputFixture'].map(name => [
+    name,
+    closedOf(definitions[name], [], ['input']) && isDeepStrictEqual(inputOf(name), ref('json'))
+  ])
+)
 for (const [name, closedForm] of closures) {
   if (!closedForm) {
     fail(`schema: ${name} is not a closed object of exactly its members`)

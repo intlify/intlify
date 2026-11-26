@@ -51,7 +51,12 @@ impl ImplementationCapability {
     /// `policyComparable` bounds, and `bootstrapOnly`'s minimum vector except
     /// `artifactBootstrap`, whose bounds are as large as a bound can be: at its
     /// minima no Resource Limit Policy can be admitted (Decision 015-164).
-    #[cfg(any(test, feature = "benchmark", feature = "dev-example"))]
+    #[cfg(any(
+        test,
+        feature = "benchmark",
+        feature = "conformance",
+        feature = "dev-example"
+    ))]
     pub(crate) fn fixture_owned(policy_comparable: ResolutionLimits) -> Self {
         use crate::construction::capability::{IDENTITY, REVISION};
         use crate::input_limits::Bound;

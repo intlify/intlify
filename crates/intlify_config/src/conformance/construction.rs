@@ -10,16 +10,19 @@
 //! what it admitted, or refuses with the reason of the first precedence row
 //! that fails, the construction-root bounds' row also naming its bound.
 //! Construction never invokes the resolver, so neither outcome has anything
-//! of a resolution.
+//! of a resolution. A Resolver Input Admission Case names the construction
+//! case under which its boundary is evaluated, and the runner constructs it
+//! to learn its identity and Capability Specification (D15:3158).
 
 use serde_json::{json, Map, Value};
 
 use crate::construction::authority_set::SubmittedSet;
 use crate::construction::component::{Artifact, Submitted};
 use crate::construction::flow::{construct, ConstructionInput};
-use crate::construction::identity;
+use crate::construction::identity::{self, ConstructionIdentity};
 use crate::construction::registry::{RegistryRole, SubmittedPackage};
 use crate::construction::root::ConstructionRoot;
+use crate::locale::VersionedIdentity;
 
 use super::fixture::{bytes, Bodies};
 
@@ -67,6 +70,29 @@ pub(crate) fn input(fixture: &Value, bodies: &Bodies) -> ConstructionInput {
 
 /// The role a Registry Package member's key names, which the Case Schema
 /// closes to the six.
+/// What a Resolver Input Admission Case's boundary is evaluated against: the
+/// identity and the Capability Specification of the resolver its
+/// construction case constructs (D15:3158).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Constructed {
+    pub(crate) identity: ConstructionIdentity,
+    pub(crate) capability: VersionedIdentity<String>,
+}
+
+/// What construction admits from `input`, `None` when it refuses it.
+pub(crate) fn constructed(input: &ConstructionInput) -> Option<Constructed> {
+    let root = ConstructionRoot::built_in().expect("the built-in construction root verifies");
+    let admitted = construct(root, input).ok()?;
+    let declared = &admitted.resolver_capability_specification.declared;
+    Some(Constructed {
+        identity: identity::derive(root, &admitted),
+        capability: VersionedIdentity {
+            identity: declared.identity.clone(),
+            revision: declared.revision.clone(),
+        },
+    })
+}
+
 fn role(name: &str) -> RegistryRole {
     RegistryRole::ALL
         .into_iter()

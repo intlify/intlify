@@ -1,0 +1,35 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-collection-container-form",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "submitted-profile-resolution-artifact-collection",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-collection-container-form.json",
+    "digest": "sha256:d981aef1abd5dea6e0a14db85bd21a85ec8d100ba85eb70d3b6178c4880b19f5"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failureReason": "malformed-container",
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-040",
+      "015-121"
+    ],
+    "ruleIds": [
+      "015.input-admission.submitted-profile-resolution-artifact-collection.malformed-container"
+    ],
+    "checkIds": []
+  }
+}

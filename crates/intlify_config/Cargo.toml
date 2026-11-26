@@ -28,8 +28,10 @@ benchmark = ["dep:blake3", "dep:getrandom", "dep:intlify_measurement", "dep:serd
 vectors = []
 # Developer-only conformance suite: the committed Suite Index and its schema,
 # written from this crate's values like the construction artifacts, and the
-# runner that opens a suite at an explicit Suite Index path.
-conformance = ["vectors"]
+# runner that opens a suite at an explicit Suite Index path. Its input
+# admission cases include the locale canonicalization data boundary, which
+# reads the data through the ICU4X provider.
+conformance = ["vectors", "icu4x"]
 
 [dependencies]
 # Shared 017 token grammars, exact quantities, framing, bounded reading, and
