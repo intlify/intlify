@@ -1277,6 +1277,25 @@ mod tests {
         }
     }
 
+    /// The file pair's and the entry pair's admitted cases hold different
+    /// marks, so writing an admitted pair's mark from anything but its
+    /// fixture fails one of them.
+    #[test]
+    fn the_two_pairs_hold_both_marks() {
+        let (cases, _) = all().unwrap();
+        let mark = |kind: &str| {
+            let case = cases
+                .iter()
+                .find(|case| case.kind == kind && case.expected["admitted"] == true)
+                .unwrap();
+            case.fixture["input"]["nonSecret"].clone()
+        };
+        assert_ne!(
+            mark("file-source-identity-revision"),
+            mark("programmatic-entry-identity-revision")
+        );
+    }
+
     /// How many bounds `to` lowers from `from`, two capability values of one
     /// shape: each bound whose decimal text is smaller, every other value
     /// unchanged.

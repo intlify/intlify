@@ -1780,6 +1780,35 @@ mod tests {
         }
     }
 
+    /// The Case Schema adds no default that 015 does not name (D15:3240): no
+    /// schema in it has a `default`. A member's name or a constant may spell
+    /// `default`, and neither is a schema.
+    #[test]
+    fn the_case_schema_adds_no_default() {
+        fn defaults(schema: &Value) -> usize {
+            match schema {
+                Value::Object(members) => members
+                    .iter()
+                    .map(|(name, value)| match name.as_str() {
+                        "default" => 1,
+                        "const" | "enum" => 0,
+                        "properties" | "definitions" => {
+                            value.as_object().unwrap().values().map(defaults).sum()
+                        }
+                        _ => defaults(value),
+                    })
+                    .sum(),
+                Value::Array(items) => items.iter().map(defaults).sum(),
+                _ => 0,
+            }
+        }
+        assert_eq!(defaults(&schema().unwrap()), 0);
+        let mut defaulted = schema().unwrap();
+        defaulted["definitions"]["selectorInputFixture"]["properties"]["input"]["default"] =
+            Value::Null;
+        assert_eq!(defaults(&defaulted), 1);
+    }
+
     /// Each kind is a closed object: every member is required, nothing else
     /// is admitted, and a manifest of one kind does not pass as another.
     #[test]

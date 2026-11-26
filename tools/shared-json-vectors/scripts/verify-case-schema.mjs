@@ -391,6 +391,39 @@ if (source.match(/pub\(crate\) const DIGEST: &str =\s*"(sha256:[\da-f]{64})";/)?
   fail('schema: its file digest is not DIGEST in src/conformance/case.rs')
 }
 
+// The schema adds no default that 015 does not name (D15:3240): no schema in
+// it has a `default`. A member's name or a constant may spell `default`, and
+// neither is a schema.
+/**
+ * Count the schemas that have a `default`.
+ *
+ * @param node - A schema, or a list of schemas.
+ * @returns How many of them, and of the schemas in them, have one.
+ */
+function defaults(node) {
+  if (Array.isArray(node)) {
+    return node.reduce((sum, item) => sum + defaults(item), 0)
+  }
+  if (node === null || typeof node !== 'object') {
+    return 0
+  }
+  return Object.entries(node).reduce((sum, [name, value]) => {
+    if (name === 'default') {
+      return sum + 1
+    }
+    if (name === 'const' || name === 'enum') {
+      return sum
+    }
+    if (name === 'properties' || name === 'definitions') {
+      return sum + defaults(Object.values(value))
+    }
+    return sum + defaults(value)
+  }, 0)
+}
+if (defaults(schema) !== 0) {
+  fail('schema: a schema in it has a default')
+}
+
 // The root admits exactly the five kinds.
 const definitions = schema.definitions ?? {}
 if (

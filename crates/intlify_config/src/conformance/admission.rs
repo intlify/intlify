@@ -1073,8 +1073,9 @@ mod tests {
         assert_eq!(reason(depth, 4), "over-bound-envelope");
     }
 
-    /// An admitted Snapshot's markers are written in the Snapshot form, a
-    /// terminal one with its bound path and decimal witness (D15:3250).
+    /// An admitted Snapshot's markers are written in the Snapshot form: each
+    /// rejected reason as its ID, and a terminal marker with its bound path
+    /// and decimal witness (D15:3250).
     #[test]
     fn an_admitted_snapshot_s_markers_are_written_in_their_form() {
         const VECTORS: &[u8] = include_bytes!("../../fixtures/snapshot/vectors.json");
@@ -1093,18 +1094,26 @@ mod tests {
         let mut marker = terminal["snapshot"]["marker"].clone();
         let bound = marker.as_object_mut().unwrap().remove("bound").unwrap();
         marker["boundPath"] = bound;
-        for (snapshot, digest, capability) in [
-            (
-                vector("marker-cycle")["snapshot"].clone(),
-                vector("marker-cycle")["digest"].clone(),
-                crate::conformance::admission_cases::capability(),
-            ),
-            (
-                json!({ "marker": marker }),
-                terminal["digest"].clone(),
-                capability_with("/bootstrapOnly/snapshot/maxNodes", 1),
-            ),
-        ] {
+        // The vectors hold one Snapshot of each rejected reason's marker.
+        let rejected = vectors["snapshots"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|vector| vector["id"].as_str().unwrap().starts_with("marker-"))
+            .map(|vector| {
+                (
+                    vector["snapshot"].clone(),
+                    vector["digest"].clone(),
+                    crate::conformance::admission_cases::capability(),
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(rejected.len(), 9);
+        for (snapshot, digest, capability) in rejected.into_iter().chain([(
+            json!({ "marker": marker }),
+            terminal["digest"].clone(),
+            capability_with("/bootstrapOnly/snapshot/maxNodes", 1),
+        )]) {
             let fixture = json!({
                 "capability": { "json": capability },
                 "input": { "snapshot": snapshot, "digest": digest },
