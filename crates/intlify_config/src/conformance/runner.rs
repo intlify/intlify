@@ -32,12 +32,13 @@
 //!    its boundary kind's, and every body it references has the digest the
 //!    fixture declares (D15:3247). A body two references name is read once,
 //!    and both must declare its digest;
-//! 6. that each input admission case of a boundary kind can run: the
-//!    construction case it names is listed, constructs, and has the identity
-//!    the case states, and the harness admits the capability value of a
-//!    boundary that reads capability bounds and, under it, the programmatic
-//!    pair's canonical Snapshot (D15:3158, 3162, 3252). The two admission
-//!    steps' kinds are verified as manifests but not run yet.
+//! 6. that each input admission case can run: the construction case it
+//!    names is listed, constructs, and has the identity the case states, and
+//!    the harness admits the capability value of a boundary that reads
+//!    capability bounds and, under it, the programmatic pair's canonical
+//!    Snapshot (D15:3158, 3162, 3252). An admission step's case has no such
+//!    part: its capability is one of its slots, or bounds its entry, and a
+//!    refusal is the step's own result (D15:3166, 3168).
 //!
 //! Steps 5 and 6 go entry by entry: an entry's body, its manifest and
 //! fixture, and an input admission case's construction are checked before
@@ -72,7 +73,7 @@ use crate::construction::{authority_set, capability, profile};
 use crate::model::CONFIGURATION_SCHEMA_VERSION;
 
 use super::admission;
-use super::case::{self, ManifestKind, ADMISSION_FIXTURES};
+use super::case::{self, input_fixture, ManifestKind};
 use super::construction::{self, Constructed};
 use super::fixture::{references, Bodies};
 use super::index::{
@@ -148,8 +149,7 @@ pub struct Opened {
     bodies: Bodies,
     /// Each construction case, in the order of its array.
     construction: Vec<ListedCase>,
-    /// Each input admission case of a boundary kind, in the order of its
-    /// array.
+    /// Each input admission case, in the order of its array.
     admission: Vec<AdmissionCase>,
 }
 
@@ -610,18 +610,12 @@ impl Closure<'_> {
         Ok(())
     }
 
-    /// List an input admission case of a boundary kind with its fixture, once
-    /// its construction is established and the parts the harness admits
-    /// before the boundary are admitted (D15:3158). The two steps' kinds are
-    /// not run yet.
+    /// List an input admission case with its fixture, once its construction
+    /// is established and the parts the harness admits before the boundary
+    /// are admitted (D15:3158).
     fn admission_case(&mut self, manifest: &Value) -> Result<(), HarnessFailure> {
-        let boundary = text(&manifest["boundaryKind"]);
-        let Some((kind, definition)) = ADMISSION_FIXTURES
-            .into_iter()
-            .find(|(name, _)| *name == boundary)
-        else {
-            return Ok(());
-        };
+        let (kind, definition) = input_fixture(text(&manifest["boundaryKind"]))
+            .expect("the Case Schema closes the kinds");
         let id = text(&manifest["id"]).to_owned();
         let fixture = self.fixture(&manifest["inputFixture"], definition)?;
         let constructed = self
@@ -1793,12 +1787,16 @@ mod tests {
         );
     }
 
-    /// The two admission steps' kinds are verified as manifests but not run
-    /// yet.
+    /// An admission step's case runs though the capability it holds is
+    /// refused: the refusal is the step's own result, not an invalid case
+    /// (D15:3166, 3168).
     #[test]
-    fn a_step_case_is_not_run_yet() {
-        let suite = admission_suite(FIXTURE, &json!({}), |manifest| {
-            manifest["boundaryKind"] = json!("common-invocation-input-set");
+    fn a_step_case_runs_under_a_refused_capability() {
+        let path =
+            committed().join("fixtures/admission/015-admission-entry-file-refused-capability.json");
+        let fixture: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        let suite = admission_suite(FIXTURE, &fixture, |manifest| {
+            manifest["boundaryKind"] = json!("entry-admission-input-set");
             manifest["expected"] = json!({
                 "admitted": false,
                 "normalizedInput": null,
@@ -1807,7 +1805,41 @@ mod tests {
             });
         });
         let outcomes = suite.open().unwrap().run();
-        assert_eq!(outcomes.len(), 1);
-        assert_eq!(outcomes[0].id, "015-a");
+        let step = outcomes
+            .iter()
+            .find(|outcome| outcome.id == "015-b")
+            .unwrap();
+        assert!(step.passed(), "{}", step.actual);
+    }
+
+    /// A programmatic entry's call-site number past binary64's range, which
+    /// the Case Schema admits as a number, reaches the entry step as the
+    /// infinity a binding reads; under a refused capability the step
+    /// evaluates only the origins (D15:3168, 3252).
+    #[test]
+    fn a_step_case_reads_a_call_site_number_past_binary64_s_range() {
+        let path =
+            committed().join("fixtures/admission/015-admission-entry-programmatic-admitted.json");
+        let mut fixture: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        fixture["capability"] = json!({ "json": {} });
+        let mappings =
+            &mut fixture["entry"]["configuration-programmatic"]["input"]["callSite"]["mappings"];
+        mappings[0]["span"]["start"] = serde_json::from_str("1e999").unwrap();
+        mappings[1]["path"] = serde_json::from_str(r#"[{ "index": -1e999 }]"#).unwrap();
+        let suite = admission_suite(FIXTURE, &fixture, |manifest| {
+            manifest["boundaryKind"] = json!("entry-admission-input-set");
+            manifest["expected"] = json!({
+                "admitted": false,
+                "normalizedInput": null,
+                "failures": [],
+                "resolverInvoked": false,
+            });
+        });
+        let outcomes = suite.open().unwrap().run();
+        let step = outcomes
+            .iter()
+            .find(|outcome| outcome.id == "015-b")
+            .unwrap();
+        assert!(step.passed(), "{}", step.actual);
     }
 }

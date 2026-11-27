@@ -39,7 +39,9 @@ use crate::resolver::evidence_source::hex;
 use crate::resolver::limits::fixture_limits;
 use crate::resolver::origin::SafeOriginKind;
 
-use super::case::{ManifestKind, BOUNDARY_PRECEDENCE, REVISION};
+use super::case::{
+    ManifestKind, BOUNDARY_PRECEDENCE, COMMON_SET, COMMON_SLOTS, ENTRY_SET, REVISION,
+};
 use super::construction_cases::{self, Cases, CONSTRUCTED};
 use super::fixture::decode;
 use super::index::SuiteFile;
@@ -975,7 +977,9 @@ struct Case {
     rules: Vec<String>,
 }
 
-/// Every case: each kind's admitted one, and one for each of its rows; and
+/// Every case: each kind's admitted one, and one for each of its rows, in
+/// ascending ID order, then the two admission steps' cases in ascending ID
+/// order, so that a step's raw input is the file a kind's case wrote; and
 /// the files the fixtures reference beyond their raw inputs.
 fn all() -> Result<(Vec<Case>, Vec<SuiteFile>), serde_json::Error> {
     let context = Context {
@@ -984,10 +988,19 @@ fn all() -> Result<(Vec<Case>, Vec<SuiteFile>), serde_json::Error> {
     };
     let mut cases = Vec::new();
     let mut files = Vec::new();
+    let mut kinds = BTreeMap::new();
     for kind in &KINDS {
         let built = (kind.cases)(&context);
         files.extend(built.files);
         let rows = rows(kind.name);
+        kinds.insert(
+            kind.name,
+            Built {
+                admitted: built.admitted.clone(),
+                normalized: built.normalized.clone(),
+                refused: rows.iter().copied().zip(built.refused.clone()).collect(),
+            },
+        );
         let decisions = SHARED_DECISIONS
             .iter()
             .chain(kind.decisions)
@@ -1024,7 +1037,452 @@ fn all() -> Result<(Vec<Case>, Vec<SuiteFile>), serde_json::Error> {
         }
     }
     cases.sort_by(|left, right| left.id.cmp(&right.id));
+    let mut steps = steps(&context, &kinds);
+    steps.sort_by(|left, right| left.id.cmp(&right.id));
+    cases.extend(steps);
     Ok((cases, files))
+}
+
+/// What the admission steps' cases take from a boundary kind's cases: the
+/// fixture its boundary admits, the normalized input that case expects, and
+/// each row with the fixture it refuses.
+struct Built {
+    admitted: Value,
+    normalized: Value,
+    refused: Vec<((&'static str, &'static str), Value)>,
+}
+
+impl Built {
+    /// The input of the fixture the row of this check and reason refuses.
+    fn input(&self, check: &str, reason: &str) -> Value {
+        self.refused
+            .iter()
+            .find(|(row, _)| *row == (check, reason))
+            .map(|(_, fixture)| fixture["input"].clone())
+            .expect("the kind has the row")
+    }
+}
+
+/// The decisions the common step's cases trace beyond the shared ones: the
+/// step, and its case kind.
+const COMMON_DECISIONS: [&str; 2] = ["015-168", "015-169"];
+
+/// The decisions a file entry's step cases trace beyond the shared ones.
+const FILE_DECISIONS: [&str; 2] = ["015-172", "015-173"];
+
+/// The decisions a programmatic entry's step cases trace beyond the shared
+/// ones.
+const PROGRAMMATIC_DECISIONS: [&str; 2] = ["015-173", "015-201"];
+
+/// A step case's failure: its slot, its boundary kind, and its reason.
+type Failure = (SafeOriginKind, &'static str, &'static str);
+
+/// The origin boundary's kind.
+const ORIGIN: &str = "safe-origin-kind";
+
+/// A step case: its ID's tail, its kind, its decisions, its fixture, and the
+/// admitted set it expects, or its failures. An admitted case traces every
+/// pair of its step's boundaries, and a refused one each pair it fails with.
+fn step_case(
+    tail: &str,
+    kind: &'static str,
+    decisions: &[&'static str],
+    fixture: Value,
+    expected: Result<Value, &[Failure]>,
+    boundaries: &[&str],
+) -> Case {
+    let mut rules = Vec::new();
+    let expected = match expected {
+        Ok(normalized) => {
+            for boundary in boundaries {
+                for (_, reason) in rows(boundary) {
+                    let pair = rule(boundary, reason);
+                    if !rules.contains(&pair) {
+                        rules.push(pair);
+                    }
+                }
+            }
+            json!({ "admitted": true, "normalizedInput": normalized, "resolverInvoked": false })
+        }
+        Err(failures) => {
+            for (_, boundary, reason) in failures {
+                let pair = rule(boundary, reason);
+                if !rules.contains(&pair) {
+                    rules.push(pair);
+                }
+            }
+            let failures = failures
+                .iter()
+                .map(|(slot, boundary, reason)| {
+                    json!({ "slot": slot.id(), "boundaryKind": boundary, "failureReason": reason })
+                })
+                .collect::<Vec<_>>();
+            json!({
+                "admitted": false,
+                "normalizedInput": null,
+                "failures": failures,
+                "resolverInvoked": false,
+            })
+        }
+    };
+    Case {
+        id: format!("015-admission-{tail}"),
+        kind,
+        fixture,
+        expected,
+        decisions: SHARED_DECISIONS.iter().chain(decisions).copied().collect(),
+        rules,
+    }
+}
+
+/// The common step's cases (D15:3164, 3166): every slot's admitted input; and
+/// its failures in slot rank, under a refused capability, which leaves a
+/// refused vocabulary unevaluated, and of one slot's origin before its
+/// value.
+fn common_steps(kinds: &BTreeMap<&str, Built>) -> Vec<Case> {
+    use SafeOriginKind as Slot;
+    let kind = |name: &str| &kinds[name];
+    let mut fixture = json!({
+        "assertion": kind("resource-limit-policy-verification-input").admitted["assertion"],
+    });
+    let mut normalized = Map::new();
+    for (slot, name) in COMMON_SLOTS {
+        fixture[slot.id()] =
+            json!({ "candidate": slot.id(), "input": kind(name).admitted["input"] });
+        normalized.insert(slot.id().to_owned(), kind(name).normalized.clone());
+    }
+    let with = |change: &dyn Fn(&mut Value)| {
+        let mut changed = fixture.clone();
+        change(&mut changed);
+        changed
+    };
+    let vocabulary = "intent-surface-class-vocabulary-artifact";
+    let verification = "resource-limit-policy-verification-input";
+    let capability = "implementation-capability";
+    let malformed = kind(vocabulary).input("strict-syntax", "malformed-envelope");
+    let boundaries = COMMON_SLOTS.map(|(_, name)| name);
+    let case = |tail: &str, fixture: Value, expected: Result<Value, &[Failure]>| {
+        step_case(
+            tail,
+            COMMON_SET,
+            &COMMON_DECISIONS,
+            fixture,
+            expected,
+            &[&[ORIGIN][..], &boundaries[..]].concat(),
+        )
+    };
+    vec![
+        case(
+            "common-admitted",
+            fixture.clone(),
+            Ok(Value::Object(normalized)),
+        ),
+        case(
+            "common-rank-order",
+            with(&|fixture| {
+                fixture[Slot::ProfileResolutionSpecificationInput.id()]["candidate"] =
+                    json!(" profile-resolution-specification-input");
+                fixture[Slot::IntentSurfaceClassVocabulary.id()]["input"] = malformed.clone();
+                remove(
+                    fixture,
+                    Slot::ProfileResolutionArtifactCollection,
+                    "candidate",
+                );
+            }),
+            Err(&[
+                (
+                    Slot::ProfileResolutionSpecificationInput,
+                    ORIGIN,
+                    "non-canonical-safe-origin-kind",
+                ),
+                (
+                    Slot::IntentSurfaceClassVocabulary,
+                    vocabulary,
+                    "malformed-envelope",
+                ),
+                (
+                    Slot::ProfileResolutionArtifactCollection,
+                    ORIGIN,
+                    "missing-safe-origin-kind",
+                ),
+            ]),
+        ),
+        case(
+            "common-refused-capability",
+            with(&|fixture| {
+                fixture[Slot::ImplementationCapability.id()]["input"] =
+                    kind(capability).input("closed-shape", "malformed-capability");
+                fixture[Slot::LocaleCanonicalizationData.id()]["candidate"] = json!("x");
+                fixture[Slot::IntentSurfaceClassVocabulary.id()]["input"] = malformed.clone();
+            }),
+            Err(&[
+                (
+                    Slot::LocaleCanonicalizationData,
+                    ORIGIN,
+                    "unknown-safe-origin-kind",
+                ),
+                (
+                    Slot::ImplementationCapability,
+                    capability,
+                    "malformed-capability",
+                ),
+            ]),
+        ),
+        case(
+            "common-origin-before-value",
+            with(&|fixture| {
+                remove(fixture, Slot::ResourceLimitPolicyVerification, "candidate");
+                fixture[Slot::ResourceLimitPolicyVerification.id()]["input"] =
+                    kind(verification).input("strict-syntax", "malformed-input");
+            }),
+            Err(&[
+                (
+                    Slot::ResourceLimitPolicyVerification,
+                    ORIGIN,
+                    "missing-safe-origin-kind",
+                ),
+                (
+                    Slot::ResourceLimitPolicyVerification,
+                    verification,
+                    "malformed-input",
+                ),
+            ]),
+        ),
+    ]
+}
+
+/// Remove `member` from the fixture's slot.
+fn remove(fixture: &mut Value, slot: SafeOriginKind, member: &str) {
+    fixture[slot.id()]
+        .as_object_mut()
+        .expect("a slot is an object")
+        .remove(member);
+}
+
+/// A file entry's step cases (D15:3164, 3168): the admitted set with its
+/// `relative-path` locator, and with a locator that is not admitted, which is
+/// absence; and its failures under a refused capability, none when both
+/// origins hold and only the origin's when one does not, and in slot rank.
+fn file_steps(context: &Context, kinds: &BTreeMap<&str, Built>) -> Vec<Case> {
+    use SafeOriginKind as Slot;
+    let source = "file-source-identity-revision";
+    let selector = "external-profile-selector-binding";
+    let pair = &kinds[source].admitted["input"];
+    let mut input = pair.clone();
+    input["locator"] =
+        json!({ "variant": "relative-path", "payload": "intlify.config.json", "nonSecret": true });
+    let fixture = json!({
+        "capability": { "json": context.capability },
+        "entry": {
+            Slot::ConfigurationFile.id(): { "candidate": Slot::ConfigurationFile.id(), "input": input },
+            Slot::ProfileSelectorCli.id(): {
+                "candidate": Slot::ProfileSelectorCli.id(),
+                "input": kinds[selector].admitted["input"],
+            },
+        },
+    });
+    let with = |change: &dyn Fn(&mut Value)| {
+        let mut changed = fixture.clone();
+        change(&mut changed);
+        changed
+    };
+    let admitted = |locator: Value| {
+        json!({
+            Slot::ConfigurationFile.id(): {
+                "bytes": { "bytes": pair["bytes"]["bytes"] },
+                "identity": pair["identity"],
+                "nonSecret": pair["nonSecret"],
+                "revision": pair["revision"],
+                "locator": locator,
+            },
+            Slot::ProfileSelectorCli.id(): kinds[selector].normalized,
+        })
+    };
+    let refused = kinds["implementation-capability"].input("closed-shape", "malformed-capability");
+    let file = Slot::ConfigurationFile.id();
+    let cli = Slot::ProfileSelectorCli.id();
+    let case = |tail: &str, fixture: Value, expected: Result<Value, &[Failure]>| {
+        step_case(
+            tail,
+            ENTRY_SET,
+            &FILE_DECISIONS,
+            fixture,
+            expected,
+            &[ORIGIN, source, selector],
+        )
+    };
+    vec![
+        case(
+            "entry-file-admitted",
+            fixture.clone(),
+            Ok(admitted(json!({ "relative-path": "intlify.config.json" }))),
+        ),
+        case(
+            "entry-file-locator-absence",
+            with(&|fixture| {
+                fixture["entry"][file]["input"]["locator"]["payload"] =
+                    json!("../intlify.config.json");
+            }),
+            Ok(admitted(Value::Null)),
+        ),
+        case(
+            "entry-file-refused-capability",
+            with(&|fixture| fixture["capability"] = refused.clone()),
+            Err(&[]),
+        ),
+        case(
+            "entry-file-refused-capability-origin",
+            with(&|fixture| {
+                fixture["capability"] = refused.clone();
+                fixture["entry"][cli]["candidate"] = json!("x");
+            }),
+            Err(&[(Slot::ProfileSelectorCli, ORIGIN, "unknown-safe-origin-kind")]),
+        ),
+        case(
+            "entry-file-rank-order",
+            with(&|fixture| {
+                fixture["entry"][file]["input"]["identity"] = kinds[source]
+                    .input("value-rules", "unstable-source-identity")["identity"]
+                    .clone();
+                fixture["entry"][cli]["input"] =
+                    kinds[selector].input("unsafe-host-inspection", "unsafe-host-inspection");
+            }),
+            Err(&[
+                (Slot::ConfigurationFile, source, "unstable-source-identity"),
+                (Slot::ProfileSelectorCli, selector, "unsafe-host-inspection"),
+            ]),
+        ),
+    ]
+}
+
+/// A programmatic entry's step cases (D15:3164, 3168): the admitted set with
+/// its call-site sidecar and its `safe-label` locator, and without the
+/// sidecar; and its failures after a refused Snapshot, which leaves the
+/// identity and revision unevaluated, and in the boundary table's order.
+fn programmatic_steps(context: &Context, kinds: &BTreeMap<&str, Built>) -> Vec<Case> {
+    use SafeOriginKind as Slot;
+    let source = "programmatic-entry-identity-revision";
+    let snapshot = "programmatic-entry-snapshot";
+    let call_site = "programmatic-call-site-evidence-input";
+    let selector = "external-profile-selector-binding";
+    let pair = &kinds[source].admitted["input"];
+    let fixture = json!({
+        "capability": { "json": context.capability },
+        "entry": {
+            Slot::ConfigurationProgrammatic.id(): {
+                "candidate": Slot::ConfigurationProgrammatic.id(),
+                "input": {
+                    "snapshot": pair["snapshot"],
+                    "identity": pair["identity"],
+                    "nonSecret": pair["nonSecret"],
+                    "revision": pair["revision"],
+                    "locator": { "variant": "safe-label", "payload": "app", "nonSecret": true },
+                    "callSite": kinds[call_site].admitted["input"],
+                },
+            },
+            Slot::ProfileSelectorProgrammatic.id(): {
+                "candidate": Slot::ProfileSelectorProgrammatic.id(),
+                "input": kinds[selector].admitted["input"],
+            },
+        },
+    });
+    let with = |change: &dyn Fn(&mut Value)| {
+        let mut changed = fixture.clone();
+        change(&mut changed);
+        changed
+    };
+    let admitted = |call_site: Value| {
+        json!({
+            Slot::ConfigurationProgrammatic.id(): {
+                "snapshot": pair["snapshot"]["snapshot"],
+                "digest": pair["snapshot"]["digest"],
+                "identity": pair["identity"],
+                "nonSecret": pair["nonSecret"],
+                "revision": pair["revision"],
+                "locator": { "safe-label": "app" },
+                "callSite": call_site,
+            },
+            Slot::ProfileSelectorProgrammatic.id(): kinds[selector].normalized,
+        })
+    };
+    let entry = Slot::ConfigurationProgrammatic.id();
+    let unstable =
+        kinds[source].input("value-rules", "unstable-entry-identity")["identity"].clone();
+    let case = |tail: &str, fixture: Value, expected: Result<Value, &[Failure]>| {
+        step_case(
+            tail,
+            ENTRY_SET,
+            &PROGRAMMATIC_DECISIONS,
+            fixture,
+            expected,
+            &[ORIGIN, source, snapshot, call_site, selector],
+        )
+    };
+    vec![
+        case(
+            "entry-programmatic-admitted",
+            fixture.clone(),
+            Ok(admitted(kinds[call_site].normalized.clone())),
+        ),
+        case(
+            "entry-programmatic-no-call-site",
+            with(&|fixture| {
+                fixture["entry"][entry]["input"]
+                    .as_object_mut()
+                    .expect("the input is an object")
+                    .remove("callSite");
+            }),
+            Ok(admitted(Value::Null)),
+        ),
+        case(
+            "entry-programmatic-refused-snapshot",
+            with(&|fixture| {
+                fixture["entry"][entry]["input"]["snapshot"] =
+                    kinds[snapshot].input("closed-shape", "malformed-snapshot");
+                fixture["entry"][entry]["input"]["identity"] = unstable.clone();
+            }),
+            Err(&[(
+                Slot::ConfigurationProgrammatic,
+                snapshot,
+                "malformed-snapshot",
+            )]),
+        ),
+        case(
+            "entry-programmatic-value-order",
+            with(&|fixture| {
+                fixture["entry"][entry]["input"]["identity"] = unstable.clone();
+                fixture["entry"][entry]["input"]["callSite"] =
+                    kinds[call_site].input("closed-shape", "invalid-utf8-source");
+                fixture["entry"][Slot::ProfileSelectorProgrammatic.id()]["input"] =
+                    kinds[selector].input("unsafe-host-inspection", "unsafe-host-inspection");
+            }),
+            Err(&[
+                (
+                    Slot::ConfigurationProgrammatic,
+                    source,
+                    "unstable-entry-identity",
+                ),
+                (
+                    Slot::ConfigurationProgrammatic,
+                    call_site,
+                    "invalid-utf8-source",
+                ),
+                (
+                    Slot::ProfileSelectorProgrammatic,
+                    selector,
+                    "unsafe-host-inspection",
+                ),
+            ]),
+        ),
+    ]
+}
+
+/// The two admission steps' cases.
+fn steps(context: &Context, kinds: &BTreeMap<&str, Built>) -> Vec<Case> {
+    let mut cases = common_steps(kinds);
+    cases.extend(file_steps(context, kinds));
+    cases.extend(programmatic_steps(context, kinds));
+    cases
 }
 
 /// The fixture of case `id` as it is written: each raw input that is strict
@@ -1145,6 +1603,7 @@ pub(crate) fn cases() -> Result<Cases, serde_json::Error> {
             bytes: manifest,
         });
     }
+    listing.sort_by(|left, right| left["id"].as_str().cmp(&right["id"].as_str()));
     Ok(Cases { files, listing })
 }
 
@@ -1196,7 +1655,11 @@ mod tests {
                 file.path
             );
         }
-        assert_eq!(cases.listing.len(), 105);
+        assert_eq!(cases.listing.len(), 105 + 13);
+        assert!(cases
+            .listing
+            .windows(2)
+            .all(|pair| pair[0]["id"].as_str() < pair[1]["id"].as_str()));
     }
 
     /// Each kind of the boundary table, in the order of the precedence, has
@@ -1215,6 +1678,10 @@ mod tests {
             assert_eq!(built.refused.len(), rows(kind.name).len(), "{}", kind.name);
         }
         let (cases, _) = all().unwrap();
+        let cases = cases
+            .iter()
+            .filter(|case| KINDS.iter().any(|kind| kind.name == case.kind))
+            .collect::<Vec<_>>();
         assert_eq!(cases.len(), 13 + 92);
         let ids = cases
             .iter()
@@ -1222,7 +1689,7 @@ mod tests {
             .collect::<BTreeSet<_>>();
         assert_eq!(ids.len(), cases.len());
         assert!(cases.windows(2).all(|pair| pair[0].id < pair[1].id));
-        for case in &cases {
+        for case in cases {
             let kind = KINDS.iter().find(|kind| kind.name == case.kind).unwrap();
             assert_eq!(case.decisions[..4], SHARED_DECISIONS, "{}", case.id);
             assert_eq!(case.decisions[4..], *kind.decisions, "{}", case.id);
@@ -1249,6 +1716,133 @@ mod tests {
                 assert_eq!(case.rules, [rule(kind.name, reason)], "{}", case.id);
             }
         }
+    }
+
+    /// The two admission steps' 13 cases follow the kinds' (D15:3390): the
+    /// common step, a file entry, and a programmatic entry each have an
+    /// admitted case and a refused one. Each traces the shared decisions and
+    /// its step's; a refused one traces the pair of each of its failures,
+    /// which run in slot rank with an origin's first, and an admitted one
+    /// every pair of its step's boundaries, those of its refused cases among
+    /// them.
+    #[test]
+    fn each_step_has_its_admitted_and_refused_cases() {
+        let (cases, _) = all().unwrap();
+        let steps = &cases[13 + 92..];
+        assert_eq!(steps.len(), 13);
+        assert!(steps.windows(2).all(|pair| pair[0].id < pair[1].id));
+        let rank = |slot: &Value| {
+            SafeOriginKind::ALL
+                .into_iter()
+                .find(|kind| *slot == kind.id())
+                .unwrap()
+                .rank()
+        };
+        let mut seen = 0;
+        for (prefix, kind, decisions) in [
+            ("015-admission-common-", COMMON_SET, &COMMON_DECISIONS),
+            ("015-admission-entry-file-", ENTRY_SET, &FILE_DECISIONS),
+            (
+                "015-admission-entry-programmatic-",
+                ENTRY_SET,
+                &PROGRAMMATIC_DECISIONS,
+            ),
+        ] {
+            let own = steps
+                .iter()
+                .filter(|case| case.id.starts_with(prefix))
+                .collect::<Vec<_>>();
+            seen += own.len();
+            let admitted = own
+                .iter()
+                .filter(|case| case.expected["admitted"] == true)
+                .collect::<Vec<_>>();
+            assert!(!admitted.is_empty(), "{prefix}");
+            assert!(admitted.len() < own.len(), "{prefix}");
+            for case in &own {
+                assert_eq!(case.kind, kind, "{}", case.id);
+                assert_eq!(case.decisions[..4], SHARED_DECISIONS, "{}", case.id);
+                assert_eq!(case.decisions[4..], *decisions, "{}", case.id);
+                if case.expected["admitted"] == true {
+                    assert_eq!(case.rules, admitted[0].rules, "{}", case.id);
+                    continue;
+                }
+                let failures = case.expected["failures"].as_array().unwrap();
+                let mut pairs = Vec::new();
+                for failure in failures {
+                    let pair = rule(
+                        failure["boundaryKind"].as_str().unwrap(),
+                        failure["failureReason"].as_str().unwrap(),
+                    );
+                    if !pairs.contains(&pair) {
+                        pairs.push(pair);
+                    }
+                }
+                assert_eq!(case.rules, pairs, "{}", case.id);
+                assert!(pairs.iter().all(|pair| admitted[0].rules.contains(pair)));
+                let order = failures
+                    .iter()
+                    .map(|failure| (rank(&failure["slot"]), failure["boundaryKind"] != ORIGIN))
+                    .collect::<Vec<_>>();
+                assert!(
+                    order.windows(2).all(|pair| pair[0] <= pair[1]),
+                    "{}",
+                    case.id
+                );
+            }
+        }
+        assert_eq!(seen, steps.len());
+    }
+
+    /// A step case that shows a boundary left unevaluated holds an input
+    /// that boundary refuses (D15:3164): the common step's refused capability
+    /// beside a vocabulary of a malformed envelope, and a programmatic entry's
+    /// refused Snapshot beside an unstable identity, which the admitted
+    /// case's canonical Snapshot shows.
+    #[test]
+    fn a_step_case_holds_what_its_unevaluated_boundary_refuses() {
+        let constructed = constructed();
+        let (cases, files) = all().unwrap();
+        let bodies = files
+            .iter()
+            .map(|file| (file.path.clone(), file.bytes.clone()))
+            .collect::<Bodies>();
+        let fixture = |id: &str| {
+            cases
+                .iter()
+                .find(|case| case.id == id)
+                .unwrap()
+                .fixture
+                .clone()
+        };
+        let reason = |kind: &str, input: &Value| {
+            let fixture = json!({ "capability": { "json": capability() }, "input": input });
+            admission::outcome(kind, &fixture, &bodies, &constructed)["failureReason"].clone()
+        };
+        let common = fixture("015-admission-common-refused-capability");
+        assert_eq!(
+            reason(
+                "intent-surface-class-vocabulary-artifact",
+                &common[SafeOriginKind::IntentSurfaceClassVocabulary.id()]["input"]
+            ),
+            "malformed-envelope"
+        );
+        let programmatic = SafeOriginKind::ConfigurationProgrammatic.id();
+        let refused = fixture("015-admission-entry-programmatic-refused-snapshot");
+        let mut pair = fixture("015-admission-entry-programmatic-admitted")["entry"][programmatic]
+            ["input"]
+            .clone();
+        pair["identity"] = refused["entry"][programmatic]["input"]["identity"].clone();
+        let pair = json!({
+            "identity": pair["identity"],
+            "nonSecret": pair["nonSecret"],
+            "revision": pair["revision"],
+            "snapshot": pair["snapshot"],
+        });
+        assert_eq!(
+            reason("programmatic-entry-identity-revision", &pair),
+            "unstable-entry-identity"
+        );
     }
 
     /// Each case's fixture, run through the harness as the runner reads it,

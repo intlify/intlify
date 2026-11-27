@@ -1,0 +1,65 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-entry-file-admitted",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "entry-admission-input-set",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-entry-file-admitted.json",
+    "digest": "sha256:43c8c820bb3b7594d1726ac2db1e161177c49a06c9bc7738de89c4bc87d0966c"
+  },
+  "expected": {
+    "admitted": true,
+    "normalizedInput": {
+      "configuration-file": {
+        "bytes": {
+          "bytes": "7b22736368656d6156657273696f6e223a2230227d0a"
+        },
+        "identity": "intlify-file-source.v0:storefront/intlify.config.json",
+        "nonSecret": true,
+        "revision": "sha256:66bb712931d10dbd02539ce2c61126543e7623228c938e48a746bad813223ac4",
+        "locator": {
+          "relative-path": "intlify.config.json"
+        }
+      },
+      "profile-selector-cli": {
+        "selector": {
+          "report": "string",
+          "value": "app"
+        }
+      }
+    },
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-172",
+      "015-173"
+    ],
+    "ruleIds": [
+      "015.input-admission.safe-origin-kind.missing-safe-origin-kind",
+      "015.input-admission.safe-origin-kind.unknown-safe-origin-kind",
+      "015.input-admission.safe-origin-kind.non-canonical-safe-origin-kind",
+      "015.input-admission.safe-origin-kind.evidence-kind-incompatible",
+      "015.input-admission.file-source-identity-revision.missing-source-identity",
+      "015.input-admission.file-source-identity-revision.missing-source-revision",
+      "015.input-admission.file-source-identity-revision.over-bound-source-identity",
+      "015.input-admission.file-source-identity-revision.over-bound-source-revision",
+      "015.input-admission.file-source-identity-revision.unstable-source-identity",
+      "015.input-admission.file-source-identity-revision.unbound-source-revision",
+      "015.input-admission.file-source-identity-revision.source-snapshot-mismatch",
+      "015.input-admission.external-profile-selector-binding.unsafe-host-inspection",
+      "015.input-admission.external-profile-selector-binding.unrepresentable-selector",
+      "015.input-admission.external-profile-selector-binding.malformed-normalized-selector"
+    ],
+    "checkIds": []
+  }
+}

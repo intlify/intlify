@@ -1,0 +1,469 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-common-admitted",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "common-invocation-input-set",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-common-admitted.json",
+    "digest": "sha256:a2826a7693f198b9feb5f273e4a255248f83db1deeb37b79ec6c8bfa1fff7884"
+  },
+  "expected": {
+    "admitted": true,
+    "normalizedInput": {
+      "profile-resolution-specification-input": {
+        "json": {
+          "coverage": {
+            "identity": "intlify-localization-coverage",
+            "revision": "0"
+          },
+          "delivery-graph": {
+            "identity": "intlify-delivery-graph",
+            "revision": "0"
+          },
+          "delivery-placement": {
+            "identity": "intlify-delivery-placement",
+            "revision": "0"
+          },
+          "intent-surface-class-vocabulary": {
+            "identity": "storefront-surfaces",
+            "revision": "1",
+            "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "locale-canonicalization": {
+            "identity": "intlify-locale-canonicalization",
+            "revision": "0"
+          },
+          "locale-negotiation": {
+            "identity": "intlify-locale-negotiation",
+            "revision": "0"
+          },
+          "message-locale-fallback": {
+            "identity": "intlify-message-locale-fallback",
+            "revision": "0"
+          },
+          "project-profile": {
+            "identity": "intlify-project-profile",
+            "revision": "0"
+          }
+        }
+      },
+      "intent-surface-class-vocabulary": {
+        "json": {
+          "identity": "intlify-test-vocabulary",
+          "integrityDigest": "sha256:ab6e3af789421cb109d49ec02e73733d65ea4e8774a168dd71d64908bc116085",
+          "kind": "intent-surface-class-vocabulary",
+          "members": [
+            "checkout",
+            "internal-tool",
+            "nav"
+          ],
+          "revision": "0",
+          "schemaRevision": "0"
+        }
+      },
+      "locale-canonicalization-data": {
+        "json": {
+          "manifest": {
+            "dataset": {
+              "identity": "intlify-locale-canonicalization-cldr-48.2.0",
+              "schema": {
+                "identity": "intlify-locale-canonicalization-dataset",
+                "revision": "0"
+              },
+              "semanticDigest": "sha256:6182421172339b8c416890e20b3121ab40e412a896df6316d8e991c756505e16"
+            },
+            "generation": {
+              "cldr": {
+                "revision": "48.2.0",
+                "sources": [
+                  {
+                    "address": "common/bcp47/calendar.xml",
+                    "digest": "sha256:fb24616f77fac1ab3246f869b69efc8a4b86d2437a947f3f6a53843ac0b60821"
+                  },
+                  {
+                    "address": "common/bcp47/collation.xml",
+                    "digest": "sha256:2fa8fef733069c4651a5c60c85cb38ba09a07151d71b9b148d9372eff28a4d42"
+                  },
+                  {
+                    "address": "common/bcp47/currency.xml",
+                    "digest": "sha256:93849191705b5e52adab6766d3bf41ae627373c34c7cb73259fdc17d22bd3bc7"
+                  },
+                  {
+                    "address": "common/bcp47/measure.xml",
+                    "digest": "sha256:6a1445e2f6af8fad47b9d5b40e67d582e7f4b9502609443780d3e3641d23be4d"
+                  },
+                  {
+                    "address": "common/bcp47/number.xml",
+                    "digest": "sha256:0c10e9578f2191527475d0f57105d56c399b2f44425ceebadf474e50157abbb6"
+                  },
+                  {
+                    "address": "common/bcp47/segmentation.xml",
+                    "digest": "sha256:9a3a00df3181b51279389655ef06f12be593d3b288c44b54caf7b2d86ed8b285"
+                  },
+                  {
+                    "address": "common/bcp47/timezone.xml",
+                    "digest": "sha256:54ce7d9f1d385101e24356df7d48ae62cf2acc4421378da60a4007d2488c1aad"
+                  },
+                  {
+                    "address": "common/bcp47/transform-destination.xml",
+                    "digest": "sha256:469976ddb878572cdede31e94a6e60a4cd9d2d83df9bda3e47045c8489cf76a0"
+                  },
+                  {
+                    "address": "common/bcp47/transform.xml",
+                    "digest": "sha256:d564dd996541afbcab77b3446bea5e591c3ec5c3b27ed0cd08326ae873ec7bdb"
+                  },
+                  {
+                    "address": "common/bcp47/transform_hybrid.xml",
+                    "digest": "sha256:cefd0cd86388941868991f50351ff61a757b0493b62bca395151aef2bcc5e46c"
+                  },
+                  {
+                    "address": "common/bcp47/transform_ime.xml",
+                    "digest": "sha256:cdc020c18ef8d7c9d3b1ccc12b3ea711cde758f8c0aed828c9bc1bc3197e051c"
+                  },
+                  {
+                    "address": "common/bcp47/transform_keyboard.xml",
+                    "digest": "sha256:a719796bd59b8daf4b98d6fd294e6d5405b8bf3b36a5086a70242bd5e8a12ef9"
+                  },
+                  {
+                    "address": "common/bcp47/transform_mt.xml",
+                    "digest": "sha256:508428eaa699cdd857d0daf7ce8ff232023abd162b5f623640b10de1348d95e7"
+                  },
+                  {
+                    "address": "common/bcp47/transform_private_use.xml",
+                    "digest": "sha256:b1157b7e690aa1f17894f0c2e1d8a16e749a1115a93f743d7032fdfb1686fbe2"
+                  },
+                  {
+                    "address": "common/bcp47/variant.xml",
+                    "digest": "sha256:e5500779baa55e838c5bf1529561c3b441fe2c331caac6ceddecffb4e425a514"
+                  },
+                  {
+                    "address": "common/validity/language.xml",
+                    "digest": "sha256:3f2be6cb8f4a1b506a5bc8d79d3a91349f3061ade565f836c534c00c2efd2996"
+                  },
+                  {
+                    "address": "common/validity/region.xml",
+                    "digest": "sha256:e751e0eedd46b52c38f3cdb72b0fab61ac8b48e052e8b28ba74b6ac26c4c8cb1"
+                  },
+                  {
+                    "address": "common/validity/script.xml",
+                    "digest": "sha256:30f7f5f64be0df200bdfe42f7ce103a045ab661490885a7f060f31d4199be948"
+                  },
+                  {
+                    "address": "common/validity/subdivision.xml",
+                    "digest": "sha256:93b12c9d55938266c96d44a7ccbb66800afeef4f9dd48b0dc16edfab89833d95"
+                  },
+                  {
+                    "address": "common/validity/variant.xml",
+                    "digest": "sha256:49019a8e903802a75197d47ef9854d24655bdac373b8667cf00a33fd9205676e"
+                  }
+                ]
+              },
+              "markerData": {
+                "checksum": "sha256:d5fdcc9ac77c6d74ff5cf6e65ef3181d6af32003b16fce3a77fb451d2f695993",
+                "package": "icu_locale_data",
+                "version": "2.2.0"
+              },
+              "markers": [
+                "LocaleAliasesV1",
+                "LocaleLikelySubtagsExtendedV1",
+                "LocaleLikelySubtagsLanguageV1",
+                "LocaleLikelySubtagsScriptRegionV1"
+              ]
+            },
+            "integrityDigest": "sha256:14d8cc5ea460baae34f7846c1a20056f7d65103699b2a76ea27fa906bc57ac38",
+            "kind": "locale-canonicalization-data",
+            "payloads": [
+              {
+                "address": "conformance.json",
+                "byteLength": "165214",
+                "digest": "sha256:a8c6b80fce762fee8b2f27e8c5c9600cc45dddaba65f98c1c1b987dfc0ff5a8a",
+                "format": {
+                  "identity": "intlify-canonical-json-text",
+                  "revision": "0"
+                },
+                "role": "conformance"
+              },
+              {
+                "address": "markers.postcard",
+                "byteLength": "86008",
+                "digest": "sha256:01fbc3009dc32371704d621e48acc484b2fa47f1b2b076701667acbaeb3b1f0b",
+                "format": {
+                  "identity": "icu4x-blob",
+                  "revision": "2.2"
+                },
+                "role": "markers"
+              }
+            ],
+            "schemaRevision": "0",
+            "specification": {
+              "identity": "intlify-locale-canonicalization",
+              "revision": "0"
+            }
+          },
+          "payloads": {
+            "conformance.json": {
+              "digest": "sha256:ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+              "path": "fixtures/admission/locale-data/conformance.json"
+            }
+          }
+        }
+      },
+      "profile-resolution-artifact-collection": {
+        "members": [
+          {
+            "json": {
+              "kind": "approval-policy",
+              "schemaRevision": "0",
+              "specification": {
+                "identity": "intlify-design-021",
+                "revision": "0"
+              },
+              "body": {
+                "identity": "storefront-approval",
+                "revision": "1",
+                "content": {
+                  "localizedApproval": "required"
+                }
+              },
+              "integrityDigest": "sha256:de5acf5b1da156c38aaa9a34563663b2b1719af9e831b6bf2ba2ecaa7e86c186"
+            }
+          }
+        ]
+      },
+      "resource-limit-policy-verification": {
+        "json": {
+          "identity": "intlify-test-verification-input",
+          "integrityDigest": "sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45",
+          "kind": "resource-limit-policy-verification-input",
+          "mode": "exact-pin",
+          "pins": [
+            {
+              "identity": "intlify-test-limits-a",
+              "kind": "resource-limit-policy",
+              "revision": "1",
+              "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+              "specificationRevision": "0"
+            },
+            {
+              "identity": "intlify-test-limits-b",
+              "kind": "resource-limit-policy",
+              "revision": "1",
+              "semanticDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+              "specificationRevision": "0"
+            }
+          ],
+          "revision": "0",
+          "schemaRevision": "0"
+        }
+      },
+      "implementation-capability": {
+        "json": {
+          "specification": {
+            "identity": "intlify-project-profile-resolver-capability",
+            "revision": "0"
+          },
+          "policyComparable": {
+            "configurationInput": {
+              "maxNodes": "1",
+              "maxDepth": "2",
+              "maxCollectionEntries": "3",
+              "maxTotalStringBytes": "4",
+              "maxSingleStringBytes": "5",
+              "maxProfiles": "6",
+              "maxProfileIdBytes": "1048576",
+              "maxStructuralAnalysisUnits": "8"
+            },
+            "localeResolution": {
+              "maxLocaleIdentifierBytes": "9",
+              "maxLocaleOccurrences": "10",
+              "maxRequestedLocales": "11",
+              "maxNegotiationAliases": "12",
+              "maxFallbackSources": "13",
+              "maxFallbackCandidatesPerSource": "14",
+              "maxCoverageRules": "15",
+              "maxCoverageLocaleSelectorOccurrences": "16",
+              "maxCoverageSurfaceSelectorOccurrences": "17",
+              "maxCoverageDecisionCells": "18",
+              "maxCoverageRuleCellComparisons": "19"
+            },
+            "artifactAdmission": {
+              "maxArtifacts": "20",
+              "maxPolicyArtifacts": "21",
+              "maxTargetProfileArtifacts": "22",
+              "maxArtifactReferences": "23",
+              "maxSingleArtifactCanonicalBytes": "24",
+              "maxTotalArtifactCanonicalBytes": "25",
+              "maxSingleReferenceCanonicalBytes": "26",
+              "maxTotalReferenceCanonicalBytes": "27"
+            },
+            "targetGrouping": {
+              "maxTargetProfiles": "28",
+              "maxTargetIdBytes": "29",
+              "maxDeploymentGroups": "30",
+              "maxGroupIdBytes": "31",
+              "maxMembersPerGroup": "32",
+              "maxMembershipOccurrences": "33",
+              "maxHydrationRelations": "34"
+            },
+            "diagnostics": {
+              "entry": {
+                "maxFindingOccurrences": "35",
+                "maxFindings": "36",
+                "maxRelatedEvidencePerOccurrenceGroup": "37",
+                "maxRelatedEvidenceOccurrences": "38",
+                "maxSingleEvidenceBytes": "39",
+                "maxTotalEvidenceBytes": "40",
+                "maxEvaluationStatusEntries": "41",
+                "maxSuppressionCausesPerStatus": "42",
+                "maxSuppressionCauseOccurrences": "43",
+                "maxRecords": "44",
+                "maxTotalCanonicalBytes": "45"
+              },
+              "shared": {
+                "maxFindingOccurrences": "46",
+                "maxFindings": "47",
+                "maxEvaluationStatusEntries": "48",
+                "maxSuppressionCausesPerStatus": "49",
+                "maxSuppressionCauseOccurrences": "50",
+                "maxRecords": "51",
+                "maxTotalCanonicalBytes": "52"
+              }
+            }
+          },
+          "bootstrapOnly": {
+            "rawInput": {
+              "maxFileBytes": "1",
+              "maxParserTokens": "1"
+            },
+            "snapshot": {
+              "maxNodes": "1048576",
+              "maxDepth": "1048576",
+              "maxCollectionEntries": "1048576",
+              "maxTotalStringBytes": "1048576",
+              "maxSingleStringBytes": "1048576",
+              "maxRejectedMarkers": "1048576",
+              "maxEnvelopeCanonicalBytes": "1048576",
+              "maxSingleMarkerCanonicalBytes": "1048576",
+              "maxTraversalUnits": "1048576"
+            },
+            "inputBoundary": {
+              "maxDepth": "1048576",
+              "maxSpecificationInputBytes": "1048576",
+              "maxVocabularyBytes": "1048576",
+              "maxVocabularyMembers": "1048576",
+              "maxVocabularyMemberBytes": "1048576",
+              "maxVocabularyTotalMemberBytes": "1048576",
+              "maxLocaleDataManifestBytes": "1048576",
+              "maxCollectionMemberBytes": "1048576",
+              "maxCollectionTotalBytes": "1048576",
+              "maxVerificationInputBytes": "1048576",
+              "maxVerificationPins": "1048576"
+            },
+            "artifactBootstrap": {
+              "maxEnvelopeDepth": "18446744073709551614",
+              "maxDecodedAllocationBytes": "18446744073709551614",
+              "maxMetadataScanUnits": "18446744073709551614",
+              "maxValidationWorkUnits": "18446744073709551614"
+            },
+            "localeData": {
+              "maxPayloads": "1048576",
+              "maxPayloadBytes": "1048576",
+              "maxMarkerBytes": "1048576",
+              "maxValidityGroups": "1048576",
+              "maxCodes": "1048576",
+              "maxExtensionKeys": "1048576",
+              "maxTypes": "1048576",
+              "maxCorrections": "1048576",
+              "maxValidationWorkUnits": "1048576"
+            },
+            "evidenceMetadata": {
+              "maxSourceIdentityBytes": "1048576",
+              "maxSourceRevisionBytes": "1048576",
+              "maxLocatorBytes": "1048576",
+              "maxCallSiteSourceBytes": "1048576",
+              "maxCallSiteMappings": "1048576",
+              "maxLogicalPathSegments": "1048576",
+              "maxLogicalPathCanonicalBytes": "1048576",
+              "maxSubjectOccurrences": "1048576",
+              "maxTokenInputs": "1048576",
+              "maxCollisionComparisons": "1048576",
+              "maxMetadataWorkUnits": "1048576"
+            },
+            "mandatoryReserve": {
+              "maxOutcomeEnvelopeSlots": "1",
+              "maxConstructionIdentitySlots": "1",
+              "maxEntryTerminalFindingSlots": "1",
+              "maxEntryTerminalStatusSlots": "1",
+              "maxSharedTerminalFindingSlots": "1",
+              "maxSharedTerminalStatusSlots": "1",
+              "maxSharedUnavailableCauseSlots": "1",
+              "maxCanonicalBytes": "65536"
+            }
+          }
+        }
+      }
+    },
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-168",
+      "015-169"
+    ],
+    "ruleIds": [
+      "015.input-admission.safe-origin-kind.missing-safe-origin-kind",
+      "015.input-admission.safe-origin-kind.unknown-safe-origin-kind",
+      "015.input-admission.safe-origin-kind.non-canonical-safe-origin-kind",
+      "015.input-admission.safe-origin-kind.evidence-kind-incompatible",
+      "015.input-admission.profile-resolution-specification-input.missing-input",
+      "015.input-admission.profile-resolution-specification-input.over-bound-member",
+      "015.input-admission.profile-resolution-specification-input.malformed-input",
+      "015.input-admission.profile-resolution-specification-input.duplicate-member",
+      "015.input-admission.profile-resolution-specification-input.unknown-member",
+      "015.input-admission.intent-surface-class-vocabulary-artifact.missing-input",
+      "015.input-admission.intent-surface-class-vocabulary-artifact.over-bound-envelope",
+      "015.input-admission.intent-surface-class-vocabulary-artifact.malformed-envelope",
+      "015.input-admission.intent-surface-class-vocabulary-artifact.duplicate-member",
+      "015.input-admission.intent-surface-class-vocabulary-artifact.unknown-member",
+      "015.input-admission.locale-canonicalization-data-artifact.missing-input",
+      "015.input-admission.locale-canonicalization-data-artifact.over-bound-envelope",
+      "015.input-admission.locale-canonicalization-data-artifact.malformed-envelope",
+      "015.input-admission.locale-canonicalization-data-artifact.duplicate-member",
+      "015.input-admission.locale-canonicalization-data-artifact.unknown-member",
+      "015.input-admission.submitted-profile-resolution-artifact-collection.missing-input",
+      "015.input-admission.submitted-profile-resolution-artifact-collection.unsafe-host-inspection",
+      "015.input-admission.submitted-profile-resolution-artifact-collection.malformed-container",
+      "015.input-admission.submitted-profile-resolution-artifact-collection.formal-envelope-over-bound",
+      "015.input-admission.submitted-profile-resolution-artifact-collection.unrepresentable-member",
+      "015.input-admission.resource-limit-policy-verification-input.missing-input",
+      "015.input-admission.resource-limit-policy-verification-input.over-bound-input",
+      "015.input-admission.resource-limit-policy-verification-input.malformed-input",
+      "015.input-admission.resource-limit-policy-verification-input.duplicate-member",
+      "015.input-admission.resource-limit-policy-verification-input.unknown-member",
+      "015.input-admission.resource-limit-policy-verification-input.secret-bearing-input",
+      "015.input-admission.resource-limit-policy-verification-input.ambient-authority",
+      "015.input-admission.resource-limit-policy-verification-input.verification-identity-mismatch",
+      "015.input-admission.resource-limit-policy-verification-input.verification-revision-mismatch",
+      "015.input-admission.resource-limit-policy-verification-input.verification-digest-mismatch",
+      "015.input-admission.implementation-capability.missing-capability",
+      "015.input-admission.implementation-capability.malformed-capability",
+      "015.input-admission.implementation-capability.capability-specification-identity-mismatch",
+      "015.input-admission.implementation-capability.capability-specification-revision-mismatch",
+      "015.input-admission.implementation-capability.incomplete-capability",
+      "015.input-admission.implementation-capability.non-canonical-bound",
+      "015.input-admission.implementation-capability.non-positive-bound",
+      "015.input-admission.implementation-capability.unrepresentable-bound",
+      "015.input-admission.implementation-capability.below-bootstrap-minimum"
+    ],
+    "checkIds": []
+  }
+}

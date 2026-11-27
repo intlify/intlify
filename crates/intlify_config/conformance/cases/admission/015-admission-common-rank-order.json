@@ -1,0 +1,53 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-common-rank-order",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "common-invocation-input-set",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-common-rank-order.json",
+    "digest": "sha256:78aba39d3eecffe25fd4815c9ee5ba9d84c341ff641da614eae99fb00e11d2f1"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failures": [
+      {
+        "slot": "profile-resolution-specification-input",
+        "boundaryKind": "safe-origin-kind",
+        "failureReason": "non-canonical-safe-origin-kind"
+      },
+      {
+        "slot": "intent-surface-class-vocabulary",
+        "boundaryKind": "intent-surface-class-vocabulary-artifact",
+        "failureReason": "malformed-envelope"
+      },
+      {
+        "slot": "profile-resolution-artifact-collection",
+        "boundaryKind": "safe-origin-kind",
+        "failureReason": "missing-safe-origin-kind"
+      }
+    ],
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-168",
+      "015-169"
+    ],
+    "ruleIds": [
+      "015.input-admission.safe-origin-kind.non-canonical-safe-origin-kind",
+      "015.input-admission.intent-surface-class-vocabulary-artifact.malformed-envelope",
+      "015.input-admission.safe-origin-kind.missing-safe-origin-kind"
+    ],
+    "checkIds": []
+  }
+}
