@@ -1811,4 +1811,35 @@ mod tests {
             .unwrap();
         assert!(step.passed(), "{}", step.actual);
     }
+
+    /// A programmatic entry's call-site number past binary64's range, which
+    /// the Case Schema admits as a number, reaches the entry step as the
+    /// infinity a binding reads; under a refused capability the step
+    /// evaluates only the origins (D15:3168, 3252).
+    #[test]
+    fn a_step_case_reads_a_call_site_number_past_binary64_s_range() {
+        let path =
+            committed().join("fixtures/admission/015-admission-entry-programmatic-admitted.json");
+        let mut fixture: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        fixture["capability"] = json!({ "json": {} });
+        let mappings =
+            &mut fixture["entry"]["configuration-programmatic"]["input"]["callSite"]["mappings"];
+        mappings[0]["span"]["start"] = serde_json::from_str("1e999").unwrap();
+        mappings[1]["path"] = serde_json::from_str(r#"[{ "index": -1e999 }]"#).unwrap();
+        let suite = admission_suite(FIXTURE, &fixture, |manifest| {
+            manifest["boundaryKind"] = json!("entry-admission-input-set");
+            manifest["expected"] = json!({
+                "admitted": false,
+                "normalizedInput": null,
+                "failures": [],
+                "resolverInvoked": false,
+            });
+        });
+        let outcomes = suite.open().unwrap().run();
+        let step = outcomes
+            .iter()
+            .find(|outcome| outcome.id == "015-b")
+            .unwrap();
+        assert!(step.passed(), "{}", step.actual);
+    }
 }

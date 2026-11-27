@@ -57,6 +57,7 @@ use crate::boundary::specification;
 use crate::boundary::step::{Component, InputFailure, Refusal};
 use crate::boundary::text::TextInput;
 use crate::boundary::verification::{self, VerificationAssertion};
+use crate::construction::validator::number::Decimal;
 use crate::input_limits::Bound;
 use crate::locale::icu4x::Icu4xData;
 use crate::locale::{EnvelopeReason, VersionedIdentity};
@@ -822,14 +823,31 @@ fn utf16(value: &Value) -> Option<Vec<u8>> {
     code_units(members.get("stringUtf16")?.as_array()?)
 }
 
+/// A code unit: a number whose value is an integer in `0..=0xFFFF`, however
+/// it is written, as the Case Schema's `integer` reads it.
+fn code_unit(unit: &Value) -> Option<u16> {
+    let count = Decimal::parse(unit.as_number()?.as_str())?.to_count()?;
+    u16::try_from(count).ok()
+}
+
+/// A fixture's number as the binary64 a binding reads from its text: the
+/// nearest value, and an infinity past binary64's range. A span coordinate
+/// and an index are such numbers (D15:3252); the call-site boundary decides
+/// which of them are byte coordinates and indexes (D15:746, 3170).
+fn binary64(number: &Value) -> f64 {
+    number
+        .as_number()
+        .expect("the Case Schema makes it a number")
+        .as_str()
+        .parse()
+        .expect("a JSON number's text reads as a binary64")
+}
+
 /// The generalized UTF-8 of UTF-16 code units: a surrogate pair is its scalar
 /// value, and a lone surrogate is encoded on its own, as a string that is not
 /// a sequence of Unicode scalar values is submitted.
 fn code_units(units: &[Value]) -> Option<Vec<u8>> {
-    let units = units
-        .iter()
-        .map(|unit| unit.as_u64().and_then(|unit| u16::try_from(unit).ok()))
-        .collect::<Option<Vec<_>>>()?;
+    let units = units.iter().map(code_unit).collect::<Option<Vec<_>>>()?;
     let mut bytes = Vec::new();
     for decoded in char::decode_utf16(units) {
         match decoded {
@@ -927,8 +945,8 @@ fn call_site_report<'a>(input: &'a Value, bodies: &Bodies) -> CallSiteReport<'a>
                         .expect("the Case Schema makes the role text")
                         .to_owned(),
                     span: SpanCandidate {
-                        start: mapping["span"]["start"].as_f64().expect("a number"),
-                        end: mapping["span"]["end"].as_f64().expect("a number"),
+                        start: binary64(&mapping["span"]["start"]),
+                        end: binary64(&mapping["span"]["end"]),
                     },
                 })
                 .collect(),
@@ -967,15 +985,13 @@ fn edge(edge: &Value) -> SubmittedEdge {
     if let Some(units) = edge.get("keyUtf16").and_then(Value::as_array) {
         return SubmittedEdge::Key(code_units(units).expect("the Case Schema makes code units"));
     }
-    SubmittedEdge::Index(
-        edge["index"]
-            .as_f64()
-            .expect("the Case Schema makes the index a number"),
-    )
+    SubmittedEdge::Index(binary64(&edge["index"]))
 }
 
 /// A span coordinate as submitted: an integer as an integer, so that a span
-/// reads as the fixture wrote it, and any other number as it is.
+/// reads as the fixture wrote it, and any other number as it is. An
+/// infinity, which a fixture's number past binary64's range reads as, has no
+/// JSON number and is written as `null`, as JSON's serializers write one.
 #[expect(
     clippy::cast_possible_truncation,
     reason = "an integer within the exact range of binary64 converts exactly"
@@ -1087,6 +1103,16 @@ mod tests {
         assert_eq!(units(json!([65536])), None);
         assert_eq!(units(json!([-1])), None);
         assert_eq!(units(json!(["a"])), None);
+        // A code unit is an integer however it is written, as the Case
+        // Schema's `integer` reads it, and only an exact integer.
+        let written = |text: &str| units(serde_json::from_str(text).unwrap());
+        assert_eq!(
+            written("[97.0, 1e2, 6.5535e4, -0]"),
+            Some(vec![0x61, 0x64, 0xef, 0xbf, 0xbf, 0x00])
+        );
+        assert_eq!(written("[97.5]"), None);
+        assert_eq!(written("[1.00000000000000000001]"), None);
+        assert_eq!(written("[6.5536e4]"), None);
         assert_eq!(
             utf16(&json!({ "stringUtf16": [0x61] })),
             Some(b"a".to_vec())
@@ -1259,6 +1285,25 @@ mod tests {
             edge(&json!({ "index": 1.5 })),
             SubmittedEdge::Index(index) if index.to_bits() == 1.5_f64.to_bits()
         ));
+        // A number reads as the binary64 a binding reads from its text: an
+        // infinity past binary64's range, zero below its least value.
+        let written = |text: &str| edge(&serde_json::from_str(text).unwrap());
+        assert!(matches!(
+            written(r#"{ "keyUtf16": [97.0] }"#),
+            SubmittedEdge::Key(key) if key == b"a"
+        ));
+        assert!(matches!(
+            written(r#"{ "index": 1e999 }"#),
+            SubmittedEdge::Index(index) if index == f64::INFINITY
+        ));
+        assert!(matches!(
+            written(r#"{ "index": -1e999 }"#),
+            SubmittedEdge::Index(index) if index == f64::NEG_INFINITY
+        ));
+        assert!(matches!(
+            written(r#"{ "index": 1e-999 }"#),
+            SubmittedEdge::Index(index) if index.to_bits() == 0.0_f64.to_bits()
+        ));
     }
 
     #[test]
@@ -1274,6 +1319,8 @@ mod tests {
             number(9_007_199_254_740_992.0).to_string(),
             "9007199254740992.0"
         );
+        assert_eq!(number(f64::INFINITY), Value::Null);
+        assert_eq!(number(f64::NEG_INFINITY), Value::Null);
     }
 
     #[test]
@@ -1306,6 +1353,46 @@ mod tests {
         let mut capability = crate::conformance::admission_cases::capability();
         *capability.pointer_mut(pointer).unwrap() = json!(value.to_string());
         capability
+    }
+
+    /// A call-site number past binary64's range reaches its boundary as the
+    /// infinity a binding reads: a span with it is no Portable Source Span
+    /// but no boundary failure either, so the sidecar is admitted with the
+    /// span as submitted, while a path with it as an index is malformed
+    /// (D15:746, 3170, 3267).
+    #[test]
+    fn a_call_site_number_past_binary64_s_range_reaches_its_boundary() {
+        const FIXTURE: &[u8] = include_bytes!(
+            "../../conformance/fixtures/admission/015-admission-call-site-admitted.json"
+        );
+        let constructed = constructed();
+        let past: Value = serde_json::from_str("1e999").unwrap();
+        let run = |change: &dyn Fn(&mut Value)| {
+            let mut fixture: Value = serde_json::from_slice(FIXTURE).unwrap();
+            change(&mut fixture);
+            outcome(
+                "programmatic-call-site-evidence-input",
+                &fixture,
+                &Bodies::new(),
+                &constructed,
+            )
+        };
+        let admitted = run(&|fixture| {
+            fixture["input"]["mappings"][0]["span"]["start"] = past.clone();
+        });
+        assert_eq!(admitted["admitted"], true, "{admitted}");
+        let starts = admitted["normalizedInput"]["json"]["mappings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|mapping| mapping["span"]["start"].clone())
+            .collect::<Vec<_>>();
+        assert_eq!(starts.iter().filter(|start| start.is_null()).count(), 1);
+        assert!(starts.iter().all(|start| start.is_null() || start.is_u64()));
+        let refused = run(&|fixture| {
+            fixture["input"]["mappings"][1]["path"] = json!([{ "index": past }]);
+        });
+        assert_eq!(refused["failureReason"], "malformed-input", "{refused}");
     }
 
     /// The locale data boundary reads both of its bounds from the
