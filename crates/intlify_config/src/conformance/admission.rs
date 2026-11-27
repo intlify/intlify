@@ -46,6 +46,7 @@ use crate::boundary::construction_identity;
 use crate::boundary::entry::{
     self, FileValue, ProgrammaticValue, SubmittedFileEntry, SubmittedProgrammaticEntry,
 };
+use crate::boundary::invocation::SubmittedEntry;
 use crate::boundary::locator::{Locator, LocatorCandidate, LocatorVariant};
 use crate::boundary::origin;
 use crate::boundary::selector::{self, SelectorReport};
@@ -236,14 +237,18 @@ fn step(result: Result<Value, Vec<InputFailure>>) -> Value {
     }
 }
 
-/// The Common Invocation Input Set's step on the fixture's slots and the
-/// trusted setup path's assertion (D15:3164, 3166): each slot's admitted
-/// value, or every failure. The capability is one of the slots.
-fn common_step(
+/// The locale data reader a Common Invocation Input Set submits.
+pub(crate) type DataReader<'a> =
+    Box<dyn FnOnce(Bound, Bound) -> Result<Icu4xData, EnvelopeReason> + 'a>;
+
+/// What the common input fixture `fixture` submits, slot by slot, each
+/// slot's input in its boundary fixture's form (D15:3252), and the data it
+/// reads: `f` takes both before the bytes they borrow are released.
+pub(crate) fn with_common<T>(
     fixture: &Value,
     bodies: &Bodies,
-    constructed: &Constructed,
-) -> Result<Value, Vec<InputFailure>> {
+    f: impl FnOnce(common::Submitted<'_, DataReader<'_>>, &DataInput) -> T,
+) -> T {
     use SafeOriginKind as Kind;
     let slot = |kind: Kind| &fixture[kind.id()];
     let origin = |kind: Kind| candidate(slot(kind));
@@ -256,6 +261,7 @@ fn common_step(
     let collection = input(Kind::ProfileResolutionArtifactCollection);
     let members = collection_members(collection, bodies);
     let borrowed = members.iter().map(Vec::as_slice).collect::<Vec<_>>();
+    let read: DataReader<'_> = Box::new(|size: Bound, depth: Bound| locale_data.read(size, depth));
     let submitted = common::Submitted {
         specification: Component {
             value: specification.as_deref(),
@@ -266,7 +272,7 @@ fn common_step(
             origin: origin(Kind::IntentSurfaceClassVocabulary),
         },
         data: Component {
-            value: |size: Bound, depth: Bound| locale_data.read(size, depth),
+            value: read,
             origin: origin(Kind::LocaleCanonicalizationData),
         },
         collection: Component {
@@ -282,47 +288,57 @@ fn common_step(
             origin: origin(Kind::ImplementationCapability),
         },
     };
-    let assertion = verification_assertion(&fixture["assertion"]);
-    let admitted = common::admit(submitted, &constructed.capability, &assertion)
-        .map_err(|refused| refused.failures)?;
-    Ok(json!({
-        Kind::ProfileResolutionSpecificationInput.id(): {
-            "json": specification_view(&admitted.specification),
-        },
-        Kind::IntentSurfaceClassVocabulary.id(): {
-            "json": value_view(admitted.vocabulary.artifact()),
-        },
-        Kind::LocaleCanonicalizationData.id(): locale_data.view(&admitted.data),
-        Kind::ProfileResolutionArtifactCollection.id(): collection_view(&admitted.collection),
-        Kind::ResourceLimitPolicyVerification.id(): {
-            "json": sorted(&admitted.verification.normalized()),
-        },
-        Kind::ImplementationCapability.id(): { "json": admitted.capability.normalized() },
-    }))
+    f(submitted, &locale_data)
 }
 
-/// A file or programmatic entry's step under the capability the harness
-/// admits first, `None` when it is refused, which leaves only the entry's
-/// origins evaluated (D15:3164, 3168): each slot's admitted value, or every
-/// failure.
-fn entry_step(
+/// The Common Invocation Input Set's step on the fixture's slots and the
+/// trusted setup path's assertion (D15:3164, 3166): each slot's admitted
+/// value, or every failure. The capability is one of the slots.
+fn common_step(
     fixture: &Value,
     bodies: &Bodies,
     constructed: &Constructed,
 ) -> Result<Value, Vec<InputFailure>> {
     use SafeOriginKind as Kind;
-    let capability = admitted_capability(fixture, constructed);
-    let entry = &fixture["entry"];
+    with_common(fixture, bodies, |submitted, locale_data| {
+        let assertion = verification_assertion(&fixture["assertion"]);
+        let admitted = common::admit(submitted, &constructed.capability, &assertion)
+            .map_err(|refused| refused.failures)?;
+        Ok(json!({
+            Kind::ProfileResolutionSpecificationInput.id(): {
+                "json": specification_view(&admitted.specification),
+            },
+            Kind::IntentSurfaceClassVocabulary.id(): {
+                "json": value_view(admitted.vocabulary.artifact()),
+            },
+            Kind::LocaleCanonicalizationData.id(): locale_data.view(&admitted.data),
+            Kind::ProfileResolutionArtifactCollection.id(): collection_view(&admitted.collection),
+            Kind::ResourceLimitPolicyVerification.id(): {
+                "json": sorted(&admitted.verification.normalized()),
+            },
+            Kind::ImplementationCapability.id(): { "json": admitted.capability.normalized() },
+        }))
+    })
+}
+
+/// What the entry admission input fixture `entry` submits through its two
+/// slots, a file entry or a programmatic one, each with its selector
+/// (D15:3252): `f` takes it before the bytes it borrows are released.
+pub(crate) fn with_entry<T>(
+    entry: &Value,
+    bodies: &Bodies,
+    f: impl FnOnce(SubmittedEntry<'_>) -> T,
+) -> T {
+    use SafeOriginKind as Kind;
     let mark = |input: &Value| {
         input["nonSecret"]
             .as_bool()
             .expect("the Case Schema makes the mark a boolean")
     };
-    let locator_view = |admitted: Option<&Locator>| admitted.map_or(Value::Null, Locator::view);
     if let Some(file) = entry.get(Kind::ConfigurationFile.id()) {
         let selector = &entry[Kind::ProfileSelectorCli.id()];
         let input = &file["input"];
-        let submitted = SubmittedFileEntry {
+        return f(SubmittedEntry::File(SubmittedFileEntry {
             file: Component {
                 value: FileValue {
                     bytes: bytes(&input["bytes"], bodies).into(),
@@ -337,24 +353,13 @@ fn entry_step(
                 value: selector_report(&selector["input"]),
                 origin: candidate(selector),
             },
-        };
-        let admitted = entry::admit(submitted, capability.as_ref())?;
-        return Ok(json!({
-            Kind::ConfigurationFile.id(): {
-                "bytes": raw_view(&admitted.bytes),
-                "identity": admitted.source.identity().as_str(),
-                "nonSecret": admitted.marked,
-                "revision": admitted.source.revision(),
-                "locator": locator_view(admitted.locator.as_ref()),
-            },
-            Kind::ProfileSelectorCli.id(): { "selector": selector_view(&admitted.selector) },
         }));
     }
     let programmatic = &entry[Kind::ConfigurationProgrammatic.id()];
     let selector = &entry[Kind::ProfileSelectorProgrammatic.id()];
     let input = &programmatic["input"];
     let snapshot = input.get("snapshot").map(snapshot_report);
-    let submitted = SubmittedProgrammaticEntry {
+    f(SubmittedEntry::Programmatic(SubmittedProgrammaticEntry {
         programmatic: Component {
             value: ProgrammaticValue {
                 snapshot: snapshot.as_ref(),
@@ -372,24 +377,57 @@ fn entry_step(
             value: selector_report(&selector["input"]),
             origin: candidate(selector),
         },
-    };
-    let admitted = entry::admit_programmatic(submitted, capability.as_ref())?;
-    let call_site = admitted.call_site.as_ref().map_or(
-        Value::Null,
-        |sidecar| json!({ "json": call_site_view(sidecar) }),
-    );
-    Ok(json!({
-        Kind::ConfigurationProgrammatic.id(): {
-            "snapshot": node_view(admitted.snapshot.root()),
-            "digest": admitted.snapshot.digest(),
-            "identity": admitted.source.identity().as_str(),
-            "nonSecret": admitted.marked,
-            "revision": admitted.source.revision(),
-            "locator": locator_view(admitted.locator.as_ref()),
-            "callSite": call_site,
-        },
-        Kind::ProfileSelectorProgrammatic.id(): { "selector": selector_view(&admitted.selector) },
     }))
+}
+
+/// A file or programmatic entry's step under the capability the harness
+/// admits first, `None` when it is refused, which leaves only the entry's
+/// origins evaluated (D15:3164, 3168): each slot's admitted value, or every
+/// failure.
+fn entry_step(
+    fixture: &Value,
+    bodies: &Bodies,
+    constructed: &Constructed,
+) -> Result<Value, Vec<InputFailure>> {
+    use SafeOriginKind as Kind;
+    let capability = admitted_capability(fixture, constructed);
+    let locator_view = |admitted: Option<&Locator>| admitted.map_or(Value::Null, Locator::view);
+    with_entry(&fixture["entry"], bodies, |submitted| match submitted {
+        SubmittedEntry::File(submitted) => {
+            let admitted = entry::admit(submitted, capability.as_ref())?;
+            Ok(json!({
+                Kind::ConfigurationFile.id(): {
+                    "bytes": raw_view(&admitted.bytes),
+                    "identity": admitted.source.identity().as_str(),
+                    "nonSecret": admitted.marked,
+                    "revision": admitted.source.revision(),
+                    "locator": locator_view(admitted.locator.as_ref()),
+                },
+                Kind::ProfileSelectorCli.id(): { "selector": selector_view(&admitted.selector) },
+            }))
+        }
+        SubmittedEntry::Programmatic(submitted) => {
+            let admitted = entry::admit_programmatic(submitted, capability.as_ref())?;
+            let call_site = admitted.call_site.as_ref().map_or(
+                Value::Null,
+                |sidecar| json!({ "json": call_site_view(sidecar) }),
+            );
+            Ok(json!({
+                Kind::ConfigurationProgrammatic.id(): {
+                    "snapshot": node_view(admitted.snapshot.root()),
+                    "digest": admitted.snapshot.digest(),
+                    "identity": admitted.source.identity().as_str(),
+                    "nonSecret": admitted.marked,
+                    "revision": admitted.source.revision(),
+                    "locator": locator_view(admitted.locator.as_ref()),
+                    "callSite": call_site,
+                },
+                Kind::ProfileSelectorProgrammatic.id(): {
+                    "selector": selector_view(&admitted.selector),
+                },
+            }))
+        }
+    })
 }
 
 /// Admitted raw bytes as hexadecimal, whichever form the fixture gave them.
@@ -398,7 +436,7 @@ fn raw_view(admitted: &[u8]) -> Value {
 }
 
 /// The trusted setup path's Verification Input assertion a fixture holds.
-fn verification_assertion(assertion: &Value) -> VerificationAssertion {
+pub(crate) fn verification_assertion(assertion: &Value) -> VerificationAssertion {
     let token = |name: &str| {
         Token::new(assertion[name].as_str().unwrap_or_default())
             .expect("the Case Schema makes it a token")
@@ -539,7 +577,7 @@ fn data(
 
 /// The locale canonicalization data a fixture supplies: the manifest's bytes,
 /// each payload's bytes by address, and each payload's reference.
-struct DataInput {
+pub(crate) struct DataInput {
     manifest: Option<Vec<u8>>,
     payloads: BTreeMap<String, Arc<[u8]>>,
     references: Map<String, Value>,
@@ -876,7 +914,7 @@ fn snapshot_view(snapshot: &AdmittedSnapshot) -> Value {
 /// A canonical node in the Snapshot form: keys in ascending byte order without
 /// repetition, which the tree keeps, and each number as the shortest decimal
 /// text that reads back as it.
-fn node_view(node: &Node) -> Value {
+pub(crate) fn node_view(node: &Node) -> Value {
     match node {
         Node::Null => json!({ "null": null }),
         Node::Boolean(value) => json!({ "boolean": value }),
@@ -1479,5 +1517,44 @@ mod tests {
             );
             assert_eq!(outcome["normalizedInput"], fixture["input"], "{outcome}");
         }
+    }
+
+    /// The common step reads the locale data under the capability's
+    /// manifest bound and its depth bound, each in its own place: a manifest
+    /// exactly at its bound is admitted under a depth bound far below it,
+    /// and a byte over it is not (D15:3164).
+    #[test]
+    fn the_locale_data_is_read_under_its_own_two_bounds() {
+        use crate::conformance::resolution::{admissible, Unrunnable};
+        use crate::conformance::resolver_cases::{data_files, Storefront};
+        use crate::construction::root::ConstructionRoot;
+        let constructed = crate::construction::resolver::committed();
+        let reference = constructed
+            .identity(ConstructionRoot::built_in().unwrap())
+            .text();
+        let storefront = Storefront::new();
+        let files = data_files();
+        let manifest = files[0].1.len();
+        let bodies: Bodies = files
+            .into_iter()
+            .map(|(path, bytes)| (path, bytes.to_vec()))
+            .collect();
+        let bounded = |bytes: usize| {
+            let mut common = storefront.common(constructed);
+            let bounds = &mut common["implementation-capability"]["input"]["json"]["bootstrapOnly"]
+                ["inputBoundary"];
+            bounds["maxLocaleDataManifestBytes"] = json!(bytes.to_string());
+            bounds["maxDepth"] = json!("32");
+            admissible(
+                &common,
+                &storefront.file(),
+                &bodies,
+                constructed,
+                &reference,
+            )
+        };
+        assert!(manifest > 32);
+        assert_eq!(bounded(manifest), Ok(()));
+        assert_eq!(bounded(manifest - 1), Err(Unrunnable::NotAdmitted));
     }
 }

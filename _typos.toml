@@ -20,6 +20,9 @@ extend-exclude = [
   "crates/intlify_locale_icu4x/cldr/**",
   "crates/intlify_locale_icu4x/data/**",
   "crates/intlify_locale_icu4x/evidence/**",
+  # The conformance suite's copy of that data, which its Resolver Cases
+  # submit from below the suite root.
+  "crates/intlify_config/conformance/fixtures/resolver/locale-data/**",
   # The JSON Schema Test Suite's vendored tests, which spell test data such
   # as `fo` and `IDed` on purpose.
   "crates/intlify_config/fixtures/json-schema-test-suite/tests/**"

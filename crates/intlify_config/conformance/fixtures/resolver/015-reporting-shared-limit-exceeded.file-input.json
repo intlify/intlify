@@ -1,0 +1,26 @@
+{
+  "configuration-file": {
+    "candidate": "configuration-file",
+    "input": {
+      "bytes": {
+        "path": "fixtures/resolver/015-reporting-shared-limit-exceeded/configuration-file.input.bytes.json",
+        "digest": "sha256:cda2d8b329b5f5b4a6e2a7582e8f69b13803b234eaa56fc231777f38262739f6"
+      },
+      "identity": "intlify-file-source.v0:storefront/intlify.config.json",
+      "nonSecret": true,
+      "revision": "sha256:1644f6c67ea47eaac66114fd1a2733577a259deb7c07609e78560608f6d00e40",
+      "locator": {
+        "variant": "relative-path",
+        "payload": "intlify.config.json",
+        "nonSecret": true
+      }
+    }
+  },
+  "profile-selector-cli": {
+    "candidate": "profile-selector-cli",
+    "input": {
+      "report": "string",
+      "value": "app"
+    }
+  }
+}

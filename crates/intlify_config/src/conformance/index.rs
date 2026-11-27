@@ -42,7 +42,7 @@ use crate::construction::root::{self, RootRole};
 use crate::model::CONFIGURATION_SCHEMA_VERSION;
 
 use super::case::{self, ManifestKind, CASE_ID_PATTERN, OBLIGATION_ID_PATTERN};
-use super::{admission_cases, construction_cases};
+use super::{admission_cases, construction_cases, resolver_cases};
 
 /// The Suite Index Schema's identity.
 pub(crate) const SCHEMA_IDENTITY: &str = "intlify-project-profile-conformance-suite-index";
@@ -276,11 +276,13 @@ pub fn artifacts() -> Result<Vec<SuiteFile>, serde_json::Error> {
     let case_schema = case::artifact()?;
     let construction = construction_cases::cases()?;
     let admission = admission_cases::cases()?;
+    let resolver = resolver_cases::cases()?;
     let index = generate::write(&index(
         &schema,
         &case_schema,
         &construction.listing,
         &admission.listing,
+        &resolver.listing,
     )?)?;
     let mut files = vec![
         SuiteFile {
@@ -295,6 +297,7 @@ pub fn artifacts() -> Result<Vec<SuiteFile>, serde_json::Error> {
     ];
     files.extend(construction.files);
     files.extend(admission.files);
+    files.extend(resolver.files);
     Ok(files)
 }
 
@@ -317,6 +320,7 @@ fn index(
     case_schema: &Artifact,
     construction: &[Value],
     input_admission: &[Value],
+    resolver: &[Value],
 ) -> Result<Value, serde_json::Error> {
     let admission = ConstructionAdmission::revision_zero();
     let components = &admission.components;
@@ -445,9 +449,8 @@ fn index(
             ),
             Member::ResolverConstructionCases => Value::Array(construction.to_vec()),
             Member::ResolverInputAdmissionCases => Value::Array(input_admission.to_vec()),
-            Member::ResolverCases | Member::HandoffVectors | Member::ConditionalObligations => {
-                json!([])
-            }
+            Member::ResolverCases => Value::Array(resolver.to_vec()),
+            Member::HandoffVectors | Member::ConditionalObligations => json!([]),
         };
         index.insert(member.name().to_owned(), value);
     }
@@ -498,6 +501,7 @@ mod tests {
         let artifacts = artifacts().unwrap();
         let mut cases = construction_cases::cases().unwrap().files;
         cases.extend(admission_cases::cases().unwrap().files);
+        cases.extend(resolver_cases::cases().unwrap().files);
         assert_eq!(artifacts.len(), COMMITTED.len() + cases.len());
         assert_eq!(artifacts[COMMITTED.len()..], cases);
         for (artifact, (path, bytes)) in artifacts.iter().zip(COMMITTED) {
@@ -576,7 +580,7 @@ mod tests {
             .chain(manifests)
             .map(|file| (file.path, file_digest(&file.bytes).as_str().to_owned()))
             .collect::<BTreeMap<_, _>>();
-        assert_eq!(named.len(), 20 + 44 + 118);
+        assert_eq!(named.len(), 20 + 44 + 118 + 5);
         assert_eq!(
             named,
             artifacts

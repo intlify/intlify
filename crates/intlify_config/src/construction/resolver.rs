@@ -23,7 +23,12 @@
 //! The implemented authority fixes the mapping to that one version and its
 //! schema to the one this crate generates from its model.
 
-#[cfg(any(test, feature = "benchmark", feature = "dev-example"))]
+#[cfg(any(
+    test,
+    feature = "benchmark",
+    feature = "conformance",
+    feature = "dev-example"
+))]
 use std::sync::OnceLock;
 
 use intlify_shared_json::decode;
@@ -197,7 +202,12 @@ impl ConstructedResolver {
 ///
 /// Panics when the committed input does not construct, which the tests rule
 /// out.
-#[cfg(any(test, feature = "benchmark", feature = "dev-example"))]
+#[cfg(any(
+    test,
+    feature = "benchmark",
+    feature = "conformance",
+    feature = "dev-example"
+))]
 pub(crate) fn committed() -> &'static ConstructedResolver {
     static COMMITTED: OnceLock<ConstructedResolver> = OnceLock::new();
     COMMITTED.get_or_init(|| {

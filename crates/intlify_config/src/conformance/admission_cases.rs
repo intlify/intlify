@@ -33,7 +33,7 @@ use serde_json::{json, Map, Value};
 use crate::base64url::CONSTRUCTION_IDENTITY_PREFIX;
 use crate::boundary::capability::ImplementationCapability;
 use crate::boundary::source::{call_site_source_revision, file_source_revision};
-use crate::construction::component::{file_digest, strict_json};
+use crate::construction::component::file_digest;
 use crate::construction::generate;
 use crate::resolver::evidence_source::hex;
 use crate::resolver::limits::fixture_limits;
@@ -43,7 +43,7 @@ use super::case::{
     ManifestKind, BOUNDARY_PRECEDENCE, COMMON_SET, COMMON_SLOTS, ENTRY_SET, REVISION,
 };
 use super::construction_cases::{self, Cases, CONSTRUCTED};
-use super::fixture::decode;
+use super::fixture::written;
 use super::index::SuiteFile;
 
 /// Where the manifests lie below the suite root.
@@ -1485,71 +1485,6 @@ fn steps(context: &Context, kinds: &BTreeMap<&str, Built>) -> Vec<Case> {
     cases
 }
 
-/// The fixture of case `id` as it is written: each raw input that is strict
-/// UTF-8 JSON a file named for where the fixture holds it, beside the
-/// fixture, unless an earlier case wrote the same bytes, whose file it
-/// references. The capability value and a decoded input hold no raw input.
-fn written(
-    id: &str,
-    fixture: &Value,
-    files: &mut Vec<SuiteFile>,
-    kept: &mut BTreeMap<Vec<u8>, String>,
-) -> Value {
-    fn walk(
-        value: &Value,
-        at: &str,
-        id: &str,
-        files: &mut Vec<SuiteFile>,
-        kept: &mut BTreeMap<Vec<u8>, String>,
-    ) -> Value {
-        match value {
-            Value::Object(members) if members.len() == 1 && members.contains_key("json") => {
-                value.clone()
-            }
-            Value::Object(members) if members.len() == 1 && members.contains_key("bytes") => {
-                let bytes = decode(members["bytes"].as_str().expect("raw bytes are hex"));
-                if strict_json(&bytes).is_none() {
-                    return value.clone();
-                }
-                let path = kept
-                    .entry(bytes.clone())
-                    .or_insert_with(|| {
-                        let path = format!("{FIXTURES}/{id}/{at}.json");
-                        files.push(SuiteFile {
-                            path: path.clone(),
-                            bytes: bytes.clone(),
-                        });
-                        path
-                    })
-                    .clone();
-                json!({ "path": path, "digest": file_digest(&bytes).as_str() })
-            }
-            Value::Object(members) => Value::Object(
-                members
-                    .iter()
-                    .map(|(name, member)| {
-                        let at = if at.is_empty() {
-                            name.clone()
-                        } else {
-                            format!("{at}.{name}")
-                        };
-                        (name.clone(), walk(member, &at, id, files, kept))
-                    })
-                    .collect::<Map<_, _>>(),
-            ),
-            Value::Array(items) => Value::Array(
-                items
-                    .iter()
-                    .enumerate()
-                    .map(|(index, item)| walk(item, &format!("{at}.{index}"), id, files, kept))
-                    .collect(),
-            ),
-            other => other.clone(),
-        }
-    }
-    walk(fixture, "", id, files, kept)
-}
-
 /// The suite's input admission cases of the boundary kinds, in ascending
 /// unsigned byte order of their IDs: each manifest, fixture, and raw input
 /// kept in a file, and the index entry of each manifest.
@@ -1564,7 +1499,7 @@ pub(crate) fn cases() -> Result<Cases, serde_json::Error> {
     let mut listing = Vec::new();
     let mut kept = BTreeMap::new();
     for case in all {
-        let fixture = written(&case.id, &case.fixture, &mut files, &mut kept);
+        let fixture = written(FIXTURES, &case.id, &case.fixture, &mut files, &mut kept);
         let fixture = generate::write(&fixture)?;
         let fixture_path = format!("{FIXTURES}/{}.json", case.id);
         let manifest = generate::write(&json!({
@@ -1957,41 +1892,6 @@ mod tests {
             ),
             "015-admission-verification-reserved-members-ambient-authority"
         );
-    }
-
-    /// A raw input that is strict UTF-8 JSON is a file named for where the
-    /// fixture holds it, written once for the same bytes; any other stays
-    /// hexadecimal, and a decoded value is kept as it is.
-    #[test]
-    fn a_raw_input_of_strict_json_is_a_file_of_its_own() {
-        let mut files = Vec::new();
-        let mut kept = BTreeMap::new();
-        let fixture = json!({
-            "capability": { "json": { "bytes": "7b7d" } },
-            "input": { "manifest": raw(b"{}"), "members": [raw(b"{"), raw(b"{}")] },
-        });
-        let first = written("015-a", &fixture, &mut files, &mut kept);
-        let reference = json!({
-            "path": "fixtures/admission/015-a/input.manifest.json",
-            "digest": file_digest(b"{}").as_str(),
-        });
-        assert_eq!(first["capability"], fixture["capability"]);
-        assert_eq!(first["input"]["manifest"], reference);
-        assert_eq!(first["input"]["members"], json!([raw(b"{"), reference]));
-        assert_eq!(files.len(), 1);
-        assert_eq!(
-            files[0].path,
-            "fixtures/admission/015-a/input.manifest.json"
-        );
-        assert_eq!(files[0].bytes, b"{}");
-        let again = written(
-            "015-b",
-            &json!({ "input": raw(b"{}") }),
-            &mut files,
-            &mut kept,
-        );
-        assert_eq!(again["input"], reference);
-        assert_eq!(files.len(), 1);
     }
 
     /// The capability value is one the constructed Capability Specification

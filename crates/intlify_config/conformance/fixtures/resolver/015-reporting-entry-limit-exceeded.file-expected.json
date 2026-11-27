@@ -1,0 +1,36 @@
+{
+  "outcome": "blocked",
+  "resolverConstructionIdentity": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids",
+  "profile": null,
+  "resolvedProfileArtifactBindings": null,
+  "resolutionEvidence": {
+    "complete": false,
+    "terminalStates": [
+      {"domain":"entry","nextUnitCursor":{"phase":"entry-admission","subjectKind":"complete-input","subject":{"token":"sha256:2fa5968abe214bed4654786e32f925d3c5afb38a71cae8ebd3252891ead003c5"},"check":"entry.input.within-file-bytes"},"cause":{"specification":{"identity":"intlify-project-profile","revision":"0"},"phase":"reporting-finalization","check":"reporting.diagnostic-domain.complete","code":"project-profile-reporting-limit-exceeded","subject":{"token":"sha256:50ffd91929761304896a5b919c04f0b4a1e268e0e891219325008ff9444b71f0"},"reason":"entry"}}
+    ],
+    "shared": null,
+    "sharedUnavailableCauseKeys": [
+      {"specification":{"identity":"intlify-project-profile","revision":"0"},"phase":"reporting-finalization","check":"reporting.diagnostic-domain.complete","code":"project-profile-reporting-limit-exceeded","subject":{"token":"sha256:50ffd91929761304896a5b919c04f0b4a1e268e0e891219325008ff9444b71f0"},"reason":"entry"}
+    ],
+    "entry": {
+      "findings": [
+        {"owner":null,"record":{"key":{"specification":{"identity":"intlify-project-profile","revision":"0"},"phase":"reporting-finalization","check":"reporting.diagnostic-domain.complete","code":"project-profile-reporting-limit-exceeded","subject":{"token":"sha256:50ffd91929761304896a5b919c04f0b4a1e268e0e891219325008ff9444b71f0"},"reason":"entry"},"severity":"error","blocking":true,"details":{"reason":"entry","bound":"maxRecords"}}}
+      ],
+      "evaluationStatus": [
+        {"owner":{"phase":"resolver-bootstrap-admission","subjectKind":"project-profile-slot","subject":{"token":"sha256:8c0ea4d383a10995a737ddef637770e406ee044455606ca00a2aaf99c9814c01"},"check":"specification.project-profile.supported"},"record":{"unit":{"phase":"resolver-bootstrap-admission","subjectKind":"project-profile-slot","subject":{"token":"sha256:8c0ea4d383a10995a737ddef637770e406ee044455606ca00a2aaf99c9814c01"},"check":"specification.project-profile.supported"},"state":"evaluated"}},
+        {"owner":{"phase":"entry-admission","subjectKind":"entry-dependencies","subject":{"token":"sha256:e6c13179bf4d7f0860b5ff4f0c7703c1c262d26d7d7972ddc66ff98582938a38"},"check":"dependency.entry.established-slots"},"record":{"unit":{"phase":"entry-admission","subjectKind":"entry-dependencies","subject":{"token":"sha256:e6c13179bf4d7f0860b5ff4f0c7703c1c262d26d7d7972ddc66ff98582938a38"},"check":"dependency.entry.established-slots"},"state":"evaluated"}}
+      ],
+      "occurrences": [],
+      "coverageDecisionEvidence": [],
+      "evidenceIndex": [],
+      "entryDependencies": [
+        {"owner":{"phase":"entry-admission","subjectKind":"entry-dependencies","subject":{"token":"sha256:e6c13179bf4d7f0860b5ff4f0c7703c1c262d26d7d7972ddc66ff98582938a38"},"check":"dependency.entry.established-slots"},"record":{"slot":"entry-source","source":{"safe-opaque":"696e746c6966792d66696c652d736f757263652e76303a73746f726566726f6e742f696e746c6966792e636f6e6669672e6a736f6e"},"revision":"sha256:3d255ff1ae1fce3fbe758ba031dd560ee7d1e84a6481f742c969af4e7ab6393d","locator":{"relative-path":"intlify.config.json"}}},
+        {"owner":{"phase":"entry-admission","subjectKind":"entry-dependencies","subject":{"token":"sha256:e6c13179bf4d7f0860b5ff4f0c7703c1c262d26d7d7972ddc66ff98582938a38"},"check":"dependency.entry.established-slots"},"record":{"slot":"profile-selector","selector":{"redacted-value":{"type":"string","length":{"exact":"3"},"token":{"token":"sha256:58890e54317c41d94c51c817eb7955d220b01829b8a5fe93dfa97149537d056b"}}}}},
+        {"owner":{"phase":"entry-admission","subjectKind":"entry-dependencies","subject":{"token":"sha256:e6c13179bf4d7f0860b5ff4f0c7703c1c262d26d7d7972ddc66ff98582938a38"},"check":"dependency.entry.established-slots"},"record":{"slot":"origins","origins":{"specification-input":"profile-resolution-specification-input","intent-surface-class-vocabulary":"intent-surface-class-vocabulary","locale-canonicalization-data":"locale-canonicalization-data","artifact-collection":"profile-resolution-artifact-collection","verification-input":"resource-limit-policy-verification","implementation-capability":"implementation-capability","entry-source":"configuration-file","profile-selector":"profile-selector-cli"}}}
+      ],
+      "sharedUnavailabilityCauses": [
+        {"owner":null,"record":{"cause":{"specification":{"identity":"intlify-project-profile","revision":"0"},"phase":"reporting-finalization","check":"reporting.diagnostic-domain.complete","code":"project-profile-reporting-limit-exceeded","subject":{"token":"sha256:50ffd91929761304896a5b919c04f0b4a1e268e0e891219325008ff9444b71f0"},"reason":"entry"}}}
+      ]
+    }
+  }
+}

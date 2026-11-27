@@ -17,14 +17,21 @@
  * and that the case expects what the row its rule ID names refuses with, or,
  * constructing, the committed construction vector's identity. For each input
  * admission case of a boundary kind it checks the same closure, that the
- * case names a listed construction case with that identity, that each kind
+ * case names a constructing case with that identity, that each kind
  * has its admitted case and one case for each row of its failure precedence
  * in the Case Schema, each expecting its row's reason under its pair's rule
  * ID, and that the admitted case expects the normalized input this script
  * derives from the fixture: a decoded input with its members in byte order,
  * a revision this script computes over the bytes, a Snapshot that is one of
  * the committed vectors with its digest, and a call-site sidecar with its
- * mappings in canonical order. It does not read the design document.
+ * mappings in canonical order. For each Resolver Case it checks the same
+ * closure for its common input, entry, and expected outcome fixtures, that
+ * the locale data it submits is the committed ICU4X artifact, that each
+ * expected outcome names the vector's identity and keeps 015's rules for an
+ * outcome, its Shared evidence and causes, its rows without an owner, and
+ * its bindings' order, that the case traces each check its expected outcomes
+ * report under the check's rule, and that its paired entries agree where 015
+ * makes them agree. It does not read the design document.
  */
 
 import { createHash } from 'node:crypto'
@@ -33,7 +40,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { isDeepStrictEqual } from 'node:util'
 
-import { digest as semanticDigest } from './framing.mjs'
+import { encode, digest as semanticDigest } from './framing.mjs'
 import { repeatsMember } from './strict-json.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -842,8 +849,12 @@ function contentRevision(domain, bytes) {
   return `sha256:${createHash('sha256').update(preimage).digest('hex')}`
 }
 const domains = named(index.value.profileSpecification)?.revisionDomains ?? {}
+// The construction cases that construct, which every input admission case
+// and Resolver Case must name (D15:3158, 3219).
 const constructionIds = new Set(
-  (index.value.resolverConstructionCases ?? []).map(entry => entry.id)
+  (index.value.resolverConstructionCases ?? [])
+    .filter(entry => named(entry)?.expected?.constructed === true)
+    .map(entry => entry.id)
 )
 const json = value => ({ json: sortedValue(value) })
 
@@ -1261,7 +1272,7 @@ for (const entry of index.value.resolverInputAdmissionCases ?? []) {
     !constructionIds.has(resolverConstruction?.caseId) ||
     resolverConstruction.identityReference !== vectorIdentity
   ) {
-    fail(`${entry.path}: does not name a listed construction case with the vector's identity`)
+    fail(`${entry.path}: does not name a constructing case with the vector's identity`)
   }
   if (STEPS.includes(kind)) {
     stepCases += 1
@@ -1359,6 +1370,296 @@ for (const form of Object.keys(STEP_FORMS)) {
   }
 }
 
+// Each Resolver Case names the constructing case with the committed vector's
+// identity, and its fixtures and every body they reference have their
+// digests (D15:3174-3216); the locale data its common input submits is the
+// committed ICU4X artifact. Each expected outcome names that identity; it is
+// checked only with a complete bundle, Shared evidence, and no blocking
+// Finding, and is otherwise blocked, without a profile or bindings
+// (D15:1153-1158, 1186); it lists one terminal state for each exhausted
+// domain, Entry first, exactly when its bundle is incomplete; its Shared
+// evidence is absent exactly when it has causes, which are its Entry cause
+// records in order; only an exhausted domain's terminal Finding and, when
+// Entry exhausts without Shared evidence, the reserve's cause have no owner,
+// each last in its array and naming the terminal state's cause
+// (D15:3271-3303); and its bindings are in ascending unsigned byte order of
+// their keys' framing. A case traces each check whose Finding its expected
+// outcomes report, in byte order, under that check's rule; a file-only case
+// expects no Shared evidence for its file entry (D15:3235); and paired
+// entries carry one identity and, when both carry Shared evidence, one
+// Shared projection and Shared terminal state, and when both bundles are
+// also complete, one outcome, profile, and bindings (D15:3233).
+const checkRegistry = named(registryMembers['check-registry'])
+const ruleOfCheck = new Map((checkRegistry?.rows ?? []).map(row => [row.checkId, row.ruleId]))
+const icu4xData = resolve(crate, '../intlify_locale_icu4x/data')
+const dataAddresses = (
+  readJson(resolve(icu4xData, 'manifest.json'), 'manifest.json').value?.payloads ?? []
+)
+  .map(payload => payload.address)
+  .toSorted(byBytes)
+// Each side's own adapter, by the slot its entry fixture submits through.
+const SOURCES = { file: 'configuration-file', programmatic: 'configuration-programmatic' }
+const SELECTORS = { file: 'profile-selector-cli', programmatic: 'profile-selector-programmatic' }
+
+/**
+ * The value a Snapshot node in the Case Schema's notation spells, or
+ * undefined for a refused node.
+ *
+ * @param node - The node.
+ * @returns The value.
+ */
+function snapshotValue(node) {
+  const [[kind, value]] = Object.entries(node ?? { refused: null })
+  switch (kind) {
+    case 'null':
+      return null
+    case 'boolean':
+    case 'string':
+      return value
+    case 'number':
+      return Number(value)
+    case 'array':
+      return value.map(snapshotValue)
+    case 'object':
+      return Object.fromEntries(value.map(([name, member]) => [name, snapshotValue(member)]))
+    default:
+      return undefined
+  }
+}
+
+/**
+ * The value an entry fixture submits, and its selector: the file's bytes read
+ * as JSON, or the programmatic entry's Snapshot.
+ *
+ * @param input - The entry fixture.
+ * @param side - Its side.
+ * @returns The value and the selector, the value undefined when the bytes
+ *   are no JSON.
+ */
+function submitted(input, side) {
+  const source = input?.[SOURCES[side]]?.input
+  let value
+  if (side === 'file') {
+    try {
+      value = JSON.parse(utf8(rawBytes(source?.bytes)) ?? '')
+    } catch {
+      value = undefined
+    }
+  } else {
+    value = snapshotValue(source?.snapshot?.snapshot)
+  }
+  return { value, selector: input?.[SELECTORS[side]]?.input }
+}
+const DOMAINS = ['entry', 'shared']
+const SIDES = ['file', 'programmatic']
+let resolverCases = 0
+let expectedOutcomes = 0
+
+/**
+ * The Finding rows of an expected outcome's projections.
+ *
+ * @param outcome - The expected outcome.
+ * @returns The rows, Entry's first.
+ */
+function findingRows(outcome) {
+  const evidence = outcome?.resolutionEvidence ?? {}
+  return DOMAINS.flatMap(domain => evidence[domain]?.findings ?? [])
+}
+
+/**
+ * What an expected outcome breaks of 015's rules for an outcome, its
+ * terminal states, causes, rows without an owner, and bindings.
+ *
+ * @param outcome - The expected outcome.
+ * @returns The first rule it breaks, or undefined.
+ */
+function outcomeWrong(outcome) {
+  const evidence = outcome?.resolutionEvidence
+  if (evidence === null || typeof evidence !== 'object' || Array.isArray(evidence)) {
+    return 'has no Resolution Evidence'
+  }
+  if (outcome.resolverConstructionIdentity !== vectorIdentity) {
+    return "does not name the construction vector's identity"
+  }
+  const states = Array.isArray(evidence.terminalStates) ? evidence.terminalStates : []
+  const exhausted = DOMAINS.filter(domain => states.some(state => state.domain === domain))
+  if (
+    !isDeepStrictEqual(
+      states.map(state => state.domain),
+      exhausted
+    )
+  ) {
+    return 'does not list one terminal state for each exhausted domain, Entry first'
+  }
+  if (evidence.complete !== (states.length === 0)) {
+    return 'is complete with a terminal state, or incomplete without one'
+  }
+  if (exhausted.some(domain => evidence[domain] === null || typeof evidence[domain] !== 'object')) {
+    return 'has a terminal state for a domain without its projection'
+  }
+  const blocking = findingRows(outcome).some(row => row.record?.blocking === true)
+  if (outcome.outcome === 'checked') {
+    if (evidence.complete !== true || evidence.shared === null || blocking) {
+      return 'is checked without a complete bundle, Shared evidence, and only non-blocking Findings'
+    }
+    if (outcome.profile === null || !Array.isArray(outcome.resolvedProfileArtifactBindings)) {
+      return 'is checked without its profile and bindings'
+    }
+  } else if (outcome.profile !== null || outcome.resolvedProfileArtifactBindings !== null) {
+    return 'is blocked with a profile or bindings'
+  }
+  const causes = (evidence.entry?.sharedUnavailabilityCauses ?? []).map(row => row.record?.cause)
+  if (!isDeepStrictEqual(evidence.sharedUnavailableCauseKeys, causes)) {
+    return 'lists cause keys other than its Entry cause records'
+  }
+  if ((evidence.shared === null) !== causes.length > 0) {
+    return 'has both Shared evidence and causes, or neither'
+  }
+  for (const domain of DOMAINS) {
+    const projection = evidence[domain]
+    if (projection === null || typeof projection !== 'object') {
+      continue
+    }
+    const cause = states.find(state => state.domain === domain)?.cause
+    const reserved = {
+      findings: cause,
+      sharedUnavailabilityCauses: domain === 'entry' && evidence.shared === null ? cause : undefined
+    }
+    for (const [name, rows] of Object.entries(projection)) {
+      const list = Array.isArray(rows) ? rows : []
+      const key = reserved[name]
+      const ownerless = list.flatMap((row, at) => (row?.owner === null ? [at] : []))
+      if (!isDeepStrictEqual(ownerless, key === undefined ? [] : [list.length - 1])) {
+        return `has a row without an owner in ${domain}.${name} other than its reserved last one`
+      }
+      const record = list.at(-1)?.record
+      if (key !== undefined && !isDeepStrictEqual(record?.key ?? record?.cause, key)) {
+        return `does not end ${domain}.${name} with the terminal state's cause`
+      }
+    }
+  }
+  const keys = (outcome.resolvedProfileArtifactBindings ?? []).map(row => encode(row.key))
+  if (keys.some((key, at) => at > 0 && Buffer.compare(keys[at - 1], key) >= 0)) {
+    return "does not list its bindings in ascending order of their keys' framing"
+  }
+  return undefined
+}
+
+for (const entry of index.value.resolverCases ?? []) {
+  const manifest = named(entry)
+  if (manifest === undefined) {
+    continue
+  }
+  resolverCases += 1
+  const { resolverConstruction, commonInvocationInputFixture: common, traceability } = manifest
+  if (
+    !constructionIds.has(resolverConstruction?.caseId) ||
+    resolverConstruction.identityReference !== vectorIdentity
+  ) {
+    fail(`${entry.path}: does not name a constructing case with the vector's identity`)
+  }
+  referenced(common, entry.path)
+  const commonFixture = named(common)
+  for (const body of references(commonFixture ?? {})) {
+    referenced(body, common.path)
+  }
+  // The manifest and a payload at each address the committed manifest
+  // names, each the committed artifact's bytes for that address.
+  const data = commonFixture?.['locale-canonicalization-data']?.input ?? {}
+  const supplied = data.payloads ?? {}
+  const sameBytes = (reference, name) => {
+    const copy = resolve(root, String(reference?.path))
+    return existsSync(copy) && readFileSync(resolve(icu4xData, name)).equals(readFileSync(copy))
+  }
+  if (
+    !isDeepStrictEqual(Object.keys(supplied).toSorted(byBytes), dataAddresses) ||
+    !sameBytes(data.manifest, 'manifest.json') ||
+    dataAddresses.some(address => !sameBytes(supplied[address], address))
+  ) {
+    fail(`${entry.path}: does not submit the committed locale data at each of its addresses`)
+  }
+  const outcomes = {}
+  const values = {}
+  for (const side of SIDES) {
+    const own = manifest.entries?.[side]
+    if (own?.unpaired !== undefined) {
+      continue
+    }
+    referenced(own?.entryAdmissionInputFixture, entry.path)
+    const input = named(own?.entryAdmissionInputFixture)
+    for (const body of references(input ?? {})) {
+      referenced(body, own.entryAdmissionInputFixture.path)
+    }
+    if (input?.[SOURCES[side]] === undefined) {
+      fail(`${entry.path}: its ${side} side does not submit through its own adapter`)
+    }
+    values[side] = submitted(input, side)
+    referenced(own?.expectedOutcomeFixture, entry.path)
+    const expected = named(own?.expectedOutcomeFixture)
+    if (expected === undefined) {
+      continue
+    }
+    expectedOutcomes += 1
+    const wrong = outcomeWrong(expected)
+    if (wrong !== undefined) {
+      fail(`${own.expectedOutcomeFixture.path}: ${wrong}`)
+    }
+    outcomes[side] = expected
+  }
+  const checks = [
+    ...new Set(
+      Object.values(outcomes).flatMap(outcome =>
+        findingRows(outcome).map(row => row.record?.key?.check)
+      )
+    )
+  ].sort(byBytes)
+  if (
+    !isDeepStrictEqual(traceability?.checkIds, checks) ||
+    !isDeepStrictEqual(
+      traceability?.ruleIds,
+      checks.map(check => ruleOfCheck.get(check))
+    )
+  ) {
+    fail(`${entry.path}: does not trace each check its expected outcomes report under its rule`)
+  }
+  const { file, programmatic } = outcomes
+  if (
+    manifest.entries?.programmatic?.unpaired !== undefined &&
+    file?.resolutionEvidence?.shared !== null
+  ) {
+    fail(`${entry.path}: a file-only case expects Shared evidence for its file entry`)
+  }
+  if (file === undefined || programmatic === undefined) {
+    continue
+  }
+  // Two entries that spell one value under one selector, beside the one
+  // common input, reach one Materialized Resolution Input Set.
+  const oneSet =
+    values.file?.value !== undefined &&
+    isDeepStrictEqual(values.file.value, values.programmatic?.value) &&
+    isDeepStrictEqual(values.file.selector, values.programmatic?.selector)
+  const sharedStates = outcome =>
+    (outcome.resolutionEvidence?.terminalStates ?? []).filter(state => state.domain === 'shared')
+  const bothComplete =
+    file.resolutionEvidence?.complete === true && programmatic.resolutionEvidence?.complete === true
+  if (
+    file.resolverConstructionIdentity !== programmatic.resolverConstructionIdentity ||
+    (oneSet &&
+      (!isDeepStrictEqual(
+        file.resolutionEvidence?.shared,
+        programmatic.resolutionEvidence?.shared
+      ) ||
+        !isDeepStrictEqual(sharedStates(file), sharedStates(programmatic)))) ||
+    (oneSet &&
+      bothComplete &&
+      ['outcome', 'profile', 'resolvedProfileArtifactBindings'].some(
+        member => !isDeepStrictEqual(file[member], programmatic[member])
+      ))
+  ) {
+    fail(`${entry.path}: its paired entries disagree where 015 makes them agree`)
+  }
+}
+
 // The containers list the digests the index declares for their members.
 const without = (entry, name) =>
   Object.fromEntries(Object.entries(entry ?? {}).filter(([key]) => key !== name))
@@ -1410,5 +1711,5 @@ for (const [module, name, pointer] of PINS) {
 finish()
 
 console.log(
-  `conformance suite index agrees: ${MEMBERS.length} members, ${bodies} bodies of which ${manifests} manifests, ${fixtures} construction fixtures, ${admissionFixtures} input admission fixtures (${stepCases} of the admission steps), ${objects} closed schema objects, ${PINS.length} pinned digests`
+  `conformance suite index agrees: ${MEMBERS.length} members, ${bodies} bodies of which ${manifests} manifests, ${fixtures} construction fixtures, ${admissionFixtures} input admission fixtures (${stepCases} of the admission steps), ${resolverCases} Resolver Cases with ${expectedOutcomes} expected outcomes, ${objects} closed schema objects, ${PINS.length} pinned digests`
 )

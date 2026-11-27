@@ -34,6 +34,8 @@ pub(crate) mod construction;
 pub(crate) mod construction_cases;
 pub(crate) mod fixture;
 pub(crate) mod index;
+pub(crate) mod resolution;
+pub(crate) mod resolver_cases;
 pub(crate) mod runner;
 
 /// The developer entry points: write the committed suite, and open a suite at

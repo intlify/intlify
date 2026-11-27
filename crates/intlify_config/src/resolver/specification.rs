@@ -146,8 +146,13 @@ impl<Id> SupportedSpecifications<Id> {
 }
 
 /// Each other slot's supported value, which the benchmark's input context
-/// binds beside the assertions.
-#[cfg(feature = "benchmark")]
+/// binds beside the assertions, and the conformance suite's Resolver Cases
+/// assert, under the gate of the conformance module.
+#[cfg(any(
+    feature = "benchmark",
+    feature = "conformance",
+    all(test, feature = "icu4x")
+))]
 impl<Id> SupportedSpecifications<Id> {
     pub(crate) const fn locale_canonicalization(&self) -> &Supported<Id> {
         &self.locale_canonicalization
@@ -267,7 +272,7 @@ impl From<ComponentInvariant> for SpecificationInvariant {
 
 /// What a slot's check observes: the slot's Specification Input component,
 /// whether its assertion is absent or names another specification (D15:719,
-/// 831).
+/// 832).
 fn at_slot(slot: Slot) -> Observation {
     Observation {
         primary: EvidenceProjection::resolver_input(ComponentPath::specification(slot)),
