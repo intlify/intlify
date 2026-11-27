@@ -5,7 +5,7 @@
 //! Source Evidence before a complete value exists, and the Portable Value
 //! Locator that locates Materialized Value Evidence inside the materialized
 //! value, with the order and view of each (D15:756-759, 771-777, 843,
-//! 2497-2499).
+//! 2498-2500).
 //!
 //! The resolver walks an internal path, the exact member names and array
 //! indices from the root, which never leaves it. Classification decides each
@@ -703,7 +703,7 @@ mod tests {
     /// Redacted members compare by every digest byte and then by the ordinal,
     /// whichever path holds them: the digests differ only in their last byte,
     /// and the second ordinal of the lower digest precedes the first of the
-    /// higher (D15:773, 775, 3504, 3507).
+    /// higher (D15:773, 775, 3515, 3518).
     #[test]
     fn redacted_members_order_by_every_digest_byte_then_the_ordinal() {
         let digest = LastByte(&[("configuration-file", 1), ("configuration-programmatic", 2)]);
@@ -748,7 +748,7 @@ mod tests {
     /// A name that classification finds unsafe reaches a token only as the
     /// `logical-input-path-member` projection: unequal names are one segment,
     /// and neither a name nor its direct digest is in the record or the view
-    /// (D15:773, 775, 3507).
+    /// (D15:773, 775, 3518).
     #[test]
     fn an_unsafe_name_and_its_digest_stay_out_of_its_token() {
         let comparable = comparable();
@@ -900,7 +900,7 @@ mod tests {
     /// Each ID key is kept when it matches the identifier syntax and is within
     /// the capability's bound for its own identifier; the schema goes on below
     /// a key over the bound, and below one outside the syntax, whose entry
-    /// structural admission evaluates (D15:2185, 3505).
+    /// structural admission evaluates (D15:2185, 3516).
     #[test]
     fn an_id_key_is_kept_within_its_identifiers_bound() {
         let comparable = comparable();
@@ -1009,7 +1009,7 @@ mod tests {
     /// Safe members order by their exact UTF-8 bytes in either path kind: a
     /// decomposed spelling before its composed one, and a supplementary
     /// character after U+FF5E, which UTF-16 code units would put first
-    /// (D15:771, 3506).
+    /// (D15:771, 3517).
     #[test]
     fn safe_members_compare_by_their_exact_utf8_bytes() {
         let names = ["Z", "a", "e\u{301}", "\u{e9}", "\u{ff5e}", "\u{1f600}"];
@@ -1033,7 +1033,7 @@ mod tests {
     /// The empty name and canonically equivalent spellings are never
     /// classified non-secret, at any place that holds dynamic keys, before
     /// or after the data is admitted. No name reaches the segment, so such
-    /// spellings of one name project alike (D15:771, 775, 3506).
+    /// spellings of one name project alike (D15:771, 775, 3517).
     #[test]
     fn an_empty_name_and_equivalent_spellings_are_never_non_secret() {
         let comparable = comparable();
@@ -1080,7 +1080,7 @@ mod tests {
 
     /// Indices ascend numerically over the whole unsigned 64-bit range in
     /// either path kind, where their decimal text would not, and each keeps
-    /// only its decimal digits (D15:772, 3506).
+    /// only its decimal digits (D15:772, 3517).
     #[test]
     fn array_indices_ascend_over_the_unsigned_64_bit_range() {
         let indices = [0, 1, 9, 10, u64::from(u32::MAX) + 1, u64::MAX - 1, u64::MAX];

@@ -159,7 +159,7 @@ mod tests {
     }
 
     /// A record several units refer to is owned by the earliest of them,
-    /// whatever order their references arrive in (D15:1973, 3393).
+    /// whatever order their references arrive in (D15:1973, 3404).
     #[test]
     fn the_earliest_unit_that_refers_to_a_record_owns_it_whatever_the_order() {
         let intact = vocabulary(Check::IntactArtifact);

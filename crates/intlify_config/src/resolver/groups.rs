@@ -32,12 +32,12 @@
 //! group/member evidence (D15:2439).
 //!
 //! Each group and each member occurrence is read on its own (D15:2150, 2368,
-//! 3445). The counts take what was submitted, an entry whose key failed and a
+//! 3581). The counts take what was submitted, an entry whose key failed and a
 //! member that failed included. A value that failed has no subject here, and
 //! holds back only what needs it: a group's members and the partition wait on
 //! every occurrence, while a target's place is found from the groups that can
 //! be read and waits on the others only when none of those names it
-//! (D15:2185, 2366, 3479).
+//! (D15:2185, 2366, 3490).
 
 use std::collections::{BTreeMap, BTreeSet};
 

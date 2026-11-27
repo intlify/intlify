@@ -8,7 +8,7 @@
 //! Profiles and the Resource Limit Policy. Neither selects a group. 020 admits
 //! the selector, permitting omission only when the profile has one group, and
 //! the selector and the group it selects never enter the profile's state
-//! (D15:3536). The Handoff Vectors in `fixtures/handoff/` fix both projections
+//! (D15:3547). The Handoff Vectors in `fixtures/handoff/` fix both projections
 //! against the resolver; 020 verifies what each selector selects.
 //!
 //! A profile whose targets did not all resolve, or whose groups do not

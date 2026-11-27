@@ -3,7 +3,7 @@
 
 //! The selected declaration as the semantic phases read it: each member's
 //! value once every candidate at and below it passed, or the causes of those
-//! that did not, as [`ValueAdmissions`] kept them (D15:394, 2368, 3465). The
+//! that did not, as [`ValueAdmissions`] kept them (D15:394, 2368, 3476). The
 //! checks decide: a member they admitted and the analysis did not, or a
 //! required one they admitted though it is absent, is a resolver bug.
 
@@ -37,7 +37,7 @@ type Members = BTreeMap<String, ObjectMember>;
 /// whether the object itself passed apart from its slots. An undeclared
 /// member is a failure of the object and in no slot, so it stops no
 /// reference, while both semantic groups of the object wait on it (D15:2185,
-/// 2367; plan 025 interpretation #346).
+/// 2368; plan 025 interpretation #346).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct PolicySlots<Policy> {
     pub(crate) slots: Vec<(PolicySlot, Admitted<Policy>)>,
@@ -48,7 +48,7 @@ pub(crate) struct PolicySlots<Policy> {
 /// its reference, and each locale-bearing field's value, element by element,
 /// or why it has none. Its key names the subjects of its fields, so one field
 /// that failed holds back neither the other nor another entry (D15:2185,
-/// 2367).
+/// 2368).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TargetEntry<Target> {
     pub(crate) id: TargetId,
@@ -62,7 +62,7 @@ pub(crate) struct TargetEntry<Target> {
 /// the map's order, whether every key was admitted, which decides that a value
 /// naming none of them names no declared Target ID, and whether everything at
 /// and below the map passed, which what needs every target waits on. An entry
-/// whose key failed has no later subject (D15:2185, 3479).
+/// whose key failed has no later subject (D15:2185, 3490).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TargetEntries<Target> {
     pub(crate) submitted: usize,
@@ -97,7 +97,7 @@ pub(crate) struct GroupEntry {
 /// its key or its value (D15:1933, 1936, 1937), whether every key was admitted,
 /// each entry with an admitted key, in the map's order, and whether everything
 /// at and below the map passed, which what needs every relation waits on. An
-/// entry whose key failed has no later subject (D15:2185, 3479).
+/// entry whose key failed has no later subject (D15:2185, 3490).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct GroupEntries {
     pub(crate) submitted: usize,
@@ -128,7 +128,7 @@ pub(crate) struct AliasEntries {
 
 /// One entry of `messageFallback`: its key, a spelling whatever its sequence
 /// is, and its sequence candidate by candidate, or why it has none (D15:1520,
-/// 2367).
+/// 2368).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FallbackEntry {
     pub(crate) key: String,
@@ -365,7 +365,7 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
     /// total counts the elements of every array of its member, of an entry
     /// whose key failed too, since a value that is none holds no occurrence;
     /// it waits on why only when no entry holds one (D15:1936, 1937, 2185,
-    /// 3354). An omitted `hydrationRelations` is no value, while an empty one
+    /// 3490). An omitted `hydrationRelations` is no value, while an empty one
     /// is a value that holds no occurrence.
     ///
     /// # Errors
@@ -595,9 +595,9 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
 
     /// How many raw items the selectors `name` of `rules` hold: every element
     /// of a selector that is an array, whatever the element is (D15:1903,
-    /// 1903). A rule that is no object, or a selector that failed, has no item
+    /// 1904). A rule that is no object, or a selector that failed, has no item
     /// to count, so the count waits on why only when no selector holds one
-    /// (D15:2185, 3479).
+    /// (D15:2185, 3490).
     fn selector_items(
         &self,
         rules: &[NodeId],
@@ -811,7 +811,7 @@ impl<'r, Policy, Target> DeclarationFragments<'r, Policy, Target> {
     /// counts them, whatever structural admission made of the fields that hold
     /// them: each string at a locale role and each key of a map keyed by
     /// locale. A value that is no string is no spelling, and an invalid string
-    /// is one (D15:1897, 1908, 2185, 3473).
+    /// is one (D15:1897, 1908, 2185, 3484).
     pub(crate) fn locale_spellings(&self) -> Tally {
         let declaration = self.declaration;
         let member = |object, name| self.member_value(object, name);
@@ -1270,7 +1270,7 @@ mod tests {
     /// Each entry is read on its own: a field that failed holds back neither
     /// its sibling field nor another entry, an entry that is no object keeps
     /// its key's subject, and one whose key failed counts without one
-    /// (D15:1931, 2185, 2368, 3479).
+    /// (D15:1931, 2185, 2368, 3490).
     #[test]
     fn the_target_map_is_read_entry_by_entry() {
         let whole = entries(None, |_| {}).unwrap().unwrap();
@@ -1393,7 +1393,7 @@ mod tests {
     /// Each entry is read on its own, and each element of its `members`: the
     /// counts take what was submitted, an entry whose key failed has no
     /// subject, and the total waits only when no entry holds an admitted
-    /// array (D15:1933, 1936, 2185, 2368, 3479).
+    /// array (D15:1933, 1936, 2185, 2368, 3490).
     #[test]
     fn the_group_map_is_read_entry_by_entry() {
         let whole = groups(None, |_| {}).unwrap().unwrap();
@@ -1490,7 +1490,7 @@ mod tests {
 
     /// The total waits only when no array can be read: an omitted array is
     /// no value, an empty one holds no occurrence, and a group that is no
-    /// object has none to read (D15:570, 1937, 2185, 3479).
+    /// object has none to read (D15:570, 1937, 2185, 3490).
     #[test]
     fn the_relation_total_waits_only_when_no_array_can_be_read() {
         let total = |edit| groups(None, edit).unwrap().unwrap().relations;
@@ -1580,7 +1580,7 @@ mod tests {
 
     /// Each entry is read on its own: a destination that failed holds back
     /// no other, and an undeclared member beside the map holds back no entry
-    /// while the whole waits on it (D15:1478, 2368, 3479).
+    /// while the whole waits on it (D15:1478, 2368, 3490).
     #[test]
     fn the_alias_map_is_read_entry_by_entry() {
         let whole = aliases(None, |_| {}).unwrap().unwrap();
@@ -1802,7 +1802,7 @@ mod tests {
     }
 
     /// A selector count takes every element of a selector that is an array,
-    /// and waits only when no selector holds one (D15:1903, 1904, 2185, 3479).
+    /// and waits only when no selector holds one (D15:1903, 1904, 2185, 3490).
     #[test]
     fn a_selector_count_takes_every_item_of_what_is_an_array() {
         let read = rules(&json!([

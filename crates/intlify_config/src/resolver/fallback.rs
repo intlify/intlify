@@ -243,7 +243,7 @@ fn entries<'a>(
 
 /// How many of a sequence's candidates its bound counts: those of an admitted
 /// kind, so that only a sequence with none waits on why (D15:1901, 2185,
-/// 3354).
+/// 3490).
 fn counted(sequence: &Admitted<Vec<Admitted<&FallbackCandidate>>>) -> Admitted<usize> {
     let candidates = sequence.as_ref().map_err(Causes::clone)?;
     let mut held = 0;
@@ -339,7 +339,7 @@ fn source(
 /// holds alone: it then has one sequence, the one the bound measures, which
 /// past the bound is observed beside the confirmed policy that supplies the
 /// bound (D15:2250). It counts the candidates of an admitted kind, the others
-/// being excluded (D15:1901, 3479). The key can stand for several sources, so
+/// being excluded (D15:1901, 3490). The key can stand for several sources, so
 /// past the bound the sequence reports only the first-over witness (Decision
 /// 015-157).
 fn bounded_sequence(
@@ -1058,7 +1058,7 @@ mod tests {
     /// Reciprocal mappings are finite independent sequences rather than graph
     /// cycles: two sources naming each other, or three naming one another in
     /// a ring, are admitted, and each keeps exactly the candidates it declares
-    /// (D15:1518, 3716).
+    /// (D15:1518, 3727).
     #[test]
     fn reciprocal_sequences_are_admitted_and_stay_independent() {
         for (requested, fallback, expected) in [
@@ -1774,7 +1774,7 @@ mod tests {
 
     /// The sequence's bound counts the candidates of an admitted kind: one
     /// that failed neither counts nor names a unit, and the policy, which
-    /// needs every candidate, waits on it (D15:1901, 2185, 2368, 3479).
+    /// needs every candidate, waits on it (D15:1901, 2185, 2368, 3490).
     #[test]
     fn the_candidate_bound_counts_the_candidates_of_an_admitted_kind() {
         let declaration = declared(&["ja"], json!({"ja": ["en", "de", "fr"]}));
@@ -1841,7 +1841,7 @@ mod tests {
     }
 
     /// A sequence with no candidate admitted waits on why each failed, while
-    /// its key's own checks are evaluated (D15:2185, 3479).
+    /// its key's own checks are evaluated (D15:2185, 3490).
     #[test]
     fn a_sequence_without_an_admitted_candidate_waits_on_every_cause() {
         let declaration = declared(&["ja"], json!({"ja": ["en", "de"]}));

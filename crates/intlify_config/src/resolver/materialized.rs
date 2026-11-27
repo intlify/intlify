@@ -9,7 +9,7 @@
 //! reference the invocation was admitted under, the value as the canonical
 //! tree of a marker-free Snapshot of it, whichever entry materialized it, the
 //! normalized External Profile Selector Input, and the six values of the
-//! Common Invocation Input Set (D15:206, 3561). It holds no entry source,
+//! Common Invocation Input Set (D15:206, 3572). It holds no entry source,
 //! locator, Snapshot digest, or call-site sidecar, which only Entry
 //! reproduction needs (D15:2660), and no Derived Admission State:
 //! Configuration Schema Selection, the confirmed selector, the admitted
@@ -212,7 +212,7 @@ mod tests {
         assert!(other != set);
     }
 
-    /// D15:206, 3561: by type, a set holds exactly the replay inventory, the
+    /// D15:206, 3572: by type, a set holds exactly the replay inventory, the
     /// reference, the value, the selector, and the six common values, and so
     /// no Derived Admission State. Each pattern names every field, so a field
     /// added to either type fails to compile here.

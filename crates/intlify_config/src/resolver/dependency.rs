@@ -2,7 +2,7 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! The owners of design 015's semantic dependency records (D15:2517,
-//! 015-161). Each semantic group of the profile view has one singleton unit in
+//! 015-162). Each semantic group of the profile view has one singleton unit in
 //! the phase of the last check that establishes the group. The unit ranks
 //! after that check's kind and waits on the group's checks, so it is evaluated
 //! exactly when the group is established. `profileSpecification`, which
@@ -1064,7 +1064,7 @@ mod tests {
     /// The owner's mark classifies a source identity and nothing else: with
     /// or without it, a declared selector stays `safe-profile-id` and any
     /// other stays what it was, so no caller overrides the selector's
-    /// classification (D15:808, 3488).
+    /// classification (D15:808, 3499).
     #[test]
     fn a_callers_mark_leaves_the_selector_evidence_unchanged() {
         let fixture = FileFixture::new(&fixture_limits(100));

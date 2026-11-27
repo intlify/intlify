@@ -858,7 +858,7 @@ mod tests {
 
     /// Under each bound at its largest value, `limit + 1` is `u64::MAX`: the
     /// marker's witness is representable, framed as its `U64`, and admitted,
-    /// and the value below it is not the witness (D15:870, 890, 3448).
+    /// and the value below it is not the witness (D15:870, 890, 3459).
     #[test]
     fn the_largest_bound_admits_the_witness_u64_max() {
         for bound in SnapshotBound::ALL {

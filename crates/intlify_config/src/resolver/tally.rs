@@ -124,7 +124,7 @@ mod tests {
     }
 
     /// At the largest bound the first-over witness is `u64::MAX`, which is
-    /// representable, and a count there or past `u64` reports it (D15:3448).
+    /// representable, and a count there or past `u64` reports it (D15:3459).
     #[test]
     fn the_largest_bound_has_a_representable_first_over_witness() {
         let largest = bound(u64::MAX - 1);

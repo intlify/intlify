@@ -194,7 +194,7 @@ mod tests {
     /// Locator admission only reads the candidate's text: neither it, its URI
     /// reader, nor a resolver module dereferences a URI, looks a name up,
     /// converts a host, reaches the network, or touches the filesystem
-    /// (D15:765, 767, 3502).
+    /// (D15:765, 767, 3513).
     #[test]
     fn locator_admission_performs_no_uri_dns_idna_network_or_file_operation() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
@@ -257,7 +257,7 @@ mod tests {
     /// resolver, no module it calls reads a file, reaches the network, the
     /// environment, or another process, or looks a name up, so equivalent
     /// declarations resolve through the collection their caller already
-    /// acquired (D15:3760). Construction embeds the one built-in package its
+    /// acquired (D15:3771). Construction embeds the one built-in package its
     /// implementation fixes (D15:913) and acquires nothing when it runs. The
     /// benchmark harness, the conformance runner, test modules, fixtures, and
     /// vectors are no part of a resolution.

@@ -129,7 +129,7 @@ pub(super) fn occurrences(
 /// The requested-set bound's unit: the canonical size of what the set holds,
 /// which a repeated locale does not grow and an element without an identity
 /// has none to add to, within `maxRequestedLocales`, observed past it at the
-/// project's `requestedLocales` (D15:1898, 2185, 3479).
+/// project's `requestedLocales` (D15:1898, 2185, 3490).
 pub(super) fn requested(
     evaluation: &mut Evaluation,
     policy: Result<&ConfirmedPolicy, &Causes>,
@@ -399,7 +399,7 @@ mod tests {
 
     /// Past the bound, the declaration is observed, which holds every field
     /// the bound counts, beside the policy, which supplies it (D15:1908,
-    /// 2249).
+    /// 2250).
     #[test]
     fn the_occurrence_bound_holds_at_its_limit_and_reports_the_first_over() {
         let config = complete_config();
@@ -449,7 +449,7 @@ mod tests {
 
     /// A field that failed holds the count back no more: the count is of the
     /// spellings, which is what it is whatever a field's failure (D15:1897,
-    /// 1907). What it reads is the declaration's own, here beside a field
+    /// 1908). What it reads is the declaration's own, here beside a field
     /// the caller marked unavailable.
     #[test]
     fn a_field_that_failed_leaves_the_bound_measured() {
@@ -573,7 +573,7 @@ mod tests {
 
     /// An element without an identity has none to add: the bound holds over
     /// the others, exactly, and is found past them, observed at the field
-    /// that still holds them (D15:1898, 2185, 3479).
+    /// that still holds them (D15:1898, 2185, 3490).
     #[test]
     fn the_requested_set_is_bounded_by_what_it_holds_beside_a_failed_element() {
         let requested_unit = unit(LocaleSubject::RequestedLocales, Check::WithinBound);

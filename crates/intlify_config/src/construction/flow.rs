@@ -666,7 +666,7 @@ mod tests {
 
     /// One failure is reported of several, the first in the precedence's
     /// order, whatever order their tuples', bodies', and mappings' members
-    /// come in and whichever worker finishes first (D15:3105, 3442).
+    /// come in and whichever worker finishes first (D15:3105, 3453).
     #[test]
     fn several_invalid_authorities_select_one_reason_in_any_order() {
         // The order alone refuses nothing: the committed authorities, every
@@ -724,7 +724,7 @@ mod tests {
     /// equal the Active Profile Specification's: they pass the rule together,
     /// and fail only at the implemented authority, which maps one. No mapped
     /// schema can name a Profile Specification of its own, in its record or
-    /// in its bytes (D15:1018-1021, 3078, 3445).
+    /// in its bytes (D15:1018-1021, 3078, 3456).
     #[test]
     fn several_mapped_schemas_target_the_one_association() {
         let second = compact(&value(CONFIGURATION_SCHEMA));

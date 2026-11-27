@@ -240,7 +240,7 @@ mod tests {
 
     /// The example's file with its default locale twice: a duplicate member,
     /// so no value, and the duplicate's Logical input path the only path
-    /// Evidence carries (D15:781, 3565).
+    /// Evidence carries (D15:781, 3576).
     fn duplicate(metadata: EvidenceMetadataLimits) -> Resolved {
         let member = br#""defaultRequestedLocale":"en""#;
         let mut prepared = prepared(R::Storefront);

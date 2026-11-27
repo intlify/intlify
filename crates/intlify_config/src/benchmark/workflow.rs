@@ -22,7 +22,7 @@
 //! start mark from the input its preparation constructed from, the one its
 //! preparation constructed and every interval reuses, or that one right after
 //! it resolved the Blocked recipe's same entry before each start mark, which
-//! shows the invocation reset (D15:2752, 3814). Its identity is derived
+//! shows the invocation reset (D15:2752, 3825). Its identity is derived
 //! before the start mark. The submission, the slot for the admitted set, and
 //! the storage the outcome borrows are made before it; the outcome and the
 //! Materialized Resolution Input Set beside it are copied out after the end
@@ -1136,7 +1136,7 @@ pub(in crate::benchmark) mod tests {
         }
     }
 
-    /// D15:2792, 2829, 3814: before every start mark, and before an untimed
+    /// D15:2792, 2829, 3825: before every start mark, and before an untimed
     /// run too, a fresh case constructs a resolver of its own and never
     /// invokes the prepared one, a reused case invokes the prepared one, and
     /// a case reused after a blocked outcome invokes it once it resolved the
@@ -1183,7 +1183,7 @@ pub(in crate::benchmark) mod tests {
         assert_eq!(counts(&prepared), [0, 4, 0]);
     }
 
-    /// D15:2752, 2792, 3814; D26:1739, 1815: the expectations pin each
+    /// D15:2752, 2792, 3825; D26:1739, 1815: the expectations pin each
     /// recipe's three cases to one result and one logical work, so a fresh
     /// resolver and one reused right after a blocked outcome resolve it as
     /// the reused one does, while each case's input context, which binds

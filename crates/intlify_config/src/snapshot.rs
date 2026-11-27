@@ -761,7 +761,7 @@ mod tests {
     /// Canonical equality is that of the complete typed tree, which is that
     /// of `S(root)`: each variant only ever equals itself, an array compares
     /// in order and a string by its scalars, and a marker through its reason,
-    /// its bound, and its witness (D15:872, 890, 3462).
+    /// its bound, and its witness (D15:872, 890, 3473).
     #[test]
     fn canonical_equality_is_the_complete_typed_tree() {
         let overrun =
@@ -806,7 +806,7 @@ mod tests {
     /// A shared acyclic value is written out where it occurs, so it compares
     /// and counts as the independent copies it expands to, and an ancestor
     /// cycle compares as its canonical marker at its position (D15:860, 868,
-    /// 871, 3337).
+    /// 872, 3473).
     #[test]
     fn a_shared_value_compares_expanded_and_a_cycle_as_its_marker() {
         let shared = from_json(&json!({ "k": [1, "x"] }));

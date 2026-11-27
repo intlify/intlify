@@ -15,7 +15,7 @@
 //! the call-site source bytes, byte coordinates that need not fall on a
 //! character boundary (D15:746). Any other candidate, and a path or role the
 //! sidecar does not map, is absence, and no other role is consulted (D15:748,
-//! 749, 751).
+//! 750, 752).
 //!
 //! A span selects the call-site source's identity and locator together;
 //! without one, Evidence names the Programmatic Entry's, so neither locator is
@@ -481,7 +481,7 @@ mod tests {
         assert_eq!(at(&[], Located::Key), None);
     }
 
-    /// D15:772, 3506: an array edge is a checked integer that keeps no
+    /// D15:772, 3517: an array edge is a checked integer that keeps no
     /// spelling: a number read from `1.0` or `1e0` is the index 1, and a key
     /// spelled like an index names no element of an array.
     #[test]

@@ -150,7 +150,7 @@ impl<'a> DeclarationObserver<'a> {
     /// The key of the member `name` of the object at the member path `path`
     /// under the declaration, at the key's token, which is classified by facts
     /// fixed when the record is constructed, never by a later check (D15:777,
-    /// 790).
+    /// 791).
     ///
     /// # Errors
     ///
@@ -640,7 +640,7 @@ mod tests {
     /// A key of `localeNegotiation.aliases` or `messageFallback`, at its rank
     /// among the map's keys, is non-secret in a record constructed once
     /// `specification-admission` bound a canonicalizer that returns a canonical
-    /// identifier for it, and redacted otherwise, and before (D15:777, 3505).
+    /// identifier for it, and redacted otherwise, and before (D15:777, 3516).
     #[test]
     fn a_locale_key_is_classified_by_the_bound_canonicalizer() {
         let mut config = complete_config();

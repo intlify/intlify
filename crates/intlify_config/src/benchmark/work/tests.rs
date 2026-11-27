@@ -1189,7 +1189,7 @@ fn recounted(output: &Output) -> Vec<(WorkKind, Option<u64>)> {
 /// commits no Finding Occurrence, the dense recipe one with a related
 /// Evidence for each of its Shared Findings, and the file without a value
 /// its Entry Finding and the causes it is of, with no path (D15:1852,
-/// 1946-1956, 2796).
+/// 1947-1957, 2801).
 #[test]
 fn the_entry_evidence_work_counts_what_the_stage_committed() {
     use crate::benchmark::cases::{EvidenceRecipe as R, DENSE};

@@ -1341,7 +1341,7 @@ mod tests {
                 // The bootstrap bounds before the checks they protect, the
                 // raw file's and then the Snapshot's in table order, then
                 // the five root-value bounds in table order (D15:1795-1805,
-                // 1876, 1999, 2006, 2008, 2356).
+                // 1877, 2000, 2007, 2009, 2357).
                 (
                     SubjectKind::CompleteInput,
                     &[
@@ -1475,7 +1475,7 @@ mod tests {
                 ),
                 (SubjectKind::CapabilityStructuralAnalysis, capability),
                 // The scope levels and the identity maps' keys, parents first
-                // (D15:2174, 3479).
+                // (D15:2174, 3490).
                 (SubjectKind::RootField, fields),
                 (SubjectKind::ProfileKey, key),
                 (SubjectKind::ProfileField, fields),

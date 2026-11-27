@@ -15,7 +15,7 @@
 //! determine, in the Shared projection stage ([`shared_scope`]), and then the
 //! complete invocation, whose paths are checked before evidence token
 //! generation, in the Entry projection stage ([`invocation`]) (D15:1852,
-//! 2775; plan 025 decisions #230 and #253). A Logical
+//! 2776; plan 025 decisions #230 and #253). A Logical
 //! input path past either path bound is absent, as path absence is (D15:777).
 //! A value locator or component path past one leaves its Evidence invalid
 //! (D15:843), and the Finding Registry fixes each check's evidence kinds, so

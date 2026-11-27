@@ -197,7 +197,7 @@ fn safe_uri(payload: &str) -> bool {
 /// Whether an authority with no user information escapes no byte past ASCII.
 /// RFC 3986 spells a non-ASCII registered name as its escaped UTF-8 bytes, so
 /// such a host is a Unicode one, which the adapter must already have converted
-/// to its A-label form (D15:765, 3502). The grammar makes every `%` the start
+/// to its A-label form (D15:765, 3513). The grammar makes every `%` the start
 /// of an escape, and a port holds none.
 fn ascii_host(authority: &str) -> bool {
     !authority
@@ -527,7 +527,7 @@ mod tests {
     }
 
     /// `%7F` is the last ASCII byte and `%80` the first past it. An escape of
-    /// another ASCII byte stays in a host, as `%2B` does (D15:765, 3502).
+    /// another ASCII byte stays in a host, as `%2B` does (D15:765, 3513).
     #[test]
     fn a_host_may_escape_only_ascii_bytes() {
         for authority in ["ssh-remote%2Bhost", "a%7Fb", "example.com:8443"] {
@@ -542,7 +542,7 @@ mod tests {
     /// rewrite gives: the core admits the canonical one and refuses the other
     /// without repairing it. RFC 3986's normalization decodes an unreserved
     /// escape first and then removes the dot segments the decoding spells
-    /// (D15:765, 767, 3501, 3502).
+    /// (D15:765, 767, 3512, 3513).
     #[test]
     fn a_spelling_the_adapter_must_rewrite_is_refused_and_not_repaired() {
         for (spelled, canonical) in [

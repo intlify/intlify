@@ -1032,7 +1032,7 @@ pub(super) fn declarations() -> Vec<Declaration> {
     // 419 rows, the same invocations on a resolver constructed before each
     // start mark, and on the prepared one right after it resolved the
     // Blocked recipe before each start mark, whose outcomes are the reused
-    // one's (D15:2752, 2792, 3814; plan 025 decision #33).
+    // one's (D15:2752, 2792, 3825; plan 025 decision #33).
     for resolver in [
         ResolverState::Reused,
         ResolverState::Fresh,
@@ -1096,7 +1096,7 @@ pub(super) fn declarations() -> Vec<Declaration> {
     // formal Snapshot of the value a recipe's file spells, which pairs with
     // that file's case, or the example's value holding an ordinary marker, on
     // a resolver in each state the file entry's cases run on (D15:2773, 2791,
-    // 2789; plan 025 decision #316).
+    // 2792; plan 025 decision #316).
     for resolver in [
         ResolverState::Reused,
         ResolverState::Fresh,
@@ -1145,7 +1145,7 @@ pub(super) fn declarations() -> Vec<Declaration> {
     // Then, without changing any of those 487 rows, the replay of the
     // Materialized Resolution Input Set of one file entry's invocation of
     // each replay recipe, on the resolver that invocation ran on (D15:2660,
-    // 2772, 2789; plan 025 decisions #34 and #316).
+    // 2773, 2792; plan 025 decisions #34 and #316).
     for recipe in ReplayRecipe::ALL {
         cases.push(declaration(
             Operation::MaterializedReresolution,

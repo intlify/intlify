@@ -19,7 +19,7 @@
 //! Materialized Resolution Input Set (D15:3233). What each entry expects is
 //! what the resolver does with it, written as a candidate for review: a
 //! checked-in expectation is reviewable evidence, not output accepted
-//! because the implementation produced it (D15:3789).
+//! because the implementation produced it (D15:3800).
 
 use std::collections::BTreeMap;
 
@@ -685,7 +685,7 @@ fn data_bodies() -> Bodies {
 /// fixtures, expected outcomes, common input fixture, and manifest. Each
 /// expected outcome is what the resolver does with its entry, a candidate
 /// that review accepts or refuses, since a checked-in expectation is
-/// reviewable evidence (D15:3789).
+/// reviewable evidence (D15:3800).
 ///
 /// # Errors
 ///

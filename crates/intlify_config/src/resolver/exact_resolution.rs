@@ -135,7 +135,7 @@ pub(crate) type Named<'s> = (&'s ExactTuple, &'s AdmittedArtifact<'s>);
 /// reference names or why it names nothing, and whether everything at and
 /// below the Target ID map passed. A later phase that needs one reference
 /// reads its result alone, so a reference that failed leaves only what needs
-/// it unavailable (D15:2368, 3570).
+/// it unavailable (D15:2368, 3581).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ReferenceResults<'s> {
     found: BTreeMap<ReferenceField, Admitted<Named<'s>>>,

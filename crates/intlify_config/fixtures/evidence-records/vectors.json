@@ -1,5 +1,5 @@
 {
-  "note": "Frozen preimages and digests of design 015's source revisions, Redacted tokens, and accounting views (D15:3444, 3483, 3487), computed apart from intlify_config by a Python script from 017's value framing and 015's field framing, with each view written from D15:2473-2519 and only rows' strategy, scope, projection, severity, and blocking taken from the committed registries.",
+  "note": "Frozen preimages and digests of design 015's source revisions, Redacted tokens, and accounting views (D15:3455, 3494, 3498), computed apart from intlify_config by a Python script from 017's value framing and 015's field framing, with each view written from D15:2473-2519 and only rows' strategy, scope, projection, severity, and blocking taken from the committed registries.",
   "sourceRevisions": [
     {
       "domain": "intlify.project-profile.file-source-revision.v0",

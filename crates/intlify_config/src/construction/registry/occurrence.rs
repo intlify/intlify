@@ -2,7 +2,7 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! The Finding Registry rows' occurrence Evidence columns (D15:2243-2246,
-//! 2249, 2251; Decisions 015-189 to 015-193).
+//! 2250, 2252; Decisions 015-189 to 015-193).
 //!
 //! For each check that may report its code, in `allowedCheckIds` order, a
 //! row names the primary evidence kind of the check's Finding Occurrences,

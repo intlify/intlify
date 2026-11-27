@@ -355,7 +355,7 @@ fn check_selector(
 /// The Profile ID of the only declaration, which an absent selector selects
 /// once one declaration requires none, or the causes of its key without the
 /// identifier syntax, which leaves the selection no subject (D15:2185,
-/// 3341). `declared` is the declarations' Profile IDs.
+/// 3477). `declared` is the declarations' Profile IDs.
 fn sole(
     evaluation: &Evaluation,
     declared: &[ProfileId],
@@ -975,7 +975,7 @@ mod tests {
 
     /// The only declaration whose key lacks the identifier syntax, or whose
     /// Profile ID exceeds the bound, is selected by no omitted selector: its
-    /// key's Finding, or its ID's, holds the selection back (D15:2185, 3466).
+    /// key's Finding, or its ID's, holds the selection back (D15:2185, 3477).
     #[test]
     fn the_only_declaration_without_an_admitted_id_is_not_selected() {
         let key = Unit {
@@ -999,7 +999,7 @@ mod tests {
     /// A structural failure inside the selected declaration holds the
     /// selection back only at the declaration's boundary or its
     /// `resourceLimits` reference, and one elsewhere in it or outside it does
-    /// not (D15:2132, 2368, 3559; plan 025 interpretation #218).
+    /// not (D15:2132, 2368, 3570; plan 025 interpretation #218).
     #[test]
     fn only_a_declarations_boundary_and_reference_hold_the_selection_back() {
         let limits = bounds(2, 64);

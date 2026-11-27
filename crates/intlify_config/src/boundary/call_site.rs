@@ -887,7 +887,7 @@ pub(crate) mod tests {
 
     /// The pair runs the file pair's checks other than its bounds, with the
     /// file row's reasons, against the Call-Site Source revision: the file
-    /// domain's revision of the same bytes is a mismatch (D15:744, 3514).
+    /// domain's revision of the same bytes is a mismatch (D15:744, 3525).
     #[test]
     fn the_pair_runs_the_file_pairs_other_checks() {
         let own = revision();
@@ -913,7 +913,7 @@ pub(crate) mod tests {
     }
 
     /// The whole boundary, not only its pair, applies the identity form and
-    /// takes no host fact for an identity or a revision (D15:744, 3513, 3514).
+    /// takes no host fact for an identity or a revision (D15:744, 3524, 3525).
     #[test]
     fn the_sidecar_applies_the_identity_form_and_takes_no_host_fact() {
         let own = revision();

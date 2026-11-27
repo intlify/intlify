@@ -4,7 +4,7 @@
 //! Design 015's Evidence record: one origin-bearing location that a Finding
 //! Occurrence or Coverage Decision Evidence names, built from the parts plan
 //! 025 PR 5d defines, with its kind, order, and view (D15:841-843, 2482,
-//! 2492; Decision 015-187).
+//! 2493; Decision 015-187).
 //!
 //! Every record has one Safe Origin Kind, and its constructor projects every
 //! part under that origin, so no part can name another. A configuration
@@ -227,7 +227,7 @@ impl EvidenceProjection {
     /// The record as path admission leaves it under `limits`, before token
     /// generation: a Logical input path past either path bound is absent, as
     /// path absence is, whether projected or only measured (D15:725, 777,
-    /// 1851).
+    /// 1852).
     ///
     /// # Errors
     ///
@@ -395,7 +395,7 @@ impl Evidence {
 
     /// `{ kind, origin, source?, locator?, path?, value?, span?, selector?,
     /// component? }` with only the members the record's kind has (D15:2482,
-    /// 2492).
+    /// 2493).
     pub(crate) fn view(&self) -> Value {
         let mut view = Map::new();
         view.insert("kind".to_owned(), Value::from(self.kind().id()));
@@ -889,7 +889,7 @@ mod tests {
     /// leaves absent; meanwhile the record carries, counts, and retains no
     /// path, as an absent one. Absence stays absence, and an origin that
     /// supplies no Logical input path is refused either way (D15:777, 1835,
-    /// 1851; plan 025 decision #299).
+    /// 1852; plan 025 decision #299).
     #[test]
     fn phase_1_projects_a_logical_input_path_only_within_the_path_bounds() {
         let identity = exact(FILE);

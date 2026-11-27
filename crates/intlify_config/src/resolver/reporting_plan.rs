@@ -400,7 +400,7 @@ impl Bounds<'_> {
     /// slice whose records are `records` exceeds once `staged` counts them:
     /// what comes after deduplication, and the domain-wide `maxRecords` and
     /// `maxTotalCanonicalBytes` (D15:1948, 1949, 1953, 1954, 1956, 1957,
-    /// 1963-1965, 1967, 1968, 2209).
+    /// 1964-1966, 1968, 1969, 2210).
     fn record_stage(self, staged: &Counters, records: &[Retained<'_>]) -> Option<BoundId> {
         let related = largest(records.iter().filter_map(|retained| {
             if let Record::Occurrence(occurrence) = &retained.record {
@@ -1047,7 +1047,7 @@ pub(crate) mod tests {
     /// index, entry dependencies, and the cause references of an entry that
     /// materialized no value, and the complete invocation's decision records
     /// and semantic and materialized dependencies (D15:2206, 2210, 2212,
-    /// 2408, 3454).
+    /// 2409, 3590).
     #[test]
     fn a_record_of_each_kind_past_a_domain_wide_bound_ends_its_domain_at_its_owner() {
         let (evaluation, causes) = entered();
@@ -1076,7 +1076,7 @@ pub(crate) mod tests {
     /// exhausted at the first unit that reports into it, its terminal Finding
     /// naming the bound by its capability path and its terminal state the
     /// cursor that a complete assignment of the subject tokens gives (D15:1852,
-    /// 2359, 2408; plan 025 decisions #229, #231, and #247, interpretation
+    /// 2360, 2409; plan 025 decisions #229, #231, and #247, interpretation
     /// #237).
     #[test]
     fn past_a_shared_scope_bound_every_domain_is_exhausted_at_its_first_unit() {
@@ -1234,7 +1234,7 @@ pub(crate) mod tests {
     /// tokens of the Shared scope and those the Entry domain's reserved
     /// terminal records name, and commits what it would under every unit's,
     /// a Phase 0 Finding that a Shared status names among them (D15:1852,
-    /// 2145, 2516, 2659, 2775; plan 025 decision #253, interpretation #257).
+    /// 2146, 2517, 2660, 2776; plan 025 decision #253, interpretation #257).
     #[test]
     fn the_shared_domain_commits_alike_under_its_own_scopes_tokens() {
         let alike = |evaluation: Evaluation| {

@@ -577,7 +577,7 @@ mod tests {
                 )]
             );
             // Each entry is found at its key, beside the other's (D15:2388,
-            // 2410).
+            // 2411).
             assert_eq!(
                 observed(&resolved.evaluation),
                 each_beside_the_other(&declaration, &duplicate)

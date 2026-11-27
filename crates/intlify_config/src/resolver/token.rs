@@ -1567,7 +1567,7 @@ mod tests {
     /// Every strategy and projection, and every compound identity view, is
     /// a frozen preimage and token that a Python script wrote from D15:2455
     /// and 2468 apart from this crate (`.plans/drafts/025-pr7/t2-vectors.py`;
-    /// D15:3444, 3483). Equal projected subjects in different owning scopes
+    /// D15:3455, 3494). Equal projected subjects in different owning scopes
     /// keep different tokens.
     #[test]
     fn every_strategy_and_compound_view_is_its_frozen_preimage_and_token() {
@@ -1609,7 +1609,7 @@ mod tests {
 
     /// Every identity key orders before every content key, and content keys
     /// order by their JSON type in the type order of Canonical content
-    /// identity, not by the bytes of the type's name (D15:2182, 2187, 3483).
+    /// identity, not by the bytes of the type's name (D15:2182, 2187, 3494).
     #[test]
     fn content_keys_follow_the_type_order_after_every_identity() {
         let member = |key| logical(&Subject::ArtifactCollection(CollectionSubject::Member(key)));
@@ -1738,7 +1738,7 @@ mod tests {
     /// A token compares by all 32 digest bytes and then by its ordinal,
     /// absence first: the higher ordinal of the lower digest precedes the
     /// lower ordinal of a digest that differs only in its last byte (D15:736,
-    /// 772, 812, 825).
+    /// 773, 813, 826).
     #[test]
     fn tokens_compare_by_every_digest_byte_then_the_ordinal() {
         let digest = |last| {
