@@ -940,6 +940,11 @@
   ],
   "resolverCases": [
     {
+      "id": "015-artifact-collection-reordered",
+      "path": "cases/resolver/015-artifact-collection-reordered.json",
+      "digest": "sha256:fb85eae36f90ccd7fb79a532f581f5535befc7e2aba8d364135d6ca0e5e4ac9c"
+    },
+    {
       "id": "015-entry-json-invalid",
       "path": "cases/resolver/015-entry-json-invalid.json",
       "digest": "sha256:aacd0e254e283b14635b02ab067080de0a56e7405b2dcc79a6e2fcbbebf314bc"
@@ -947,7 +952,12 @@
     {
       "id": "015-locale-default-not-in-project",
       "path": "cases/resolver/015-locale-default-not-in-project.json",
-      "digest": "sha256:146fe133717f20558adeec4f1c8dcfc467d9be5665bef49784ebb39388bb0967"
+      "digest": "sha256:f681709a6c2933026bdc38bf2703931b191defa4753e5a897855a88083692391"
+    },
+    {
+      "id": "015-locale-requested-added",
+      "path": "cases/resolver/015-locale-requested-added.json",
+      "digest": "sha256:afe97e8fac0ec55f7d97139bd795a22d529cb1917b74d49b3ea595d63db24a0e"
     },
     {
       "id": "015-reporting-entry-limit-exceeded",
@@ -957,7 +967,7 @@
     {
       "id": "015-reporting-shared-limit-exceeded",
       "path": "cases/resolver/015-reporting-shared-limit-exceeded.json",
-      "digest": "sha256:22b3a147124a442c3ab77840e2873123fb3b9a7db1a32a5b47ad00ab695c5f5f"
+      "digest": "sha256:6ea46448dfe719fc6c074ad10529d1914c3c4d55d70b00426bf67b0f3d4bc2be"
     },
     {
       "id": "015-storefront-checked",

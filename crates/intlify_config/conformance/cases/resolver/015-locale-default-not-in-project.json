@@ -34,7 +34,9 @@
   },
   "traceability": {
     "decisionIds": [
-      "015-028"
+      "015-028",
+      "015-036",
+      "015-129"
     ],
     "ruleIds": [
       "015.locale.default-requested.member",
@@ -44,5 +46,19 @@
       "locale.default-requested.member",
       "target.effective-default.supported"
     ]
-  }
+  },
+  "relations": [
+    {
+      "role": "mutation",
+      "kind": "invocation-stale",
+      "case": "015-storefront-checked",
+      "class": "projectLocales"
+    },
+    {
+      "role": "mutation",
+      "kind": "materialized-input-changed",
+      "case": "015-storefront-checked",
+      "class": "projectLocales"
+    }
+  ]
 }

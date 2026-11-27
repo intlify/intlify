@@ -38,8 +38,10 @@ use crate::resolver::invocation::{OutcomeStorage, Resolver};
 use crate::resolver::materialized::MaterializedInputs;
 use crate::resolver::outcome::{Checked, Outcome};
 use crate::resolver::resolution_evidence::Projection;
+use crate::resolver::staleness::{self, Retained, Staleness};
 
 use super::admission::{verification_assertion, with_common, with_entry};
+use super::case::RelationKind;
 use super::fixture::Bodies;
 
 /// The arrays of the Shared projection, each with the record kind it lists,
@@ -74,11 +76,13 @@ const ENTRY: [(&str, RecordKind); 7] = [
 ];
 
 /// What one entry of a Resolver Case resolves to: the outcome in the
-/// expected-outcome form, and its Materialized Resolution Input Set once
-/// Phase 1 materialized a value (D15:2658).
+/// expected-outcome form, its Materialized Resolution Input Set once Phase 1
+/// materialized a value (D15:2658), and the Resolver Invocation Input Set
+/// the boundaries admitted, which staleness compares (D15:2584).
 pub(crate) struct Resolved {
     pub(crate) outcome: Value,
     pub(crate) materialized: Option<MaterializedInputs<Icu4xData>>,
+    pub(crate) inputs: InvocationInputs<Icu4xData>,
 }
 
 /// Why an entry of a Resolver Case cannot run.
@@ -105,7 +109,7 @@ fn admitted<T>(
     bodies: &Bodies,
     constructed: &ConstructedResolver,
     reference: &str,
-    f: impl FnOnce(&Resolver<'_>, &InvocationInputs<Icu4xData>) -> Result<T, Unrunnable>,
+    f: impl FnOnce(&Resolver<'_>, InvocationInputs<Icu4xData>) -> Result<T, Unrunnable>,
 ) -> Result<T, Unrunnable> {
     let root = ConstructionRoot::built_in().expect("the built-in construction root verifies");
     let resolver = Resolver::new(constructed, root);
@@ -123,7 +127,7 @@ fn admitted<T>(
             if !canonical(entry, &inputs) {
                 return Err(Unrunnable::LocatorNotCanonical);
             }
-            f(&resolver, &inputs)
+            f(&resolver, inputs)
         })
     })
 }
@@ -163,13 +167,17 @@ pub(crate) fn resolved(
         constructed,
         reference,
         |resolver, inputs| {
-            let mut storage = OutcomeStorage::default();
-            let resolution = resolver
-                .resolve(inputs, &mut storage)
-                .map_err(|_| Unrunnable::Resolver)?;
+            let (outcome, materialized) = {
+                let mut storage = OutcomeStorage::default();
+                let resolution = resolver
+                    .resolve(&inputs, &mut storage)
+                    .map_err(|_| Unrunnable::Resolver)?;
+                (view(&resolution.outcome), resolution.materialized)
+            };
             Ok(Resolved {
-                outcome: view(&resolution.outcome),
-                materialized: resolution.materialized,
+                outcome,
+                materialized,
+                inputs,
             })
         },
     )
@@ -419,6 +427,53 @@ pub(crate) fn paired(file: &Value, programmatic: &Value, materialized: bool) -> 
             || ["outcome", "profile", "resolvedProfileArtifactBindings"]
                 .iter()
                 .all(|member| file[*member] == programmatic[*member]))
+}
+
+/// Whether `later` stands in the relation `kind` to `earlier`, two entries
+/// of one side of two cases on the resolver `constructed` (D15:3305): the
+/// profile views of two checked outcomes equal or not, the later invocation
+/// fresh or invocation-stale against the earlier one, and two Materialized
+/// Resolution Input Sets equal or not.
+pub(crate) fn related(
+    kind: RelationKind,
+    earlier: &Resolved,
+    later: &Resolved,
+    constructed: &ConstructedResolver,
+) -> bool {
+    fn profile(resolved: &Resolved) -> Option<&Value> {
+        (resolved.outcome["outcome"] == "checked").then_some(&resolved.outcome["profile"])
+    }
+    fn retained<'a>(
+        constructed: &'a ConstructedResolver,
+        resolved: &'a Resolved,
+    ) -> Retained<'a, Icu4xData> {
+        Retained {
+            construction: constructed.context(),
+            invocation: &resolved.inputs,
+        }
+    }
+    let profiles = (profile(earlier), profile(later));
+    let staleness = || {
+        let root = ConstructionRoot::built_in().expect("the built-in construction root verifies");
+        staleness::compare(
+            root,
+            &retained(constructed, earlier),
+            &retained(constructed, later),
+        )
+    };
+    let materialized = (earlier.materialized.as_ref(), later.materialized.as_ref());
+    match kind {
+        RelationKind::ProfileEqual => matches!(profiles, (Some(a), Some(b)) if a == b),
+        RelationKind::ProfileChanged => matches!(profiles, (Some(a), Some(b)) if a != b),
+        RelationKind::InvocationStale => staleness() == Staleness::InvocationStale,
+        RelationKind::InvocationNotStale => staleness() == Staleness::Fresh,
+        RelationKind::MaterializedInputEqual => {
+            matches!(materialized, (Some(a), Some(b)) if a == b)
+        }
+        RelationKind::MaterializedInputChanged => {
+            matches!(materialized, (Some(a), Some(b)) if a != b)
+        }
+    }
 }
 
 #[cfg(test)]

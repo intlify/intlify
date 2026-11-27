@@ -1454,6 +1454,10 @@ const DOMAINS = ['entry', 'shared']
 const SIDES = ['file', 'programmatic']
 let resolverCases = 0
 let expectedOutcomes = 0
+let relations = 0
+// Each listed Resolver Case by its ID: its path, construction case, expected
+// outcomes by side, and relations.
+const resolverListing = new Map()
 
 /**
  * The Finding rows of an expected outcome's projections.
@@ -1606,6 +1610,12 @@ for (const entry of index.value.resolverCases ?? []) {
     }
     outcomes[side] = expected
   }
+  resolverListing.set(manifest.id, {
+    path: entry.path,
+    construction: resolverConstruction?.caseId,
+    outcomes,
+    relations: Array.isArray(manifest.relations) ? manifest.relations : []
+  })
   const checks = [
     ...new Set(
       Object.values(outcomes).flatMap(outcome =>
@@ -1660,6 +1670,58 @@ for (const entry of index.value.resolverCases ?? []) {
   }
 }
 
+/**
+ * Whether an expected outcome reached materialization, which its Shared
+ * projection marks.
+ *
+ * @param outcome - The expected outcome.
+ * @returns Whether it has Shared evidence.
+ */
+function materialized(outcome) {
+  const shared = outcome?.resolutionEvidence?.shared
+  return shared !== null && typeof shared === 'object'
+}
+
+// Each relation names a listed case under the same construction case that
+// pairs one of the declaring case's sides (D15:3305). On each such side, a
+// profile relation holds between two checked expected outcomes whose
+// profile views are equal or not, and a materialized-input relation between
+// two that reached materialization. Staleness and the sets' equality are
+// left to the runner, which resolves both entries.
+for (const own of resolverListing.values()) {
+  for (const relation of own.relations) {
+    relations += 1
+    const other = resolverListing.get(relation?.case)
+    const sides = SIDES.filter(
+      side => own.outcomes[side] !== undefined && other?.outcomes[side] !== undefined
+    )
+    if (other === undefined || other.construction !== own.construction || sides.length === 0) {
+      fail(
+        `${own.path}: relates to ${String(relation?.case)}, which is no listed case under its construction case pairing one of its sides`
+      )
+      continue
+    }
+    for (const side of sides) {
+      const earlier = other.outcomes[side]
+      const later = own.outcomes[side]
+      const checked = earlier.outcome === 'checked' && later.outcome === 'checked'
+      const equal = isDeepStrictEqual(earlier.profile, later.profile)
+      const both = materialized(earlier) && materialized(later)
+      const holds = {
+        'profile-equal': checked && equal,
+        'profile-changed': checked && !equal,
+        'materialized-input-equal': both,
+        'materialized-input-changed': both
+      }[relation.kind]
+      if (holds === false) {
+        fail(
+          `${own.path}: its ${String(relation.kind)} relation to ${String(relation.case)} cannot hold for the ${side} entries' expected outcomes`
+        )
+      }
+    }
+  }
+}
+
 // The containers list the digests the index declares for their members.
 const without = (entry, name) =>
   Object.fromEntries(Object.entries(entry ?? {}).filter(([key]) => key !== name))
@@ -1711,5 +1773,5 @@ for (const [module, name, pointer] of PINS) {
 finish()
 
 console.log(
-  `conformance suite index agrees: ${MEMBERS.length} members, ${bodies} bodies of which ${manifests} manifests, ${fixtures} construction fixtures, ${admissionFixtures} input admission fixtures (${stepCases} of the admission steps), ${resolverCases} Resolver Cases with ${expectedOutcomes} expected outcomes, ${objects} closed schema objects, ${PINS.length} pinned digests`
+  `conformance suite index agrees: ${MEMBERS.length} members, ${bodies} bodies of which ${manifests} manifests, ${fixtures} construction fixtures, ${admissionFixtures} input admission fixtures (${stepCases} of the admission steps), ${resolverCases} Resolver Cases with ${expectedOutcomes} expected outcomes and ${relations} relations, ${objects} closed schema objects, ${PINS.length} pinned digests`
 )

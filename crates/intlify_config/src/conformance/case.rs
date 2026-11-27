@@ -582,15 +582,40 @@ const PROGRAMMATIC_ONLY_REASONS: [&str; 4] = [
     "safe-host-inspection",
 ];
 
-/// The kinds of a relation between two Resolver Cases (D15:3305).
-const RELATION_KINDS: [&str; 6] = [
-    "profile-equal",
-    "profile-changed",
-    "invocation-stale",
-    "invocation-not-stale",
-    "materialized-input-equal",
-    "materialized-input-changed",
-];
+/// The kind of a relation between two Resolver Cases (D15:3305).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RelationKind {
+    ProfileEqual,
+    ProfileChanged,
+    InvocationStale,
+    InvocationNotStale,
+    MaterializedInputEqual,
+    MaterializedInputChanged,
+}
+
+impl RelationKind {
+    /// Every kind, in the order the Case Schema closes them.
+    pub(crate) const ALL: [Self; 6] = [
+        Self::ProfileEqual,
+        Self::ProfileChanged,
+        Self::InvocationStale,
+        Self::InvocationNotStale,
+        Self::MaterializedInputEqual,
+        Self::MaterializedInputChanged,
+    ];
+
+    /// The kind as 015 spells it.
+    pub(crate) const fn id(self) -> &'static str {
+        match self {
+            Self::ProfileEqual => "profile-equal",
+            Self::ProfileChanged => "profile-changed",
+            Self::InvocationStale => "invocation-stale",
+            Self::InvocationNotStale => "invocation-not-stale",
+            Self::MaterializedInputEqual => "materialized-input-equal",
+            Self::MaterializedInputChanged => "materialized-input-changed",
+        }
+    }
+}
 
 /// The conditional obligations of revision `"0"`: the ID, the activation,
 /// the not-applicable reason, and the verification owner of each row
@@ -1408,9 +1433,10 @@ fn resolver(definitions: &mut Map<String, Value>) {
         .filter(|group| *group != SemanticGroup::ProfileSpecification)
         .map(SemanticGroup::id);
     // An equivalence class's change must leave the profile unchanged.
-    let equivalence = RELATION_KINDS
+    let equivalence = RelationKind::ALL
         .into_iter()
-        .filter(|kind| *kind != "profile-changed");
+        .filter(|kind| *kind != RelationKind::ProfileChanged)
+        .map(RelationKind::id);
     let relation = json!({
         "oneOf": [
             closed(&[
@@ -1421,7 +1447,7 @@ fn resolver(definitions: &mut Map<String, Value>) {
             ]),
             closed(&[
                 ("role", constant("mutation")),
-                ("kind", strings(RELATION_KINDS)),
+                ("kind", strings(RelationKind::ALL.map(RelationKind::id))),
                 ("case", definition("caseId")),
                 ("class", strings(mutable)),
             ]),
@@ -2562,7 +2588,7 @@ mod tests {
             manifest
         };
         let relation = |role: &str, kind: &str, class: &str| json!({ "role": role, "kind": kind, "case": "015-locale-default-other", "class": class });
-        for kind in RELATION_KINDS {
+        for kind in RelationKind::ALL.map(RelationKind::id) {
             assert_eq!(
                 validators.admits(&with(json!([relation("equivalence", kind, "015-COV-114")]))),
                 kind != "profile-changed",

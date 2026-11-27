@@ -45,7 +45,7 @@ use crate::resolver::origin::SafeOriginKind;
 use crate::snapshot::Node;
 
 use super::admission::node_view;
-use super::case::{ManifestKind, REVISION};
+use super::case::{ManifestKind, RelationKind, REVISION};
 use super::construction_cases::{Cases, CONSTRUCTED};
 use super::fixture::{written, Bodies};
 use super::index::SuiteFile;
@@ -55,7 +55,8 @@ use super::resolution::resolved;
 const CASES: &str = "cases/resolver";
 const FIXTURES: &str = "fixtures/resolver";
 
-/// The storefront, whose bodies the other cases share.
+/// The storefront, whose bodies the other cases share and with which every
+/// relation compares a case.
 const STOREFRONT: &str = "015-storefront-checked";
 
 /// Where the suite holds the committed canonicalization data, below its
@@ -495,7 +496,7 @@ enum Side {
 }
 
 /// One Resolver Case before it is written: its ID, its common input fixture,
-/// both sides, and the decisions and checks it traces.
+/// both sides, the decisions and checks it traces, and its relations.
 struct Case {
     id: &'static str,
     common: Value,
@@ -503,6 +504,49 @@ struct Case {
     programmatic: Side,
     decisions: &'static [&'static str],
     checks: &'static [&'static str],
+    relations: Vec<Related>,
+}
+
+/// A relation a case declares to the storefront (D15:3305): its role, its
+/// kind, and its class, a Coverage inventory item for an equivalence and a
+/// semantic group for a mutation.
+struct Related {
+    role: &'static str,
+    kind: RelationKind,
+    class: &'static str,
+}
+
+impl Related {
+    /// The relations of an input class whose change leaves the profile
+    /// unchanged, each of `kinds`.
+    fn equivalence(class: &'static str, kinds: &[RelationKind]) -> Vec<Self> {
+        kinds
+            .iter()
+            .map(|&kind| Self {
+                role: "equivalence",
+                kind,
+                class,
+            })
+            .collect()
+    }
+
+    /// The relations of a change to the semantic group `class`, each of
+    /// `kinds`.
+    fn mutation(class: &'static str, kinds: &[RelationKind]) -> Vec<Self> {
+        kinds
+            .iter()
+            .map(|&kind| Self {
+                role: "mutation",
+                kind,
+                class,
+            })
+            .collect()
+    }
+
+    /// The relation as a manifest lists it.
+    fn view(&self) -> Value {
+        json!({ "role": self.role, "kind": self.kind.id(), "case": STOREFRONT, "class": self.class })
+    }
 }
 
 impl Case {
@@ -513,19 +557,46 @@ impl Case {
 }
 
 /// The suite's Resolver Cases on the resolver `constructed`, in ascending
-/// unsigned byte order of their IDs: the storefront checked; its project
-/// default outside its requested locales, blocked with Shared evidence; its
-/// bytes unclosed, a file-only case without Shared evidence; and each
-/// diagnostic domain exhausting, Entry before any Shared evidence and Shared
-/// beside a complete Entry.
+/// unsigned byte order of their IDs: the storefront checked; its collection
+/// in the other order, an equivalence; its project default outside its
+/// requested locales, blocked with Shared evidence; a requested locale
+/// added, a mutation; its bytes unclosed, a file-only case without Shared
+/// evidence; and each diagnostic domain exhausting, Entry before any Shared
+/// evidence and Shared beside a complete Entry. Each relation compares its
+/// case with the storefront (D15:3305).
 fn all(constructed: &ConstructedResolver) -> Vec<Case> {
+    use RelationKind as Kind;
     let storefront = Storefront::new();
     let common = storefront.common(constructed);
     let mut default = Storefront::new();
     default.config["profiles"][SELECTED]["defaultRequestedLocale"] = json!("fr");
     let entry = Storefront::at(records_at(Group::DiagnosticsEntry, ENTRY_RECORDS));
     let shared = Storefront::at(records_at(Group::DiagnosticsShared, SHARED_RECORDS));
+    let mut reordered = common.clone();
+    reordered[SafeOriginKind::ProfileResolutionArtifactCollection.id()]["input"]["members"]
+        .as_array_mut()
+        .expect("the collection lists its members")
+        .reverse();
+    let mut added = Storefront::new();
+    added.config["profiles"][SELECTED]["requestedLocales"] = json!(["ja", "en", "fr"]);
+    let changed = [Kind::InvocationStale, Kind::MaterializedInputChanged];
     vec![
+        Case {
+            id: "015-artifact-collection-reordered",
+            common: reordered,
+            file: Side::Paired(storefront.file()),
+            programmatic: Side::Paired(storefront.programmatic()),
+            decisions: &["015-036", "015-088", "015-129"],
+            checks: &[],
+            relations: Related::equivalence(
+                "015-COV-028",
+                &[
+                    Kind::ProfileEqual,
+                    Kind::InvocationNotStale,
+                    Kind::MaterializedInputEqual,
+                ],
+            ),
+        },
         Case {
             id: "015-entry-json-invalid",
             common: common.clone(),
@@ -533,17 +604,35 @@ fn all(constructed: &ConstructedResolver) -> Vec<Case> {
             programmatic: Side::Unpaired("raw-json-syntax"),
             decisions: &["015-037", "015-065", "015-202"],
             checks: &["entry.input.well-formed-json"],
+            relations: Vec::new(),
         },
         Case {
             id: "015-locale-default-not-in-project",
             common: common.clone(),
             file: Side::Paired(default.file()),
             programmatic: Side::Paired(default.programmatic()),
-            decisions: &["015-028"],
+            decisions: &["015-028", "015-036", "015-129"],
             checks: &[
                 "locale.default-requested.member",
                 "target.effective-default.supported",
             ],
+            relations: Related::mutation("projectLocales", &changed),
+        },
+        Case {
+            id: "015-locale-requested-added",
+            common: common.clone(),
+            file: Side::Paired(added.file()),
+            programmatic: Side::Paired(added.programmatic()),
+            decisions: &["015-036", "015-129"],
+            checks: &[],
+            relations: Related::mutation(
+                "projectLocales",
+                &[
+                    Kind::ProfileChanged,
+                    Kind::InvocationStale,
+                    Kind::MaterializedInputChanged,
+                ],
+            ),
         },
         Case {
             id: "015-reporting-entry-limit-exceeded",
@@ -552,14 +641,16 @@ fn all(constructed: &ConstructedResolver) -> Vec<Case> {
             programmatic: Side::Unpaired("raw-json-syntax"),
             decisions: &["015-060", "015-065", "015-067", "015-069"],
             checks: &["reporting.diagnostic-domain.complete"],
+            relations: Vec::new(),
         },
         Case {
             id: "015-reporting-shared-limit-exceeded",
             common: shared.common(constructed),
             file: Side::Paired(shared.file()),
             programmatic: Side::Paired(shared.programmatic()),
-            decisions: &["015-060", "015-067", "015-069"],
+            decisions: &["015-036", "015-060", "015-067", "015-069", "015-129"],
             checks: &["reporting.diagnostic-domain.complete"],
+            relations: Related::mutation("requiredPolicies", &changed),
         },
         Case {
             id: "015-storefront-checked",
@@ -568,6 +659,7 @@ fn all(constructed: &ConstructedResolver) -> Vec<Case> {
             programmatic: Side::Paired(storefront.programmatic()),
             decisions: &["015-037", "015-060", "015-064", "015-066"],
             checks: &[],
+            relations: Vec::new(),
         },
     ]
 }
@@ -671,7 +763,7 @@ pub(crate) fn cases() -> Result<Cases, serde_json::Error> {
                     .expect("a case traces a registered check")
             })
             .collect::<Vec<_>>();
-        let manifest = generate::write(&json!({
+        let mut manifest = json!({
             "suiteRevision": REVISION,
             "manifestKind": ManifestKind::Resolver.name(),
             "id": case.id,
@@ -686,7 +778,11 @@ pub(crate) fn cases() -> Result<Cases, serde_json::Error> {
                 "ruleIds": rules,
                 "checkIds": case.checks,
             },
-        }))?;
+        });
+        if !case.relations.is_empty() {
+            manifest["relations"] = case.relations.iter().map(Related::view).collect();
+        }
+        let manifest = generate::write(&manifest)?;
         let path = format!("{CASES}/{}.json", case.id);
         listing.push(json!({
             "id": case.id,
@@ -1034,6 +1130,141 @@ mod tests {
                 "reporting.diagnostic-domain.complete"
             );
         }
+    }
+
+    /// Each relation holds on every side both cases pair, and the cases
+    /// together show each of 015's six kinds; a case that relates to the
+    /// storefront changes its inputs, an equivalence never changes the
+    /// profile, and a mutation names a semantic group (D15:3305).
+    #[test]
+    fn each_relation_holds_on_every_side_both_cases_pair() {
+        use crate::conformance::resolution::related;
+        let constructed = committed();
+        let cases = all(constructed);
+        let storefront = cases.iter().find(|case| case.id == STOREFRONT).unwrap();
+        let base = run(storefront);
+        let input = |side: &Side| match side {
+            Side::Paired(input) => Some(input.clone()),
+            Side::Unpaired(_) => None,
+        };
+        let inputs = |case: &Case| {
+            (
+                case.common.clone(),
+                input(&case.file),
+                input(&case.programmatic),
+            )
+        };
+        let mut kinds = Vec::new();
+        for case in &cases {
+            assert!(
+                case.relations.is_empty() || inputs(case) != inputs(storefront),
+                "{} changes no input",
+                case.id
+            );
+            let done = run(case);
+            for relation in &case.relations {
+                for (side, later) in &done {
+                    let (_, earlier) = base.iter().find(|(own, _)| own == side).unwrap();
+                    assert!(
+                        related(relation.kind, earlier, later, constructed),
+                        "{} {} {side}",
+                        case.id,
+                        relation.kind.id()
+                    );
+                }
+                assert!(
+                    relation.role != "equivalence" || relation.kind != RelationKind::ProfileChanged
+                );
+                if relation.role == "mutation" {
+                    assert!(crate::resolver::dependency::SemanticGroup::ALL
+                        .iter()
+                        .any(|group| group.id() == relation.class));
+                }
+                if !kinds.contains(&relation.kind) {
+                    kinds.push(relation.kind);
+                }
+            }
+        }
+        kinds.sort_by_key(|kind| kind.id());
+        let mut all = RelationKind::ALL.to_vec();
+        all.sort_by_key(|kind| kind.id());
+        assert_eq!(kinds, all);
+    }
+
+    /// Each kind holds only where its comparison does: an entry against
+    /// itself has an equal profile, a fresh invocation, and an equal set, and
+    /// one with a requested locale added has a changed profile, a stale
+    /// invocation, and a changed set; no profile kind holds beside a blocked
+    /// outcome, no set kind beside an entry that never materialized, and no
+    /// staleness kind beside an entry whose source identity carries another
+    /// non-secret mark, which is corrupt rather than stale (D15:2586, 2590,
+    /// 3305).
+    #[test]
+    fn each_kind_holds_only_where_its_comparison_does() {
+        use crate::conformance::resolution::related;
+        use RelationKind::{
+            InvocationNotStale, InvocationStale, MaterializedInputChanged, MaterializedInputEqual,
+            ProfileChanged, ProfileEqual,
+        };
+        let constructed = committed();
+        let cases = all(constructed);
+        let file = |id: &str| {
+            let case = cases.iter().find(|case| case.id == id).unwrap();
+            run(case)
+                .into_iter()
+                .find(|(side, _)| *side == "file")
+                .unwrap()
+                .1
+        };
+        let storefront = file(STOREFRONT);
+        let added = file("015-locale-requested-added");
+        let blocked = file("015-locale-default-not-in-project");
+        let unclosed = file("015-entry-json-invalid");
+        let holds =
+            |kind: RelationKind, later: &Resolved| related(kind, &storefront, later, constructed);
+        let same = [true, false, false, true, true, false];
+        let kinds = [
+            ProfileEqual,
+            ProfileChanged,
+            InvocationStale,
+            InvocationNotStale,
+            MaterializedInputEqual,
+            MaterializedInputChanged,
+        ];
+        for (kind, same) in kinds.into_iter().zip(same) {
+            assert_eq!(holds(kind, &storefront), same, "itself {}", kind.id());
+            assert_eq!(holds(kind, &added), !same, "added {}", kind.id());
+        }
+        assert_eq!(blocked.outcome["outcome"], "blocked");
+        assert!(!holds(ProfileEqual, &blocked) && !holds(ProfileChanged, &blocked));
+        assert!(unclosed.materialized.is_none());
+        assert!(!holds(MaterializedInputEqual, &unclosed));
+        assert!(!holds(MaterializedInputChanged, &unclosed));
+        // Two blocked outcomes have no profiles to compare, and two entries
+        // that never materialized no sets.
+        assert!(!related(ProfileEqual, &blocked, &blocked, constructed));
+        assert!(!related(
+            MaterializedInputEqual,
+            &unclosed,
+            &unclosed,
+            constructed
+        ));
+        let case = cases.iter().find(|case| case.id == STOREFRONT).unwrap();
+        let Side::Paired(input) = &case.file else {
+            panic!("the storefront pairs its file entry")
+        };
+        let mut marked = input.clone();
+        marked["configuration-file"]["input"]["nonSecret"] = json!(false);
+        let bodies = data_bodies();
+        let corrupt = resolved(
+            &case.common,
+            &marked,
+            &bodies,
+            constructed,
+            &identity(constructed),
+        );
+        let corrupt = corrupt.unwrap();
+        assert!(!holds(InvocationStale, &corrupt) && !holds(InvocationNotStale, &corrupt));
     }
 
     /// An expected outcome reads back as the value written, with each record

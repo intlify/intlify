@@ -630,7 +630,7 @@ mod tests {
             .chain(manifests)
             .map(|file| (file.path, file_digest(&file.bytes).as_str().to_owned()))
             .collect::<BTreeMap<_, _>>();
-        assert_eq!(named.len(), 20 + 44 + 118 + 5);
+        assert_eq!(named.len(), 20 + 44 + 118 + 7);
         assert_eq!(
             named,
             artifacts

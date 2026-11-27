@@ -34,9 +34,11 @@
   },
   "traceability": {
     "decisionIds": [
+      "015-036",
       "015-060",
       "015-067",
-      "015-069"
+      "015-069",
+      "015-129"
     ],
     "ruleIds": [
       "015.reporting.diagnostic-domain.complete"
@@ -44,5 +46,19 @@
     "checkIds": [
       "reporting.diagnostic-domain.complete"
     ]
-  }
+  },
+  "relations": [
+    {
+      "role": "mutation",
+      "kind": "invocation-stale",
+      "case": "015-storefront-checked",
+      "class": "requiredPolicies"
+    },
+    {
+      "role": "mutation",
+      "kind": "materialized-input-changed",
+      "case": "015-storefront-checked",
+      "class": "requiredPolicies"
+    }
+  ]
 }

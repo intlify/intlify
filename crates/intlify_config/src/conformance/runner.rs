@@ -75,13 +75,13 @@ use crate::model::CONFIGURATION_SCHEMA_VERSION;
 use crate::resolver::origin::SafeOriginKind;
 
 use super::admission;
-use super::case::{self, input_fixture, ManifestKind};
+use super::case::{self, input_fixture, ManifestKind, RelationKind};
 use super::construction::{self, Constructed};
 use super::fixture::{references, Bodies};
 use super::index::{
     Member, SCHEMA_DIGEST, SCHEMA_IDENTITY, SCHEMA_PATH, SCHEMA_REVISION, SUITE_REVISION,
 };
-use super::resolution;
+use super::resolution::{self, Resolved, Unrunnable};
 
 /// Why a suite does not open: a Conformance harness failure (D15:2858).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -188,6 +188,16 @@ struct ResolverCase {
     reference: String,
     common: Value,
     entries: Vec<ResolverEntry>,
+    relations: Vec<Relation>,
+}
+
+/// A relation a Resolver Case declares to another: its kind and the other
+/// case's ID (D15:3305). Its role and class say why the case holds it, and
+/// the harness checks only the kind.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Relation {
+    kind: RelationKind,
+    case: String,
 }
 
 /// One paired entry of a Resolver Case: its side, its admission input
@@ -237,79 +247,130 @@ impl Opened {
                 &admission.constructed,
             ),
         });
+        // Every entry of every Resolver Case resolves first, since a relation
+        // reads another case's entries (D15:3305).
         let mut resolvers = BTreeMap::new();
-        let mut resolver = Vec::new();
         for case in &self.resolver {
-            let constructed = resolvers
+            resolvers
                 .entry(case.construction.as_str())
-                .or_insert_with(|| built(&self.construction, &case.construction, &self.bodies))
+                .or_insert_with(|| built(&self.construction, &case.construction, &self.bodies));
+        }
+        let constructed = |case: &ResolverCase| {
+            resolvers[case.construction.as_str()]
                 .as_ref()
-                .expect("the runner established the case's construction");
-            resolver.extend(self.resolver_outcomes(case, constructed));
+                .expect("the runner established the case's construction")
+        };
+        let resolved = self
+            .resolver
+            .iter()
+            .map(|case| {
+                case.entries
+                    .iter()
+                    .map(|entry| {
+                        resolution::resolved(
+                            &case.common,
+                            &entry.fixture,
+                            &self.bodies,
+                            constructed(case),
+                            &case.reference,
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        let mut resolver = Vec::new();
+        for (case, done) in self.resolver.iter().zip(&resolved) {
+            resolver.extend(resolver_outcomes(case, done));
+            resolver.extend(self.relation_outcomes(case, done, &resolved, constructed(case)));
         }
         construction.chain(admission).chain(resolver).collect()
     }
 
-    /// What each paired entry of `case` resolves to on `constructed` beside
-    /// what it expects, the duties its outcome breaks beside none, and, when
-    /// both entries are paired and resolve, whether they agree where 015
-    /// makes them agree (D15:3227, 3229, 3233): `<id>/<side>`,
-    /// `<id>/<side>/duties`, then `<id>/pair`. An entry the resolver does not
-    /// resolve, which only a defect of the resolver makes, fails its own
-    /// outcomes and has no pair.
-    fn resolver_outcomes(
+    /// Whether each relation of `case` holds for each side both cases pair,
+    /// `case`'s entry the later and the other case's the earlier, once both
+    /// entries resolve (D15:3305): `<id>/relation/<n>/<side>`, with the
+    /// relation's other case and kind.
+    fn relation_outcomes(
         &self,
         case: &ResolverCase,
+        done: &[Result<Resolved, Unrunnable>],
+        resolved: &[Vec<Result<Resolved, Unrunnable>>],
         constructed: &ConstructedResolver,
     ) -> Vec<Outcome> {
         let mut outcomes = Vec::new();
-        let mut resolved = Vec::new();
-        for entry in &case.entries {
-            let id = format!("{}/{}", case.id, entry.side);
-            let done = resolution::resolved(
-                &case.common,
-                &entry.fixture,
-                &self.bodies,
-                constructed,
-                &case.reference,
-            );
-            let (actual, duties) = match &done {
-                Ok(done) => (
-                    done.outcome.clone(),
-                    json!(resolution::duties(&done.outcome)),
-                ),
-                Err(unrunnable) => {
-                    let unrunnable = json!({ "unrunnable": format!("{unrunnable:?}") });
-                    (unrunnable.clone(), unrunnable)
+        for (index, relation) in case.relations.iter().enumerate() {
+            let other = self
+                .resolver
+                .iter()
+                .position(|other| other.id == relation.case)
+                .expect("the runner checked each relation's case");
+            for (entry, later) in case.entries.iter().zip(done) {
+                let earlier = self.resolver[other]
+                    .entries
+                    .iter()
+                    .zip(&resolved[other])
+                    .find(|(own, _)| own.side == entry.side)
+                    .map(|(_, done)| done);
+                if let (Some(Ok(earlier)), Ok(later)) = (earlier, later) {
+                    let holds = resolution::related(relation.kind, earlier, later, constructed);
+                    let view = |holds: bool| json!({ "case": relation.case, "kind": relation.kind.id(), "holds": holds });
+                    outcomes.push(Outcome {
+                        id: format!("{}/relation/{index}/{}", case.id, entry.side),
+                        expected: view(true),
+                        actual: view(holds),
+                    });
                 }
-            };
-            outcomes.push(Outcome {
-                id: id.clone(),
-                expected: entry.expected.clone(),
-                actual,
-            });
-            outcomes.push(Outcome {
-                id: format!("{id}/duties"),
-                expected: json!([]),
-                actual: duties,
-            });
-            resolved.push(done.ok());
-        }
-        if let [Some(file), Some(programmatic)] = resolved.as_slice() {
-            let materialized =
-                file.materialized.is_some() && file.materialized == programmatic.materialized;
-            outcomes.push(Outcome {
-                id: format!("{}/pair", case.id),
-                expected: json!(true),
-                actual: json!(resolution::paired(
-                    &file.outcome,
-                    &programmatic.outcome,
-                    materialized
-                )),
-            });
+            }
         }
         outcomes
     }
+}
+
+/// What each paired entry of `case`, resolved as `done`, does beside what it
+/// expects, the duties its outcome breaks beside none, and, when both
+/// entries are paired and resolve, whether they agree where 015 makes them
+/// agree (D15:3227, 3229, 3233): `<id>/<side>`, `<id>/<side>/duties`, then
+/// `<id>/pair`. An entry the resolver does not resolve, which only a defect
+/// of the resolver makes, fails its own outcomes and has no pair.
+fn resolver_outcomes(case: &ResolverCase, done: &[Result<Resolved, Unrunnable>]) -> Vec<Outcome> {
+    let mut outcomes = Vec::new();
+    for (entry, done) in case.entries.iter().zip(done) {
+        let id = format!("{}/{}", case.id, entry.side);
+        let (actual, duties) = match done {
+            Ok(done) => (
+                done.outcome.clone(),
+                json!(resolution::duties(&done.outcome)),
+            ),
+            Err(unrunnable) => {
+                let unrunnable = json!({ "unrunnable": format!("{unrunnable:?}") });
+                (unrunnable.clone(), unrunnable)
+            }
+        };
+        outcomes.push(Outcome {
+            id: id.clone(),
+            expected: entry.expected.clone(),
+            actual,
+        });
+        outcomes.push(Outcome {
+            id: format!("{id}/duties"),
+            expected: json!([]),
+            actual: duties,
+        });
+    }
+    if let [Ok(file), Ok(programmatic)] = done {
+        let materialized =
+            file.materialized.is_some() && file.materialized == programmatic.materialized;
+        outcomes.push(Outcome {
+            id: format!("{}/pair", case.id),
+            expected: json!(true),
+            actual: json!(resolution::paired(
+                &file.outcome,
+                &programmatic.outcome,
+                materialized
+            )),
+        });
+    }
+    outcomes
 }
 
 /// The resolver the construction case `id` of `construction` builds, `None`
@@ -353,6 +414,7 @@ pub fn open(index: &Path) -> Result<Opened, HarnessFailure> {
     for member in Member::ALL {
         closure.verify(member, &value[member.name()])?;
     }
+    closure.relations()?;
     Ok(Opened {
         verified: closure.verified,
         bodies: closure.bodies,
@@ -790,13 +852,50 @@ impl Closure<'_> {
             )
             .map_err(|_| invalid())?;
         }
+        let relations = manifest
+            .get("relations")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .map(|relation| Relation {
+                kind: RelationKind::ALL
+                    .into_iter()
+                    .find(|kind| relation["kind"] == kind.id())
+                    .expect("the Case Schema closes the relation kinds"),
+                case: text(&relation["case"]).to_owned(),
+            })
+            .collect();
         self.resolver.push(ResolverCase {
             id,
             construction: case_id,
             reference,
             common,
             entries,
+            relations,
         });
+        Ok(())
+    }
+
+    /// Check each relation once every case is listed: it names a listed
+    /// Resolver Case under the same construction case that pairs one of the
+    /// declaring case's sides; a case whose relation does not cannot run
+    /// (D15:3305).
+    fn relations(&self) -> Result<(), HarnessFailure> {
+        for case in &self.resolver {
+            for relation in &case.relations {
+                let other = self.resolver.iter().find(|other| other.id == relation.case);
+                let related = other.is_some_and(|other| {
+                    other.construction == case.construction
+                        && other
+                            .entries
+                            .iter()
+                            .any(|entry| case.entries.iter().any(|own| own.side == entry.side))
+                });
+                if !related {
+                    return Err(HarnessFailure::InvalidCase(case.id.clone()));
+                }
+            }
+        }
         Ok(())
     }
 
@@ -1712,29 +1811,46 @@ mod tests {
             .map(|entry| entry["id"].as_str().unwrap().to_owned())
             .collect::<Vec<_>>();
         // A Resolver Case runs each paired entry and its duties, then the
-        // pair when both entries are paired.
+        // pair when both entries are paired, then each relation on each side
+        // both cases pair.
         let resolver = resolver_cases::cases().unwrap();
-        for entry in &resolver.listing {
-            let path = entry["path"].as_str().unwrap();
-            let manifest = &resolver
-                .files
-                .iter()
-                .find(|file| file.path == path)
-                .unwrap()
-                .bytes;
-            let manifest: Value = serde_json::from_slice(manifest).unwrap();
-            let id = entry["id"].as_str().unwrap();
-            let paired = ["file", "programmatic"]
+        let manifest = |path: &str| -> Value {
+            let file = resolver.files.iter().find(|file| file.path == path);
+            serde_json::from_slice(&file.unwrap().bytes).unwrap()
+        };
+        let paired = |manifest: &Value| {
+            ["file", "programmatic"]
                 .into_iter()
                 .filter(|side| manifest["entries"][side].get("unpaired").is_none())
-                .collect::<Vec<_>>();
-            for side in &paired {
+                .collect::<Vec<_>>()
+        };
+        let manifests = resolver
+            .listing
+            .iter()
+            .map(|entry| {
+                let id = entry["id"].as_str().unwrap().to_owned();
+                (id, manifest(entry["path"].as_str().unwrap()))
+            })
+            .collect::<BTreeMap<_, _>>();
+        for entry in &resolver.listing {
+            let id = entry["id"].as_str().unwrap();
+            let manifest = &manifests[id];
+            let sides = paired(manifest);
+            for side in &sides {
                 listed.extend([format!("{id}/{side}"), format!("{id}/{side}/duties")]);
             }
-            if paired.len() == 2 {
+            if sides.len() == 2 {
                 listed.push(format!("{id}/pair"));
             }
+            let relations = manifest["relations"].as_array().into_iter().flatten();
+            for (index, relation) in relations.enumerate() {
+                let other = paired(&manifests[relation["case"].as_str().unwrap()]);
+                for side in sides.iter().filter(|side| other.contains(side)) {
+                    listed.push(format!("{id}/relation/{index}/{side}"));
+                }
+            }
         }
+        assert!(listed.iter().any(|id| id.contains("/relation/")));
         let ids = outcomes
             .iter()
             .map(|outcome| outcome.id.clone())
@@ -1886,6 +2002,110 @@ mod tests {
                 manifest["entries"][to] = manifest["entries"][from].clone();
             });
             assert_eq!(suite.open(), invalid, "{from} on the {to} side");
+        }
+    }
+
+    /// The committed suite with the Resolver Cases `ids` as its only cases
+    /// besides the construction cases, each manifest changed by `change`.
+    fn related_suite(ids: &[&str], change: impl Fn(&Suite, &str, &mut Value)) -> Suite {
+        let suite = Suite::new();
+        let mut manifests = ids
+            .iter()
+            .map(|id| {
+                let path = format!("cases/resolver/{id}.json");
+                let mut manifest: Value = serde_json::from_slice(&suite.read(&path)).unwrap();
+                change(&suite, id, &mut manifest);
+                (*id, bytes(&manifest))
+            })
+            .collect::<Vec<_>>();
+        manifests.sort_by_key(|(id, _)| *id);
+        suite.list(Member::ResolverCases, &manifests);
+        suite.change_index(|index| {
+            index[Member::ResolverInputAdmissionCases.name()] = json!([]);
+        });
+        suite
+    }
+
+    /// A relation names a listed Resolver Case under the same construction
+    /// case, which pairs one of the declaring case's sides; otherwise the
+    /// declaring case cannot run (D15:3305).
+    #[test]
+    fn a_relation_names_a_listed_case_under_one_construction_on_a_shared_side() {
+        const ADDED: &str = "015-locale-requested-added";
+        let invalid = Err(HarnessFailure::InvalidCase(ADDED.to_owned()));
+        let opened = related_suite(&[STOREFRONT, ADDED], |_, _, _| {}).open();
+        assert_eq!(opened.err(), None);
+        assert_eq!(related_suite(&[ADDED], |_, _, _| {}).open(), invalid);
+        // The storefront under a copy of the constructing case, which builds
+        // the same resolver under another ID.
+        let copy = "015-construction-copy";
+        let suite = related_suite(&[STOREFRONT, ADDED], |suite, id, manifest| {
+            if id == STOREFRONT {
+                manifest["resolverConstruction"]["caseId"] = json!(copy);
+                let path = format!("cases/construction/{CONSTRUCTED}.json");
+                let mut construction: Value = serde_json::from_slice(&suite.read(&path)).unwrap();
+                construction["id"] = json!(copy);
+                let written = bytes(&construction);
+                let path = format!("cases/construction/{copy}.json");
+                suite.write(&path, &written);
+                let digest = file_digest(&written);
+                suite.change_index(|index| {
+                    let entry = json!({ "id": copy, "path": path, "digest": digest.as_str() });
+                    let cases = index[Member::ResolverConstructionCases.name()]
+                        .as_array_mut()
+                        .unwrap();
+                    cases.push(entry);
+                    cases.sort_by(|a, b| a["id"].as_str().cmp(&b["id"].as_str()));
+                });
+            }
+        });
+        assert_eq!(suite.open(), invalid);
+        // The storefront pairs only the file side, the declaring case only
+        // the programmatic one.
+        let suite = related_suite(&[STOREFRONT, ADDED], |_, id, manifest| {
+            let (side, reason) = if id == STOREFRONT {
+                ("programmatic", "raw-json-syntax")
+            } else {
+                ("file", "programmatic-entry-snapshot")
+            };
+            manifest["entries"][side] = json!({
+                "unpaired": { "reason": reason, "verificationOwner": "intlify_config" }
+            });
+        });
+        assert_eq!(suite.open(), invalid);
+    }
+
+    /// A relation that does not hold fails its outcome on each side both
+    /// cases pair, beside the relation's case and kind, while every other
+    /// outcome still passes (D15:3305).
+    #[test]
+    fn a_relation_that_does_not_hold_fails_on_each_side() {
+        const ADDED: &str = "015-locale-requested-added";
+        let suite = related_suite(&[STOREFRONT, ADDED], |_, id, manifest| {
+            if id == ADDED {
+                manifest["relations"][0]["kind"] = json!("profile-equal");
+            }
+        });
+        let outcomes = suite.open().unwrap().run();
+        let failed = outcomes
+            .iter()
+            .filter(|outcome| !outcome.passed())
+            .collect::<Vec<_>>();
+        let ids = failed
+            .iter()
+            .map(|outcome| outcome.id.clone())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            ids,
+            [
+                format!("{ADDED}/relation/0/file"),
+                format!("{ADDED}/relation/0/programmatic")
+            ]
+        );
+        for outcome in failed {
+            let view = |holds: bool| json!({ "case": STOREFRONT, "kind": "profile-equal", "holds": holds });
+            assert_eq!(outcome.expected, view(true));
+            assert_eq!(outcome.actual, view(false));
         }
     }
 
