@@ -3,7 +3,7 @@
 
 //! Design 015's reporting slices: the records each evaluation unit reports
 //! into the two diagnostic domains, before their bounds (D15:1941,
-//! 2205-2211).
+//! 2206-2212).
 //!
 //! Phases 0 and 1 report their Findings and statuses into the Entry domain,
 //! and every later phase into the Shared one, while the occurrences of every
@@ -166,14 +166,16 @@ pub(crate) enum Record<'e> {
     EntryDependency(EntryDependency),
 }
 
-/// A retained record, of its record kind, with its view and the length of
-/// `C` of its accounting view, `{ owner, record: { <record kind>: view } }`
-/// (D15:2519).
+/// A retained record, of its record kind, with its view, its Evidence record
+/// owner's Unit view, and the length of `C` of its accounting view,
+/// `{ owner, record: { <record kind>: view } }` (D15:2519). An expected
+/// outcome lists each record with its owner (D15:3303).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Retained<'e> {
     pub(crate) kind: RecordKind,
     pub(crate) record: Record<'e>,
     pub(crate) view: Value,
+    pub(crate) owner: Value,
     pub(crate) bytes: u64,
 }
 
@@ -628,7 +630,7 @@ impl<'e, 's> Reporting<'e, 's> {
     /// the decision table, an index record for each Evidence they refer to
     /// that `indexed` does not hold, the entry dependencies of their owner,
     /// and the Shared-unavailability causes that name its Findings (D15:2208,
-    /// 2516).
+    /// 2517).
     fn entry(
         &self,
         unit: &'e Unit,
@@ -727,6 +729,7 @@ impl<'e, 's> Reporting<'e, 's> {
             kind,
             record,
             view,
+            owner: accounting["owner"].clone(),
             bytes: bytes(&accounting),
         })
     }
@@ -880,7 +883,7 @@ mod tests {
     /// the cause in the status of a unit that reports into the Shared one:
     /// the only later row that waits on a Phase 0 or Phase 1 row is the
     /// profile specification group's owner, waiting on Phase 0's (D15:2146,
-    /// 2516; plan 025 interpretation #257).
+    /// 2517; plan 025 interpretation #257).
     /// Phase 0's unit is the Entry domain's first, so the Shared projection
     /// stage's views need no other Entry subject's token than those the
     /// Entry domain's reserved terminal records name.
@@ -977,6 +980,16 @@ mod tests {
             );
             let slices = reporting.slices().unwrap();
             let views = RecordViews::assign(PROFILE, &evaluation, &Sha256);
+            // Each record keeps its Evidence record owner's Unit view, which
+            // an expected outcome lists beside it (D15:3303).
+            for slice in &slices {
+                let owner = views.unit(slice.unit).unwrap();
+                assert!(
+                    slice.records.iter().all(|retained| retained.owner == owner),
+                    "{:?}",
+                    slice.unit
+                );
+            }
             let table = table();
             let mut expected = Vec::new();
             for (unit, _) in evaluation.statuses() {

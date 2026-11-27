@@ -53,6 +53,8 @@ use crate::snapshot::SnapshotBound;
 
 use super::index::PATH_PATTERN;
 
+mod outcome;
+
 /// The Case Schema's identity.
 pub(crate) const IDENTITY: &str = "intlify-project-profile-conformance-case";
 
@@ -64,7 +66,7 @@ pub(crate) const PATH: &str = "schemas/case-v0.schema.json";
 
 /// The Case Schema's file digest, which the runner pins.
 pub(crate) const DIGEST: &str =
-    "sha256:f039664eec285d6f3e089e98581c4c1fc99f23e21ceb11553ec7098550b12e48";
+    "sha256:fe8f8dfeb8acb4450f95987122332f0995bc310e9742c02e2893393757cb1973";
 
 /// A case or Handoff Vector ID: `015-` and lowercase kebab-case.
 pub(crate) const CASE_ID_PATTERN: &str = "^015-[a-z0-9]+(?:-[a-z0-9]+)*$";
@@ -1560,6 +1562,7 @@ pub(crate) fn schema() -> Result<Value, serde_json::Error> {
     construction(&mut definitions);
     input_admission(&mut definitions);
     resolver(&mut definitions);
+    outcome::outcome(&mut definitions);
     handoff(&mut definitions);
     obligation(&mut definitions);
     Ok(json!({

@@ -4030,6 +4030,6081 @@
         }
       }
     },
+    "phaseId": {
+      "type": "string",
+      "enum": [
+        "resolver-bootstrap-admission",
+        "entry-admission",
+        "structural-admission",
+        "profile-selection",
+        "resource-policy-admission",
+        "specification-admission",
+        "project-identity-resolution",
+        "locale-resolution",
+        "locale-policy-resolution",
+        "artifact-reference-resolution",
+        "delivery-resolution",
+        "target-resolution",
+        "group-resolution",
+        "hydration-validation",
+        "profile-projection",
+        "reporting-finalization"
+      ]
+    },
+    "versionedIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "revision"
+      ],
+      "properties": {
+        "identity": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+        }
+      }
+    },
+    "tokenView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "token"
+      ],
+      "properties": {
+        "token": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "collision": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        }
+      }
+    },
+    "unitView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "phase",
+        "subjectKind",
+        "subject",
+        "check"
+      ],
+      "properties": {
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "subjectKind": {
+          "enum": [
+            "project-profile-slot",
+            "entry-dependencies",
+            "complete-input",
+            "materialized-dependencies",
+            "configuration-schema-selection",
+            "capability-structural-analysis",
+            "root-field",
+            "profile-key",
+            "profile-field",
+            "target-profile-key",
+            "target-field",
+            "deployment-group-key",
+            "group-field",
+            "profile-specification-dependency",
+            "capability-profiles",
+            "capability-profile-id",
+            "profile-selector",
+            "capability-artifacts",
+            "capability-policy-artifacts",
+            "capability-target-profile-artifacts",
+            "capability-references",
+            "capability-artifact",
+            "capability-artifact-bytes",
+            "capability-policy-reference",
+            "capability-target-profile-reference",
+            "capability-reference-bytes",
+            "resource-limits",
+            "root-nodes",
+            "root-depth",
+            "root-collection-entries",
+            "root-string-bytes",
+            "root-longest-string",
+            "profiles",
+            "profile-id",
+            "selector",
+            "structural-analysis",
+            "artifacts",
+            "policy-artifacts",
+            "target-profile-artifacts",
+            "references",
+            "artifact",
+            "artifact-bytes",
+            "policy-reference",
+            "target-profile-reference",
+            "reference-bytes",
+            "locale-canonicalization-slot",
+            "locale-negotiation-slot",
+            "message-locale-fallback-slot",
+            "coverage-slot",
+            "intent-surface-class-vocabulary-slot",
+            "delivery-graph-slot",
+            "delivery-placement-slot",
+            "vocabulary",
+            "canonicalization-data",
+            "locale-canonicalization-dependency",
+            "declaration-field",
+            "project-identity-dependency",
+            "locale-occurrences",
+            "requested-locale",
+            "requested-locales",
+            "default-source-locale",
+            "default-requested-locale",
+            "negotiation-alias-key",
+            "negotiation-alias-value",
+            "message-fallback-key",
+            "target-profiles",
+            "target-id",
+            "target-requested-locale",
+            "target-default-requested-locale",
+            "project-locales-dependency",
+            "negotiation-aliases",
+            "negotiation-key",
+            "negotiation-destination",
+            "fallback-sources",
+            "fallback-source",
+            "fallback-sequence",
+            "fallback-candidate",
+            "fallback-literal",
+            "fallback-intent-source",
+            "coverage-rules",
+            "coverage-locale-selectors",
+            "coverage-surface-selectors",
+            "coverage-locale",
+            "coverage-surface-class",
+            "coverage-rule",
+            "coverage-domain",
+            "coverage-cells",
+            "coverage-comparisons",
+            "coverage-cell",
+            "coverage-table",
+            "locale-negotiation-dependency",
+            "message-fallback-dependency",
+            "coverage-dependency",
+            "collection-member",
+            "collection-group",
+            "resolved-policy-reference",
+            "resolved-target-profile-reference",
+            "required-policies-dependency",
+            "optional-policies-dependency",
+            "delivery-placement",
+            "delivery-dependency",
+            "target",
+            "targets-dependency",
+            "groups",
+            "memberships",
+            "group",
+            "group-members",
+            "group-member",
+            "assignment",
+            "relations",
+            "relation-endpoint",
+            "relation",
+            "roles",
+            "deployment-groups-dependency",
+            "diagnostic-domain"
+          ],
+          "type": "string"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        },
+        "check": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*\\.[a-z][a-z0-9]*(-[a-z0-9]+)*\\.[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+        }
+      }
+    },
+    "findingKey:project-profile-json-invalid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "entry.input.well-formed-json"
+          ]
+        },
+        "code": {
+          "const": "project-profile-json-invalid"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-json-member-duplicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "entry.input.unique-members"
+          ]
+        },
+        "code": {
+          "const": "project-profile-json-member-duplicate"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-input-not-json-compatible": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject",
+        "reason"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "entry.input.json-compatible"
+          ]
+        },
+        "code": {
+          "const": "project-profile-input-not-json-compatible"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "unsupported-type",
+            "non-finite-number",
+            "non-portable-number",
+            "invalid-unicode",
+            "non-string-key",
+            "dynamic-container",
+            "dynamic-property",
+            "sparse-array",
+            "cycle"
+          ]
+        }
+      }
+    },
+    "findingKey:project-profile-schema-version-unsupported": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "structural.schema-selection.supported-schema-version"
+          ]
+        },
+        "code": {
+          "const": "project-profile-schema-version-unsupported"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-required-field-missing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "structural.schema-selection.present-schema-version",
+            "structural.root.required-field",
+            "structural.profile.required-field",
+            "structural.target.required-field",
+            "structural.group.required-field"
+          ]
+        },
+        "code": {
+          "const": "project-profile-required-field-missing"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-field-type-invalid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "structural.schema-selection.object-root",
+            "structural.schema-selection.string-schema-version",
+            "structural.root.field-type",
+            "structural.profile.field-type",
+            "structural.target.field-type",
+            "structural.group.field-type"
+          ]
+        },
+        "code": {
+          "const": "project-profile-field-type-invalid"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-field-value-invalid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "structural.root.field-value",
+            "structural.profile-key.field-value",
+            "structural.profile.field-value",
+            "structural.target-key.field-value",
+            "structural.target.field-value",
+            "structural.group-key.field-value",
+            "structural.group.field-value"
+          ]
+        },
+        "code": {
+          "const": "project-profile-field-value-invalid"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-unknown-field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "structural.root.known-field",
+            "structural.profile.known-field",
+            "structural.target.known-field",
+            "structural.group.known-field"
+          ]
+        },
+        "code": {
+          "const": "project-profile-unknown-field"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-selector-required": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "selection.selector.required"
+          ]
+        },
+        "code": {
+          "const": "project-profile-selector-required"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-selector-invalid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "selection.selector.valid"
+          ]
+        },
+        "code": {
+          "const": "project-profile-selector-invalid"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-selector-unknown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "selection.selector.declared"
+          ]
+        },
+        "code": {
+          "const": "project-profile-selector-unknown"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-specification-input-incomplete": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject",
+        "reason"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "specification.project-profile.supported",
+            "specification.locale-canonicalization.supported",
+            "specification.locale-negotiation.supported",
+            "specification.message-locale-fallback.supported",
+            "specification.coverage.supported",
+            "specification.intent-surface-class-vocabulary.supported",
+            "specification.delivery-graph.supported",
+            "specification.delivery-placement.supported"
+          ]
+        },
+        "code": {
+          "const": "project-profile-specification-input-incomplete"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "missing-required-slot"
+          ]
+        }
+      }
+    },
+    "findingKey:project-profile-specification-not-admitted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject",
+        "reason"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "specification.project-profile.supported"
+          ]
+        },
+        "code": {
+          "const": "project-profile-specification-not-admitted"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "unsupported",
+            "incompatible"
+          ]
+        }
+      }
+    },
+    "findingKey:project-profile-locale-specification-not-admitted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject",
+        "reason"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "specification.locale-canonicalization.supported"
+          ]
+        },
+        "code": {
+          "const": "project-profile-locale-specification-not-admitted"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "unsupported",
+            "incompatible"
+          ]
+        }
+      }
+    },
+    "findingKey:project-profile-locale-data-not-admitted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "specification.locale-data.manifest-intact",
+            "specification.locale-data.markers-readable",
+            "specification.locale-data.conformance-readable",
+            "specification.locale-data.dataset-intact",
+            "specification.locale-data.matching"
+          ]
+        },
+        "code": {
+          "const": "project-profile-locale-data-not-admitted"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-negotiation-specification-not-admitted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject",
+        "reason"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "specification.locale-negotiation.supported"
+          ]
+        },
+        "code": {
+          "const": "project-profile-negotiation-specification-not-admitted"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "unsupported",
+            "incompatible"
+          ]
+        }
+      }
+    },
+    "findingKey:project-profile-message-fallback-specification-not-admitted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject",
+        "reason"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "specification.message-locale-fallback.supported"
+          ]
+        },
+        "code": {
+          "const": "project-profile-message-fallback-specification-not-admitted"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "unsupported",
+            "incompatible"
+          ]
+        }
+      }
+    },
+    "findingKey:project-profile-coverage-specification-not-admitted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject",
+        "reason"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "specification.coverage.supported"
+          ]
+        },
+        "code": {
+          "const": "project-profile-coverage-specification-not-admitted"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "unsupported",
+            "incompatible"
+          ]
+        }
+      }
+    },
+    "findingKey:project-profile-delivery-specification-not-admitted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject",
+        "reason"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "specification.delivery-graph.supported",
+            "specification.delivery-placement.supported"
+          ]
+        },
+        "code": {
+          "const": "project-profile-delivery-specification-not-admitted"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "unsupported",
+            "incompatible"
+          ]
+        }
+      }
+    },
+    "findingKey:project-profile-intent-surface-class-vocabulary-not-admitted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject",
+        "reason"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "specification.vocabulary.intact",
+            "specification.vocabulary.asserted"
+          ]
+        },
+        "code": {
+          "const": "project-profile-intent-surface-class-vocabulary-not-admitted"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "body-integrity-invalid",
+            "member-invalid",
+            "member-duplicate",
+            "non-canonical-order",
+            "identity-mismatch",
+            "revision-mismatch",
+            "digest-mismatch"
+          ]
+        }
+      }
+    },
+    "findingKey:project-profile-locale-invalid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "locale.requested.canonical",
+            "locale.default-source.canonical",
+            "locale.default-requested.canonical",
+            "locale.alias-key.canonical",
+            "locale.alias-destination.canonical",
+            "locale.fallback-key.canonical",
+            "locale.target-requested.canonical",
+            "locale.target-default-requested.canonical",
+            "fallback.candidate.canonical",
+            "coverage.locale.canonical"
+          ]
+        },
+        "code": {
+          "const": "project-profile-locale-invalid"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-locale-non-canonical": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "locale.requested.canonical",
+            "locale.default-source.canonical",
+            "locale.default-requested.canonical",
+            "locale.alias-key.canonical",
+            "locale.alias-destination.canonical",
+            "locale.fallback-key.canonical",
+            "locale.target-requested.canonical",
+            "locale.target-default-requested.canonical",
+            "fallback.candidate.canonical",
+            "coverage.locale.canonical"
+          ]
+        },
+        "code": {
+          "const": "project-profile-locale-non-canonical"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-locale-duplicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "locale.requested.unique",
+            "locale.target-requested.unique",
+            "fallback.source.unique",
+            "coverage.locale.unique"
+          ]
+        },
+        "code": {
+          "const": "project-profile-locale-duplicate"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-default-requested-locale-not-in-project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "locale.default-requested.member"
+          ]
+        },
+        "code": {
+          "const": "project-profile-default-requested-locale-not-in-project"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-target-locales-not-subset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "target.requested-locales.project-subset"
+          ]
+        },
+        "code": {
+          "const": "project-profile-target-locales-not-subset"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-target-default-locale-not-supported": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject",
+        "reason"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "target.effective-default.supported"
+          ]
+        },
+        "code": {
+          "const": "project-profile-target-default-locale-not-supported"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "explicit-override",
+            "inherited-project-default"
+          ]
+        }
+      }
+    },
+    "findingKey:project-profile-target-locale-direction-missing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "target.requested-locales.directed"
+          ]
+        },
+        "code": {
+          "const": "project-profile-target-locale-direction-missing"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-negotiation-alias-duplicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject",
+        "reason"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "negotiation.alias-key.unique"
+          ]
+        },
+        "code": {
+          "const": "project-profile-negotiation-alias-duplicate"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "same-destination",
+            "conflicting-destination"
+          ]
+        }
+      }
+    },
+    "findingKey:project-profile-negotiation-alias-destination-not-requested": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "negotiation.destination.member"
+          ]
+        },
+        "code": {
+          "const": "project-profile-negotiation-alias-destination-not-requested"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-message-fallback-source-not-requested": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "fallback.source.member"
+          ]
+        },
+        "code": {
+          "const": "project-profile-message-fallback-source-not-requested"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-message-fallback-sequence-invalid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject",
+        "reason"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "fallback.candidate.distinct-from-source",
+            "fallback.literal.unique",
+            "fallback.intent-source.unique"
+          ]
+        },
+        "code": {
+          "const": "project-profile-message-fallback-sequence-invalid"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "literal-self-reference",
+            "literal-duplicate",
+            "intent-source-duplicate"
+          ]
+        }
+      }
+    },
+    "findingKey:project-profile-coverage-rule-invalid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject",
+        "reason"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "coverage.locale.member",
+            "coverage.surface-class.vocabulary-member",
+            "coverage.surface-class.unique"
+          ]
+        },
+        "code": {
+          "const": "project-profile-coverage-rule-invalid"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "locale-not-requested",
+            "surface-class-unknown",
+            "surface-class-duplicate"
+          ]
+        }
+      }
+    },
+    "findingKey:project-profile-coverage-rule-duplicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "coverage.domain.unique"
+          ]
+        },
+        "code": {
+          "const": "project-profile-coverage-rule-duplicate"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-coverage-rule-conflict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "coverage.cell.effective-mode"
+          ]
+        },
+        "code": {
+          "const": "project-profile-coverage-rule-conflict"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-artifact-reference-not-admitted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject",
+        "reason"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "resource-policy.resource-limits.bootstrap-candidate",
+            "artifact.policy-reference.resolved",
+            "artifact.target-profile-reference.resolved"
+          ]
+        },
+        "code": {
+          "const": "project-profile-artifact-reference-not-admitted"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "not-found",
+            "kind-mismatch",
+            "identity-mismatch",
+            "revision-mismatch",
+            "specification-revision-mismatch",
+            "specification-revision-unsupported",
+            "role-kind-mismatch",
+            "digest-mismatch"
+          ]
+        }
+      }
+    },
+    "findingKey:project-profile-artifact-collection-not-admitted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject",
+        "reason"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "resource-policy.resource-limits.bootstrap-candidate",
+            "artifact.member.admissible",
+            "artifact.member.single-occurrence",
+            "artifact.conflict-group.consistent-content"
+          ]
+        },
+        "code": {
+          "const": "project-profile-artifact-collection-not-admitted"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "envelope-invalid",
+            "kind-unsupported",
+            "duplicate-envelope",
+            "conflicting-content"
+          ]
+        }
+      }
+    },
+    "findingKey:project-profile-group-member-unknown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "group.member.known"
+          ]
+        },
+        "code": {
+          "const": "project-profile-group-member-unknown"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-group-member-duplicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "group.member.unique"
+          ]
+        },
+        "code": {
+          "const": "project-profile-group-member-duplicate"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-target-unassigned": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "group.target.single-group"
+          ]
+        },
+        "code": {
+          "const": "project-profile-target-unassigned"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-target-assigned-to-multiple-groups": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "group.target.single-group"
+          ]
+        },
+        "code": {
+          "const": "project-profile-target-assigned-to-multiple-groups"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-hydration-relation-invalid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject",
+        "reason"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "hydration.endpoint.known",
+            "hydration.endpoint.same-group",
+            "hydration.endpoint.role",
+            "hydration.relation.distinct-endpoints",
+            "hydration.relation.unique",
+            "hydration.target.single-role"
+          ]
+        },
+        "code": {
+          "const": "project-profile-hydration-relation-invalid"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "equal-endpoint",
+            "unknown-endpoint",
+            "cross-group",
+            "duplicate-relation",
+            "server-capability-missing",
+            "client-capability-missing",
+            "dual-role"
+          ]
+        }
+      }
+    },
+    "findingKey:project-profile-hydration-locale-policy-incompatible": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject",
+        "reason"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "hydration.relation.same-requested-locales",
+            "hydration.relation.same-effective-default"
+          ]
+        },
+        "code": {
+          "const": "project-profile-hydration-locale-policy-incompatible"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "requested-locales",
+            "effective-default"
+          ]
+        }
+      }
+    },
+    "findingKey:project-profile-hydration-capability-incompatible": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "hydration.relation.static-compatibility"
+          ]
+        },
+        "code": {
+          "const": "project-profile-hydration-capability-incompatible"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-resource-policy-not-admitted": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject",
+        "reason"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "resource-policy.resource-limits.candidate-body"
+          ]
+        },
+        "code": {
+          "const": "project-profile-resource-policy-not-admitted"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "body-integrity-invalid",
+            "body-schema-invalid",
+            "project-profile-resolution-missing",
+            "project-profile-resolution-invalid"
+          ]
+        }
+      }
+    },
+    "findingKey:project-profile-resource-policy-capability-incompatible": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "resource-policy.resource-limits.compatible"
+          ]
+        },
+        "code": {
+          "const": "project-profile-resource-policy-capability-incompatible"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-bootstrap-limit-exceeded": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "entry.input.within-file-bytes",
+            "entry.input.within-parser-tokens",
+            "entry.input.within-snapshot-nodes",
+            "entry.input.within-snapshot-depth",
+            "entry.input.within-snapshot-collection-entries",
+            "entry.input.within-snapshot-total-string-bytes",
+            "entry.input.within-snapshot-single-string-bytes",
+            "entry.input.within-snapshot-rejected-markers",
+            "entry.input.within-snapshot-envelope-canonical-bytes",
+            "entry.input.within-snapshot-single-marker-canonical-bytes",
+            "entry.input.within-snapshot-traversal-units",
+            "resource-policy.resource-limits.within-metadata-scan",
+            "resource-policy.resource-limits.within-envelope-depth",
+            "resource-policy.resource-limits.within-decoded-allocation",
+            "resource-policy.resource-limits.within-validation-work",
+            "specification.locale-data.within-payloads",
+            "specification.locale-data.within-payload-bytes",
+            "specification.locale-data.within-marker-bytes",
+            "specification.locale-data.within-validity-groups",
+            "specification.locale-data.within-codes",
+            "specification.locale-data.within-extension-keys",
+            "specification.locale-data.within-types",
+            "specification.locale-data.within-corrections",
+            "specification.locale-data.within-validation-work"
+          ]
+        },
+        "code": {
+          "const": "project-profile-bootstrap-limit-exceeded"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-resource-limit-exceeded": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "entry.input.within-nodes",
+            "entry.input.within-depth",
+            "entry.input.within-collection-entries",
+            "entry.input.within-total-string-bytes",
+            "entry.input.within-single-string-bytes",
+            "structural.analysis.within-capability",
+            "selection.profiles.within-capability",
+            "selection.profile-id.within-capability",
+            "selection.selector.within-capability",
+            "resource-policy.artifacts.within-capability",
+            "resource-policy.policy-artifacts.within-capability",
+            "resource-policy.target-profile-artifacts.within-capability",
+            "resource-policy.references.within-capability",
+            "resource-policy.artifact.within-capability",
+            "resource-policy.artifact-bytes.within-capability",
+            "resource-policy.policy-reference.within-capability",
+            "resource-policy.target-profile-reference.within-capability",
+            "resource-policy.reference-bytes.within-capability",
+            "resource-policy.root-nodes.within-bound",
+            "resource-policy.root-depth.within-bound",
+            "resource-policy.root-collection-entries.within-bound",
+            "resource-policy.root-string-bytes.within-bound",
+            "resource-policy.root-longest-string.within-bound",
+            "resource-policy.profiles.within-bound",
+            "resource-policy.profile-id.within-bound",
+            "resource-policy.selector.within-bound",
+            "resource-policy.structural-analysis.within-bound",
+            "resource-policy.artifacts.within-bound",
+            "resource-policy.policy-artifacts.within-bound",
+            "resource-policy.target-profile-artifacts.within-bound",
+            "resource-policy.references.within-bound",
+            "resource-policy.artifact.within-bound",
+            "resource-policy.artifact-bytes.within-bound",
+            "resource-policy.policy-reference.within-bound",
+            "resource-policy.target-profile-reference.within-bound",
+            "resource-policy.reference-bytes.within-bound",
+            "locale.occurrences.within-bound",
+            "locale.requested.canonical",
+            "locale.requested-set.within-bound",
+            "locale.default-source.canonical",
+            "locale.default-requested.canonical",
+            "locale.alias-key.canonical",
+            "locale.alias-destination.canonical",
+            "locale.fallback-key.canonical",
+            "locale.target-profiles.within-bound",
+            "locale.target-id.within-bound",
+            "locale.target-requested.canonical",
+            "locale.target-default-requested.canonical",
+            "negotiation.aliases.within-bound",
+            "fallback.sources.within-bound",
+            "fallback.sequence.within-bound",
+            "fallback.candidate.canonical",
+            "coverage.rules.within-bound",
+            "coverage.locale-selectors.within-bound",
+            "coverage.surface-selectors.within-bound",
+            "coverage.locale.canonical",
+            "coverage.cells.within-bound",
+            "coverage.comparisons.within-bound",
+            "group.groups.within-bound",
+            "group.memberships.within-bound",
+            "group.group-id.within-bound",
+            "group.members.within-bound",
+            "group.member.within-bound",
+            "hydration.relations.within-bound",
+            "hydration.endpoint.within-bound"
+          ]
+        },
+        "code": {
+          "const": "project-profile-resource-limit-exceeded"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        }
+      }
+    },
+    "findingKey:project-profile-reporting-limit-exceeded": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification",
+        "phase",
+        "check",
+        "code",
+        "subject",
+        "reason"
+      ],
+      "properties": {
+        "specification": {
+          "$ref": "#/definitions/versionedIdentity"
+        },
+        "phase": {
+          "$ref": "#/definitions/phaseId"
+        },
+        "check": {
+          "type": "string",
+          "enum": [
+            "reporting.diagnostic-domain.complete"
+          ]
+        },
+        "code": {
+          "const": "project-profile-reporting-limit-exceeded"
+        },
+        "subject": {
+          "$ref": "#/definitions/tokenView"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "entry",
+            "shared"
+          ]
+        }
+      }
+    },
+    "findingKeyView": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/findingKey:project-profile-json-invalid"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-json-member-duplicate"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-input-not-json-compatible"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-schema-version-unsupported"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-required-field-missing"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-field-type-invalid"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-field-value-invalid"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-unknown-field"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-selector-required"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-selector-invalid"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-selector-unknown"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-specification-input-incomplete"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-specification-not-admitted"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-locale-specification-not-admitted"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-locale-data-not-admitted"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-negotiation-specification-not-admitted"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-message-fallback-specification-not-admitted"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-coverage-specification-not-admitted"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-delivery-specification-not-admitted"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-intent-surface-class-vocabulary-not-admitted"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-locale-invalid"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-locale-non-canonical"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-locale-duplicate"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-default-requested-locale-not-in-project"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-target-locales-not-subset"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-target-default-locale-not-supported"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-target-locale-direction-missing"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-negotiation-alias-duplicate"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-negotiation-alias-destination-not-requested"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-message-fallback-source-not-requested"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-message-fallback-sequence-invalid"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-coverage-rule-invalid"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-coverage-rule-duplicate"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-coverage-rule-conflict"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-artifact-reference-not-admitted"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-artifact-collection-not-admitted"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-group-member-unknown"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-group-member-duplicate"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-target-unassigned"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-target-assigned-to-multiple-groups"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-hydration-relation-invalid"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-hydration-locale-policy-incompatible"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-hydration-capability-incompatible"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-resource-policy-not-admitted"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-resource-policy-capability-incompatible"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-bootstrap-limit-exceeded"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-resource-limit-exceeded"
+        },
+        {
+          "$ref": "#/definitions/findingKey:project-profile-reporting-limit-exceeded"
+        }
+      ]
+    },
+    "findingView": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-json-invalid"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-json-member-duplicate"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-input-not-json-compatible"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "unsupported-type",
+                    "non-finite-number",
+                    "non-portable-number",
+                    "invalid-unicode",
+                    "non-string-key",
+                    "dynamic-container",
+                    "dynamic-property",
+                    "sparse-array",
+                    "cycle"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-schema-version-unsupported"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-required-field-missing"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "field"
+              ],
+              "properties": {
+                "field": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-field-type-invalid"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "field"
+              ],
+              "properties": {
+                "field": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-field-value-invalid"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "field"
+              ],
+              "properties": {
+                "field": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-unknown-field"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "field"
+              ],
+              "properties": {
+                "field": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-selector-required"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-selector-invalid"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-selector-unknown"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-specification-input-incomplete"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason",
+                "slot"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "missing-required-slot"
+                  ]
+                },
+                "slot": {
+                  "type": "string",
+                  "enum": [
+                    "project-profile",
+                    "locale-canonicalization",
+                    "locale-negotiation",
+                    "message-locale-fallback",
+                    "coverage",
+                    "intent-surface-class-vocabulary",
+                    "delivery-graph",
+                    "delivery-placement"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-specification-not-admitted"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "unsupported",
+                    "incompatible"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-locale-specification-not-admitted"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "unsupported",
+                    "incompatible"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-locale-data-not-admitted"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-negotiation-specification-not-admitted"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "unsupported",
+                    "incompatible"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-message-fallback-specification-not-admitted"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "unsupported",
+                    "incompatible"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-coverage-specification-not-admitted"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "unsupported",
+                    "incompatible"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-delivery-specification-not-admitted"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason",
+                "component"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "unsupported",
+                    "incompatible"
+                  ]
+                },
+                "component": {
+                  "type": "string",
+                  "enum": [
+                    "delivery-graph",
+                    "delivery-placement"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-intent-surface-class-vocabulary-not-admitted"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "body-integrity-invalid",
+                    "member-invalid",
+                    "member-duplicate",
+                    "non-canonical-order",
+                    "identity-mismatch",
+                    "revision-mismatch",
+                    "digest-mismatch"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-locale-invalid"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "suggestion"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-locale-non-canonical"
+            },
+            "severity": {
+              "const": "warning"
+            },
+            "blocking": {
+              "const": false
+            },
+            "suggestion": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "canonical-locale-replacement"
+              ],
+              "properties": {
+                "canonical-locale-replacement": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-locale-duplicate"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-default-requested-locale-not-in-project"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-target-locales-not-subset"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-target-default-locale-not-supported"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "explicit-override",
+                    "inherited-project-default"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-target-locale-direction-missing"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-negotiation-alias-duplicate"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "same-destination",
+                    "conflicting-destination"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-negotiation-alias-destination-not-requested"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-message-fallback-source-not-requested"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-message-fallback-sequence-invalid"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "literal-self-reference",
+                    "literal-duplicate",
+                    "intent-source-duplicate"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-coverage-rule-invalid"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "locale-not-requested",
+                    "surface-class-unknown",
+                    "surface-class-duplicate"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-coverage-rule-duplicate"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-coverage-rule-conflict"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-artifact-reference-not-admitted"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "not-found",
+                    "kind-mismatch",
+                    "identity-mismatch",
+                    "revision-mismatch",
+                    "specification-revision-mismatch",
+                    "specification-revision-unsupported",
+                    "role-kind-mismatch",
+                    "digest-mismatch"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-artifact-collection-not-admitted"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "envelope-invalid",
+                    "kind-unsupported",
+                    "duplicate-envelope",
+                    "conflicting-content"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-group-member-unknown"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-group-member-duplicate"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-target-unassigned"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-target-assigned-to-multiple-groups"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-hydration-relation-invalid"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "equal-endpoint",
+                    "unknown-endpoint",
+                    "cross-group",
+                    "duplicate-relation",
+                    "server-capability-missing",
+                    "client-capability-missing",
+                    "dual-role"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-hydration-locale-policy-incompatible"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "requested-locales",
+                    "effective-default"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-hydration-capability-incompatible"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-resource-policy-not-admitted"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "body-integrity-invalid",
+                    "body-schema-invalid",
+                    "project-profile-resolution-missing",
+                    "project-profile-resolution-invalid"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-resource-policy-capability-incompatible"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "resourceGroup",
+                "bound",
+                "required",
+                "available"
+              ],
+              "properties": {
+                "resourceGroup": {
+                  "type": "string",
+                  "enum": [
+                    "configurationInput",
+                    "localeResolution",
+                    "artifactAdmission",
+                    "targetGrouping",
+                    "diagnostics.entry",
+                    "diagnostics.shared"
+                  ]
+                },
+                "bound": {
+                  "type": "string",
+                  "pattern": "^[a-z][A-Za-z0-9]*(?:\\.[a-z][A-Za-z0-9]*)*$"
+                },
+                "required": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]*)$"
+                },
+                "available": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]*)$"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-bootstrap-limit-exceeded"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "bound",
+                "limit",
+                "actual",
+                "actualRelation"
+              ],
+              "properties": {
+                "bound": {
+                  "type": "string",
+                  "pattern": "^[a-z][A-Za-z0-9]*(?:\\.[a-z][A-Za-z0-9]*)*$"
+                },
+                "limit": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]*)$"
+                },
+                "actual": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]*)$"
+                },
+                "actualRelation": {
+                  "type": "string",
+                  "enum": [
+                    "exact",
+                    "at-least"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-resource-limit-exceeded"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "subject",
+                "resourceGroup",
+                "bound",
+                "limit",
+                "actual",
+                "actualRelation"
+              ],
+              "properties": {
+                "subject": {
+                  "enum": [
+                    "project-profile-slot",
+                    "entry-dependencies",
+                    "complete-input",
+                    "materialized-dependencies",
+                    "configuration-schema-selection",
+                    "capability-structural-analysis",
+                    "root-field",
+                    "profile-key",
+                    "profile-field",
+                    "target-profile-key",
+                    "target-field",
+                    "deployment-group-key",
+                    "group-field",
+                    "profile-specification-dependency",
+                    "capability-profiles",
+                    "capability-profile-id",
+                    "profile-selector",
+                    "capability-artifacts",
+                    "capability-policy-artifacts",
+                    "capability-target-profile-artifacts",
+                    "capability-references",
+                    "capability-artifact",
+                    "capability-artifact-bytes",
+                    "capability-policy-reference",
+                    "capability-target-profile-reference",
+                    "capability-reference-bytes",
+                    "resource-limits",
+                    "root-nodes",
+                    "root-depth",
+                    "root-collection-entries",
+                    "root-string-bytes",
+                    "root-longest-string",
+                    "profiles",
+                    "profile-id",
+                    "selector",
+                    "structural-analysis",
+                    "artifacts",
+                    "policy-artifacts",
+                    "target-profile-artifacts",
+                    "references",
+                    "artifact",
+                    "artifact-bytes",
+                    "policy-reference",
+                    "target-profile-reference",
+                    "reference-bytes",
+                    "locale-canonicalization-slot",
+                    "locale-negotiation-slot",
+                    "message-locale-fallback-slot",
+                    "coverage-slot",
+                    "intent-surface-class-vocabulary-slot",
+                    "delivery-graph-slot",
+                    "delivery-placement-slot",
+                    "vocabulary",
+                    "canonicalization-data",
+                    "locale-canonicalization-dependency",
+                    "declaration-field",
+                    "project-identity-dependency",
+                    "locale-occurrences",
+                    "requested-locale",
+                    "requested-locales",
+                    "default-source-locale",
+                    "default-requested-locale",
+                    "negotiation-alias-key",
+                    "negotiation-alias-value",
+                    "message-fallback-key",
+                    "target-profiles",
+                    "target-id",
+                    "target-requested-locale",
+                    "target-default-requested-locale",
+                    "project-locales-dependency",
+                    "negotiation-aliases",
+                    "negotiation-key",
+                    "negotiation-destination",
+                    "fallback-sources",
+                    "fallback-source",
+                    "fallback-sequence",
+                    "fallback-candidate",
+                    "fallback-literal",
+                    "fallback-intent-source",
+                    "coverage-rules",
+                    "coverage-locale-selectors",
+                    "coverage-surface-selectors",
+                    "coverage-locale",
+                    "coverage-surface-class",
+                    "coverage-rule",
+                    "coverage-domain",
+                    "coverage-cells",
+                    "coverage-comparisons",
+                    "coverage-cell",
+                    "coverage-table",
+                    "locale-negotiation-dependency",
+                    "message-fallback-dependency",
+                    "coverage-dependency",
+                    "collection-member",
+                    "collection-group",
+                    "resolved-policy-reference",
+                    "resolved-target-profile-reference",
+                    "required-policies-dependency",
+                    "optional-policies-dependency",
+                    "delivery-placement",
+                    "delivery-dependency",
+                    "target",
+                    "targets-dependency",
+                    "groups",
+                    "memberships",
+                    "group",
+                    "group-members",
+                    "group-member",
+                    "assignment",
+                    "relations",
+                    "relation-endpoint",
+                    "relation",
+                    "roles",
+                    "deployment-groups-dependency",
+                    "diagnostic-domain"
+                  ],
+                  "type": "string"
+                },
+                "resourceGroup": {
+                  "type": "string",
+                  "enum": [
+                    "configurationInput",
+                    "localeResolution",
+                    "artifactAdmission",
+                    "targetGrouping",
+                    "diagnostics.entry",
+                    "diagnostics.shared"
+                  ]
+                },
+                "bound": {
+                  "type": "string",
+                  "pattern": "^[a-z][A-Za-z0-9]*(?:\\.[a-z][A-Za-z0-9]*)*$"
+                },
+                "limit": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]*)$"
+                },
+                "actual": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]*)$"
+                },
+                "actualRelation": {
+                  "type": "string",
+                  "enum": [
+                    "exact",
+                    "at-least"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "severity",
+            "blocking",
+            "details"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/findingKey:project-profile-reporting-limit-exceeded"
+            },
+            "severity": {
+              "const": "error"
+            },
+            "blocking": {
+              "const": true
+            },
+            "details": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "reason",
+                "bound"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "entry",
+                    "shared"
+                  ]
+                },
+                "bound": {
+                  "type": "string",
+                  "pattern": "^[a-z][A-Za-z0-9]*(?:\\.[a-z][A-Za-z0-9]*)*$"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "evaluationStatusView": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "unit",
+            "state"
+          ],
+          "properties": {
+            "unit": {
+              "$ref": "#/definitions/unitView"
+            },
+            "state": {
+              "const": "evaluated"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "unit",
+            "state",
+            "causes"
+          ],
+          "properties": {
+            "unit": {
+              "$ref": "#/definitions/unitView"
+            },
+            "state": {
+              "const": "not-evaluated"
+            },
+            "causes": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/findingKeyView"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "sharedUnavailabilityCauseView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cause"
+      ],
+      "properties": {
+        "cause": {
+          "$ref": "#/definitions/findingKeyView"
+        }
+      }
+    },
+    "terminalStateView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "domain",
+        "nextUnitCursor",
+        "cause"
+      ],
+      "properties": {
+        "domain": {
+          "type": "string",
+          "enum": [
+            "entry",
+            "shared"
+          ]
+        },
+        "nextUnitCursor": {
+          "$ref": "#/definitions/unitView"
+        },
+        "cause": {
+          "$ref": "#/definitions/findingKeyView"
+        }
+      }
+    },
+    "ruleDomainView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "locales",
+        "surfaceClasses"
+      ],
+      "properties": {
+        "locales": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "surfaceClasses": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "coverageDecisionBasisView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cell",
+        "mode",
+        "decision",
+        "domains"
+      ],
+      "properties": {
+        "cell": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "locale",
+            "surfaceClass"
+          ],
+          "properties": {
+            "locale": {
+              "type": "string",
+              "minLength": 1
+            },
+            "surfaceClass": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "mode": {
+          "enum": [
+            "direct-required",
+            "fallback-allowed"
+          ],
+          "type": "string"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "default",
+            "rule"
+          ]
+        },
+        "domains": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ruleDomainView"
+          }
+        }
+      }
+    },
+    "coverageDecisionEvidenceView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cell",
+        "source",
+        "evidence"
+      ],
+      "properties": {
+        "cell": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "locale",
+            "surfaceClass"
+          ],
+          "properties": {
+            "locale": {
+              "type": "string",
+              "minLength": 1
+            },
+            "surfaceClass": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "source": {
+          "oneOf": [
+            {
+              "const": "default"
+            },
+            {
+              "$ref": "#/definitions/ruleDomainView"
+            }
+          ]
+        },
+        "evidence": {
+          "$ref": "#/definitions/evidenceView"
+        }
+      }
+    },
+    "findingOccurrenceView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "finding",
+        "primary",
+        "ordinal",
+        "related"
+      ],
+      "properties": {
+        "finding": {
+          "$ref": "#/definitions/findingKeyView"
+        },
+        "primary": {
+          "$ref": "#/definitions/evidenceView"
+        },
+        "ordinal": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "related": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/evidenceView"
+          }
+        }
+      }
+    },
+    "semanticDependencyView": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "group",
+            "inputs"
+          ],
+          "properties": {
+            "group": {
+              "const": "profileSpecification"
+            },
+            "inputs": {
+              "const": []
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "group",
+            "inputs"
+          ],
+          "properties": {
+            "group": {
+              "const": "projectIdentity"
+            },
+            "inputs": {
+              "const": [
+                "configuration-value"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "group",
+            "inputs"
+          ],
+          "properties": {
+            "group": {
+              "const": "localeCanonicalization"
+            },
+            "inputs": {
+              "const": [
+                "specification-input",
+                "locale-canonicalization-data"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "group",
+            "inputs"
+          ],
+          "properties": {
+            "group": {
+              "const": "projectLocales"
+            },
+            "inputs": {
+              "const": [
+                "specification-input",
+                "locale-canonicalization-data",
+                "artifact-collection",
+                "configuration-value"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "group",
+            "inputs"
+          ],
+          "properties": {
+            "group": {
+              "const": "localeNegotiation"
+            },
+            "inputs": {
+              "const": [
+                "specification-input",
+                "locale-canonicalization-data",
+                "artifact-collection",
+                "configuration-value"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "group",
+            "inputs"
+          ],
+          "properties": {
+            "group": {
+              "const": "messageFallback"
+            },
+            "inputs": {
+              "const": [
+                "specification-input",
+                "locale-canonicalization-data",
+                "artifact-collection",
+                "configuration-value"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "group",
+            "inputs"
+          ],
+          "properties": {
+            "group": {
+              "const": "coverage"
+            },
+            "inputs": {
+              "const": [
+                "specification-input",
+                "intent-surface-class-vocabulary",
+                "locale-canonicalization-data",
+                "artifact-collection",
+                "configuration-value"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "group",
+            "inputs"
+          ],
+          "properties": {
+            "group": {
+              "const": "requiredPolicies"
+            },
+            "inputs": {
+              "const": [
+                "artifact-collection",
+                "configuration-value"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "group",
+            "inputs"
+          ],
+          "properties": {
+            "group": {
+              "const": "optionalPolicies"
+            },
+            "inputs": {
+              "const": [
+                "artifact-collection",
+                "configuration-value"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "group",
+            "inputs"
+          ],
+          "properties": {
+            "group": {
+              "const": "targets"
+            },
+            "inputs": {
+              "const": [
+                "specification-input",
+                "locale-canonicalization-data",
+                "artifact-collection",
+                "configuration-value"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "group",
+            "inputs"
+          ],
+          "properties": {
+            "group": {
+              "const": "deploymentGroups"
+            },
+            "inputs": {
+              "const": [
+                "specification-input",
+                "locale-canonicalization-data",
+                "artifact-collection",
+                "configuration-value"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "group",
+            "inputs"
+          ],
+          "properties": {
+            "group": {
+              "const": "delivery"
+            },
+            "inputs": {
+              "const": [
+                "specification-input",
+                "configuration-value"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "materializedDependencyView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "slot"
+      ],
+      "properties": {
+        "slot": {
+          "type": "string",
+          "enum": [
+            "specification-input",
+            "intent-surface-class-vocabulary",
+            "locale-canonicalization-data",
+            "artifact-collection",
+            "verification-input",
+            "implementation-capability",
+            "configuration-value",
+            "profile-selector"
+          ]
+        }
+      }
+    },
+    "entryDependencyView": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "slot",
+            "source",
+            "revision"
+          ],
+          "properties": {
+            "slot": {
+              "type": "string",
+              "enum": [
+                "entry-source",
+                "call-site-source"
+              ]
+            },
+            "source": {
+              "$ref": "#/definitions/sourceView"
+            },
+            "revision": {
+              "type": "string",
+              "minLength": 1
+            },
+            "locator": {
+              "$ref": "#/definitions/locatorView"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "slot",
+            "selector"
+          ],
+          "properties": {
+            "slot": {
+              "const": "profile-selector"
+            },
+            "selector": {
+              "$ref": "#/definitions/selectorView"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "slot",
+            "origins"
+          ],
+          "properties": {
+            "slot": {
+              "const": "origins"
+            },
+            "origins": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "specification-input",
+                    "intent-surface-class-vocabulary",
+                    "locale-canonicalization-data",
+                    "artifact-collection",
+                    "verification-input",
+                    "implementation-capability",
+                    "entry-source",
+                    "profile-selector"
+                  ],
+                  "properties": {
+                    "specification-input": {
+                      "const": "profile-resolution-specification-input"
+                    },
+                    "intent-surface-class-vocabulary": {
+                      "const": "intent-surface-class-vocabulary"
+                    },
+                    "locale-canonicalization-data": {
+                      "const": "locale-canonicalization-data"
+                    },
+                    "artifact-collection": {
+                      "const": "profile-resolution-artifact-collection"
+                    },
+                    "verification-input": {
+                      "const": "resource-limit-policy-verification"
+                    },
+                    "implementation-capability": {
+                      "const": "implementation-capability"
+                    },
+                    "entry-source": {
+                      "const": "configuration-file"
+                    },
+                    "profile-selector": {
+                      "const": "profile-selector-cli"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "specification-input",
+                    "intent-surface-class-vocabulary",
+                    "locale-canonicalization-data",
+                    "artifact-collection",
+                    "verification-input",
+                    "implementation-capability",
+                    "entry-source",
+                    "profile-selector"
+                  ],
+                  "properties": {
+                    "specification-input": {
+                      "const": "profile-resolution-specification-input"
+                    },
+                    "intent-surface-class-vocabulary": {
+                      "const": "intent-surface-class-vocabulary"
+                    },
+                    "locale-canonicalization-data": {
+                      "const": "locale-canonicalization-data"
+                    },
+                    "artifact-collection": {
+                      "const": "profile-resolution-artifact-collection"
+                    },
+                    "verification-input": {
+                      "const": "resource-limit-policy-verification"
+                    },
+                    "implementation-capability": {
+                      "const": "implementation-capability"
+                    },
+                    "entry-source": {
+                      "const": "configuration-programmatic"
+                    },
+                    "profile-selector": {
+                      "const": "profile-selector-programmatic"
+                    },
+                    "call-site-source": {
+                      "const": "configuration-programmatic"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "sourceView": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "safe-opaque"
+          ],
+          "properties": {
+            "safe-opaque": {
+              "type": "string",
+              "pattern": "^(?:[0-9a-f]{2})*$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "redacted"
+          ],
+          "properties": {
+            "redacted": {
+              "$ref": "#/definitions/tokenView"
+            }
+          }
+        }
+      ]
+    },
+    "locatorView": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "relative-path"
+          ],
+          "properties": {
+            "relative-path": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "safe-label"
+          ],
+          "properties": {
+            "safe-label": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "safe-uri"
+          ],
+          "properties": {
+            "safe-uri": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "pathSegmentView": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "safe-member"
+          ],
+          "properties": {
+            "safe-member": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "array-index"
+          ],
+          "properties": {
+            "array-index": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "redacted-member"
+          ],
+          "properties": {
+            "redacted-member": {
+              "$ref": "#/definitions/tokenView"
+            }
+          }
+        }
+      ]
+    },
+    "valueView": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "exact-json-pointer"
+          ],
+          "properties": {
+            "exact-json-pointer": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "redacted-logical-path"
+          ],
+          "properties": {
+            "redacted-logical-path": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/pathSegmentView"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "selectorView": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "absent"
+          ],
+          "properties": {
+            "absent": {
+              "type": "null"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "safe-profile-id"
+          ],
+          "properties": {
+            "safe-profile-id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "redacted-value"
+          ],
+          "properties": {
+            "redacted-value": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "token"
+              ],
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "null",
+                    "boolean",
+                    "number",
+                    "string",
+                    "array",
+                    "object"
+                  ]
+                },
+                "token": {
+                  "$ref": "#/definitions/tokenView"
+                },
+                "length": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "exact"
+                      ],
+                      "properties": {
+                        "exact": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        }
+                      }
+                    },
+                    {
+                      "const": "over-limit"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "componentView": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "fixed-role"
+            ],
+            "properties": {
+              "fixed-role": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "safe-key"
+            ],
+            "properties": {
+              "safe-key": {
+                "type": "string",
+                "pattern": "^(?:[0-9a-f]{2})*$"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "redacted-key"
+            ],
+            "properties": {
+              "redacted-key": {
+                "$ref": "#/definitions/tokenView"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "evidenceView": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "origin",
+            "source"
+          ],
+          "properties": {
+            "kind": {
+              "const": "entry-source"
+            },
+            "origin": {
+              "type": "string",
+              "enum": [
+                "configuration-file",
+                "configuration-programmatic"
+              ]
+            },
+            "source": {
+              "$ref": "#/definitions/sourceView"
+            },
+            "locator": {
+              "$ref": "#/definitions/locatorView"
+            },
+            "path": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/pathSegmentView"
+              }
+            },
+            "span": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "start",
+                "end"
+              ],
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]*)$"
+                },
+                "end": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]*)$"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "origin",
+            "source",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "const": "configuration-value"
+            },
+            "origin": {
+              "type": "string",
+              "enum": [
+                "configuration-file",
+                "configuration-programmatic"
+              ]
+            },
+            "source": {
+              "$ref": "#/definitions/sourceView"
+            },
+            "value": {
+              "$ref": "#/definitions/valueView"
+            },
+            "locator": {
+              "$ref": "#/definitions/locatorView"
+            },
+            "span": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "start",
+                "end"
+              ],
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]*)$"
+                },
+                "end": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]*)$"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "origin",
+            "selector"
+          ],
+          "properties": {
+            "kind": {
+              "const": "profile-selector"
+            },
+            "origin": {
+              "type": "string",
+              "enum": [
+                "profile-selector-cli",
+                "profile-selector-programmatic"
+              ]
+            },
+            "selector": {
+              "$ref": "#/definitions/selectorView"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "origin",
+            "component"
+          ],
+          "properties": {
+            "kind": {
+              "const": "specification-input"
+            },
+            "origin": {
+              "type": "string",
+              "enum": [
+                "profile-resolution-specification-input"
+              ]
+            },
+            "component": {
+              "$ref": "#/definitions/componentView"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "origin",
+            "component"
+          ],
+          "properties": {
+            "kind": {
+              "const": "artifact-input"
+            },
+            "origin": {
+              "type": "string",
+              "enum": [
+                "intent-surface-class-vocabulary",
+                "locale-canonicalization-data",
+                "profile-resolution-artifact-collection"
+              ]
+            },
+            "component": {
+              "$ref": "#/definitions/componentView"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "origin",
+            "component"
+          ],
+          "properties": {
+            "kind": {
+              "const": "verification-input"
+            },
+            "origin": {
+              "type": "string",
+              "enum": [
+                "resource-limit-policy-verification"
+              ]
+            },
+            "component": {
+              "$ref": "#/definitions/componentView"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "origin",
+            "component"
+          ],
+          "properties": {
+            "kind": {
+              "const": "implementation-capability"
+            },
+            "origin": {
+              "type": "string",
+              "enum": [
+                "implementation-capability"
+              ]
+            },
+            "component": {
+              "$ref": "#/definitions/componentView"
+            }
+          }
+        }
+      ]
+    },
+    "profileView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profileSpecification",
+        "projectIdentity",
+        "localeCanonicalization",
+        "projectLocales",
+        "localeNegotiation",
+        "messageFallback",
+        "coverage",
+        "requiredPolicies",
+        "optionalPolicies",
+        "targets",
+        "deploymentGroups",
+        "delivery"
+      ],
+      "properties": {
+        "profileSpecification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "identity",
+            "revision",
+            "semanticDigest"
+          ],
+          "properties": {
+            "identity": {
+              "type": "string",
+              "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+            },
+            "revision": {
+              "type": "string",
+              "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+            },
+            "semanticDigest": {
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          }
+        },
+        "projectIdentity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "projectId",
+            "selectionScope"
+          ],
+          "properties": {
+            "projectId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "selectionScope": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "localeCanonicalization": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "specification",
+            "dataset"
+          ],
+          "properties": {
+            "specification": {
+              "$ref": "#/definitions/versionedIdentity"
+            },
+            "dataset": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "identity",
+                "semanticDigest"
+              ],
+              "properties": {
+                "identity": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "semanticDigest": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        },
+        "projectLocales": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "requestedLocales",
+            "defaultRequestedLocale",
+            "defaultSourceLocale"
+          ],
+          "properties": {
+            "requestedLocales": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "defaultRequestedLocale": {
+              "type": "string",
+              "minLength": 1
+            },
+            "defaultSourceLocale": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "localeNegotiation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "specification",
+            "aliases"
+          ],
+          "properties": {
+            "specification": {
+              "$ref": "#/definitions/versionedIdentity"
+            },
+            "aliases": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "messageFallback": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "specification",
+            "mappings"
+          ],
+          "properties": {
+            "specification": {
+              "$ref": "#/definitions/versionedIdentity"
+            },
+            "mappings": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "intent-source-locale"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "coverage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "specification",
+            "vocabulary",
+            "defaultMode",
+            "decisions"
+          ],
+          "properties": {
+            "specification": {
+              "$ref": "#/definitions/versionedIdentity"
+            },
+            "vocabulary": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "identity",
+                "revision",
+                "semanticDigest"
+              ],
+              "properties": {
+                "identity": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+                },
+                "revision": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"
+                },
+                "semanticDigest": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                }
+              }
+            },
+            "defaultMode": {
+              "enum": [
+                "direct-required",
+                "fallback-allowed"
+              ],
+              "type": "string"
+            },
+            "decisions": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": {
+                  "enum": [
+                    "direct-required",
+                    "fallback-allowed"
+                  ],
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "requiredPolicies": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "resourceLimits",
+            "trust",
+            "sourceAdmission",
+            "approval",
+            "selection",
+            "projectProfileResolution"
+          ],
+          "properties": {
+            "resourceLimits": {
+              "$ref": "#/definitions/exactReference"
+            },
+            "trust": {
+              "$ref": "#/definitions/exactReference"
+            },
+            "sourceAdmission": {
+              "$ref": "#/definitions/exactReference"
+            },
+            "approval": {
+              "$ref": "#/definitions/exactReference"
+            },
+            "selection": {
+              "$ref": "#/definitions/exactReference"
+            },
+            "projectProfileResolution": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "diagnostics",
+                "configurationInput",
+                "localeResolution",
+                "artifactAdmission",
+                "targetGrouping"
+              ],
+              "properties": {
+                "diagnostics": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "entry",
+                    "shared"
+                  ],
+                  "properties": {
+                    "entry": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "maxFindingOccurrences",
+                        "maxFindings",
+                        "maxRelatedEvidencePerOccurrenceGroup",
+                        "maxRelatedEvidenceOccurrences",
+                        "maxSingleEvidenceBytes",
+                        "maxTotalEvidenceBytes",
+                        "maxEvaluationStatusEntries",
+                        "maxSuppressionCausesPerStatus",
+                        "maxSuppressionCauseOccurrences",
+                        "maxRecords",
+                        "maxTotalCanonicalBytes"
+                      ],
+                      "properties": {
+                        "maxFindingOccurrences": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "maxFindings": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "maxRelatedEvidencePerOccurrenceGroup": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "maxRelatedEvidenceOccurrences": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "maxSingleEvidenceBytes": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "maxTotalEvidenceBytes": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "maxEvaluationStatusEntries": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "maxSuppressionCausesPerStatus": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "maxSuppressionCauseOccurrences": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "maxRecords": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "maxTotalCanonicalBytes": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        }
+                      }
+                    },
+                    "shared": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "maxFindingOccurrences",
+                        "maxFindings",
+                        "maxEvaluationStatusEntries",
+                        "maxSuppressionCausesPerStatus",
+                        "maxSuppressionCauseOccurrences",
+                        "maxRecords",
+                        "maxTotalCanonicalBytes"
+                      ],
+                      "properties": {
+                        "maxFindingOccurrences": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "maxFindings": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "maxEvaluationStatusEntries": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "maxSuppressionCausesPerStatus": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "maxSuppressionCauseOccurrences": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "maxRecords": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "maxTotalCanonicalBytes": {
+                          "type": "string",
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        }
+                      }
+                    }
+                  }
+                },
+                "configurationInput": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "maxNodes",
+                    "maxDepth",
+                    "maxCollectionEntries",
+                    "maxTotalStringBytes",
+                    "maxSingleStringBytes",
+                    "maxProfiles",
+                    "maxProfileIdBytes",
+                    "maxStructuralAnalysisUnits"
+                  ],
+                  "properties": {
+                    "maxNodes": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxDepth": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxCollectionEntries": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxTotalStringBytes": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxSingleStringBytes": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxProfiles": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxProfileIdBytes": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxStructuralAnalysisUnits": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    }
+                  }
+                },
+                "localeResolution": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "maxLocaleIdentifierBytes",
+                    "maxLocaleOccurrences",
+                    "maxRequestedLocales",
+                    "maxNegotiationAliases",
+                    "maxFallbackSources",
+                    "maxFallbackCandidatesPerSource",
+                    "maxCoverageRules",
+                    "maxCoverageLocaleSelectorOccurrences",
+                    "maxCoverageSurfaceSelectorOccurrences",
+                    "maxCoverageDecisionCells",
+                    "maxCoverageRuleCellComparisons"
+                  ],
+                  "properties": {
+                    "maxLocaleIdentifierBytes": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxLocaleOccurrences": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxRequestedLocales": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxNegotiationAliases": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxFallbackSources": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxFallbackCandidatesPerSource": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxCoverageRules": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxCoverageLocaleSelectorOccurrences": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxCoverageSurfaceSelectorOccurrences": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxCoverageDecisionCells": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxCoverageRuleCellComparisons": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    }
+                  }
+                },
+                "artifactAdmission": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "maxArtifacts",
+                    "maxPolicyArtifacts",
+                    "maxTargetProfileArtifacts",
+                    "maxArtifactReferences",
+                    "maxSingleArtifactCanonicalBytes",
+                    "maxTotalArtifactCanonicalBytes",
+                    "maxSingleReferenceCanonicalBytes",
+                    "maxTotalReferenceCanonicalBytes"
+                  ],
+                  "properties": {
+                    "maxArtifacts": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxPolicyArtifacts": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxTargetProfileArtifacts": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxArtifactReferences": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxSingleArtifactCanonicalBytes": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxTotalArtifactCanonicalBytes": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxSingleReferenceCanonicalBytes": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxTotalReferenceCanonicalBytes": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    }
+                  }
+                },
+                "targetGrouping": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "maxTargetProfiles",
+                    "maxTargetIdBytes",
+                    "maxDeploymentGroups",
+                    "maxGroupIdBytes",
+                    "maxMembersPerGroup",
+                    "maxMembershipOccurrences",
+                    "maxHydrationRelations"
+                  ],
+                  "properties": {
+                    "maxTargetProfiles": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxTargetIdBytes": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxDeploymentGroups": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxGroupIdBytes": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxMembersPerGroup": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxMembershipOccurrences": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    },
+                    "maxHydrationRelations": {
+                      "type": "string",
+                      "pattern": "^(0|[1-9][0-9]*)$"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "optionalPolicies": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "providerRouting",
+            "glossarySet"
+          ],
+          "properties": {
+            "providerRouting": {
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/exactReference"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "glossarySet": {
+              "oneOf": [
+                {
+                  "$ref": "#/definitions/exactReference"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "targets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "profile",
+              "requestedLocales",
+              "defaultRequestedLocale",
+              "effectiveDefaultRequestedLocale"
+            ],
+            "properties": {
+              "profile": {
+                "$ref": "#/definitions/exactReference"
+              },
+              "requestedLocales": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "defaultRequestedLocale": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "effectiveDefaultRequestedLocale": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "deploymentGroups": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "members",
+              "hydrationRelations"
+            ],
+            "properties": {
+              "members": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "hydrationRelations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "server",
+                    "client"
+                  ],
+                  "properties": {
+                    "server": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "client": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "delivery": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "graph",
+            "placement",
+            "mode"
+          ],
+          "properties": {
+            "graph": {
+              "$ref": "#/definitions/versionedIdentity"
+            },
+            "placement": {
+              "$ref": "#/definitions/versionedIdentity"
+            },
+            "mode": {
+              "const": "duplicate"
+            }
+          }
+        }
+      }
+    },
+    "sharedProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "findings",
+        "evaluationStatus",
+        "coverageDecisionBases",
+        "semanticDependencies",
+        "materializedDependencies"
+      ],
+      "properties": {
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "owner",
+              "record"
+            ],
+            "properties": {
+              "owner": {
+                "oneOf": [
+                  {
+                    "$ref": "#/definitions/unitView"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "record": {
+                "$ref": "#/definitions/findingView"
+              }
+            }
+          }
+        },
+        "evaluationStatus": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "owner",
+              "record"
+            ],
+            "properties": {
+              "owner": {
+                "$ref": "#/definitions/unitView"
+              },
+              "record": {
+                "$ref": "#/definitions/evaluationStatusView"
+              }
+            }
+          }
+        },
+        "coverageDecisionBases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "owner",
+              "record"
+            ],
+            "properties": {
+              "owner": {
+                "$ref": "#/definitions/unitView"
+              },
+              "record": {
+                "$ref": "#/definitions/coverageDecisionBasisView"
+              }
+            }
+          }
+        },
+        "semanticDependencies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "owner",
+              "record"
+            ],
+            "properties": {
+              "owner": {
+                "$ref": "#/definitions/unitView"
+              },
+              "record": {
+                "$ref": "#/definitions/semanticDependencyView"
+              }
+            }
+          }
+        },
+        "materializedDependencies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "owner",
+              "record"
+            ],
+            "properties": {
+              "owner": {
+                "$ref": "#/definitions/unitView"
+              },
+              "record": {
+                "$ref": "#/definitions/materializedDependencyView"
+              }
+            }
+          }
+        }
+      }
+    },
+    "entryProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "findings",
+        "evaluationStatus",
+        "occurrences",
+        "coverageDecisionEvidence",
+        "evidenceIndex",
+        "entryDependencies",
+        "sharedUnavailabilityCauses"
+      ],
+      "properties": {
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "owner",
+              "record"
+            ],
+            "properties": {
+              "owner": {
+                "oneOf": [
+                  {
+                    "$ref": "#/definitions/unitView"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "record": {
+                "$ref": "#/definitions/findingView"
+              }
+            }
+          }
+        },
+        "evaluationStatus": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "owner",
+              "record"
+            ],
+            "properties": {
+              "owner": {
+                "$ref": "#/definitions/unitView"
+              },
+              "record": {
+                "$ref": "#/definitions/evaluationStatusView"
+              }
+            }
+          }
+        },
+        "occurrences": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "owner",
+              "record"
+            ],
+            "properties": {
+              "owner": {
+                "$ref": "#/definitions/unitView"
+              },
+              "record": {
+                "$ref": "#/definitions/findingOccurrenceView"
+              }
+            }
+          }
+        },
+        "coverageDecisionEvidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "owner",
+              "record"
+            ],
+            "properties": {
+              "owner": {
+                "$ref": "#/definitions/unitView"
+              },
+              "record": {
+                "$ref": "#/definitions/coverageDecisionEvidenceView"
+              }
+            }
+          }
+        },
+        "evidenceIndex": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "owner",
+              "record"
+            ],
+            "properties": {
+              "owner": {
+                "$ref": "#/definitions/unitView"
+              },
+              "record": {
+                "$ref": "#/definitions/evidenceView"
+              }
+            }
+          }
+        },
+        "entryDependencies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "owner",
+              "record"
+            ],
+            "properties": {
+              "owner": {
+                "$ref": "#/definitions/unitView"
+              },
+              "record": {
+                "$ref": "#/definitions/entryDependencyView"
+              }
+            }
+          }
+        },
+        "sharedUnavailabilityCauses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "owner",
+              "record"
+            ],
+            "properties": {
+              "owner": {
+                "oneOf": [
+                  {
+                    "$ref": "#/definitions/unitView"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "record": {
+                "$ref": "#/definitions/sharedUnavailabilityCauseView"
+              }
+            }
+          }
+        }
+      }
+    },
+    "resolutionEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "complete",
+        "terminalStates",
+        "shared",
+        "sharedUnavailableCauseKeys",
+        "entry"
+      ],
+      "properties": {
+        "complete": {
+          "type": "boolean"
+        },
+        "terminalStates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/terminalStateView"
+          }
+        },
+        "shared": {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/sharedProjection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sharedUnavailableCauseKeys": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/findingKeyView"
+          }
+        },
+        "entry": {
+          "$ref": "#/definitions/entryProjection"
+        }
+      }
+    },
+    "expectedOutcomeFixture": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "outcome",
+            "resolverConstructionIdentity",
+            "profile",
+            "resolvedProfileArtifactBindings",
+            "resolutionEvidence"
+          ],
+          "properties": {
+            "outcome": {
+              "const": "checked"
+            },
+            "resolverConstructionIdentity": {
+              "$ref": "#/definitions/constructionIdentity"
+            },
+            "profile": {
+              "$ref": "#/definitions/profileView"
+            },
+            "resolvedProfileArtifactBindings": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "key"
+                ],
+                "properties": {
+                  "key": {
+                    "$ref": "#/definitions/exactReference"
+                  }
+                }
+              }
+            },
+            "resolutionEvidence": {
+              "$ref": "#/definitions/resolutionEvidence"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "outcome",
+            "resolverConstructionIdentity",
+            "profile",
+            "resolvedProfileArtifactBindings",
+            "resolutionEvidence"
+          ],
+          "properties": {
+            "outcome": {
+              "const": "blocked"
+            },
+            "resolverConstructionIdentity": {
+              "$ref": "#/definitions/constructionIdentity"
+            },
+            "profile": {
+              "type": "null"
+            },
+            "resolvedProfileArtifactBindings": {
+              "type": "null"
+            },
+            "resolutionEvidence": {
+              "$ref": "#/definitions/resolutionEvidence"
+            }
+          }
+        }
+      ]
+    },
     "exactReference": {
       "type": "object",
       "additionalProperties": false,

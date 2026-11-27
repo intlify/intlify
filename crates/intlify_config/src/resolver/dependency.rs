@@ -210,7 +210,7 @@ impl MaterializedSlot {
 
     /// The Safe Origin Kind of a common slot, which every entry fixes alike,
     /// or none for a materialized slot, whose origin depends on the entry.
-    const fn common_origin(self) -> Option<SafeOriginKind> {
+    pub(crate) const fn common_origin(self) -> Option<SafeOriginKind> {
         match self {
             Self::SpecificationInput => Some(SafeOriginKind::ProfileResolutionSpecificationInput),
             Self::IntentSurfaceClassVocabulary => {
@@ -1020,7 +1020,7 @@ mod tests {
     /// An unmarked source identity and an undeclared selector are redacted,
     /// so their records wait on the invocation's evidence tokens, and a
     /// present locator is kept and counted (D15:735-738, 807-809, 1852,
-    /// 2516).
+    /// 2517).
     #[test]
     fn a_redacted_entry_dependency_waits_on_its_tokens() {
         let entry = redacted_entry();

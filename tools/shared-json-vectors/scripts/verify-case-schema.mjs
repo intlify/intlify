@@ -1087,6 +1087,328 @@ for (const [name, closedForm] of closures) {
   }
 }
 
+// The expected-outcome fixture (D15:3271-3303): a checked outcome with its
+// profile view and binding keys, or a blocked one with neither, each with
+// the construction identity and the Resolution Evidence of both projections,
+// the Shared one absent after an entry failure. Each projection's arrays
+// list `{ owner, record }` rows, and only the terminal Finding and the Entry
+// reserve's cause have no owner (D15:3303).
+const OUTCOME_MEMBERS = [
+  'outcome',
+  'resolverConstructionIdentity',
+  'profile',
+  'resolvedProfileArtifactBindings',
+  'resolutionEvidence'
+]
+const NULL = { type: 'null' }
+
+/**
+ * What a node admits besides null, when it is a `oneOf` of it and null.
+ *
+ * @param node - The node.
+ * @returns The other form, or undefined.
+ */
+function orNull(node) {
+  return node?.oneOf?.length === 2 && isDeepStrictEqual(node.oneOf[1], NULL)
+    ? node.oneOf[0]
+    : undefined
+}
+
+const outcomes = definitions.expectedOutcomeFixture?.oneOf ?? []
+if (outcomes.length !== 2 || !outcomes.every(form => closedOf(form, OUTCOME_MEMBERS))) {
+  fail('expectedOutcomeFixture: not a checked and a blocked closed outcome')
+} else {
+  const [checked, blocked] = outcomes.map(form => form.properties)
+  const bindings = checked.resolvedProfileArtifactBindings
+  if (
+    checked.outcome.const !== 'checked' ||
+    !isDeepStrictEqual(checked.profile, ref('profileView')) ||
+    bindings?.type !== 'array' ||
+    !closedOf(bindings.items, ['key']) ||
+    !isDeepStrictEqual(bindings.items.properties.key, ref('exactReference'))
+  ) {
+    fail('expectedOutcomeFixture: the checked outcome is not a profile view and binding keys')
+  }
+  if (
+    blocked.outcome.const !== 'blocked' ||
+    !isDeepStrictEqual(blocked.profile, NULL) ||
+    !isDeepStrictEqual(blocked.resolvedProfileArtifactBindings, NULL)
+  ) {
+    fail('expectedOutcomeFixture: the blocked outcome holds a profile or bindings')
+  }
+  for (const form of [checked, blocked]) {
+    if (
+      !isDeepStrictEqual(form.resolverConstructionIdentity, ref('constructionIdentity')) ||
+      !isDeepStrictEqual(form.resolutionEvidence, ref('resolutionEvidence'))
+    ) {
+      fail('expectedOutcomeFixture: an outcome without its identity or Resolution Evidence')
+    }
+  }
+}
+const evidence = definitions.resolutionEvidence
+if (
+  !closedOf(evidence, [
+    'complete',
+    'terminalStates',
+    'shared',
+    'sharedUnavailableCauseKeys',
+    'entry'
+  ]) ||
+  !isDeepStrictEqual(evidence.properties.complete, { type: 'boolean' }) ||
+  !isDeepStrictEqual(orNull(evidence.properties.shared), ref('sharedProjection')) ||
+  !isDeepStrictEqual(evidence.properties.entry, ref('entryProjection')) ||
+  !isDeepStrictEqual(evidence.properties.terminalStates?.items, ref('terminalStateView')) ||
+  !isDeepStrictEqual(evidence.properties.sharedUnavailableCauseKeys?.items, ref('findingKeyView'))
+) {
+  fail('resolutionEvidence: not the bundle of both projections')
+}
+const PROJECTIONS = [
+  [
+    'sharedProjection',
+    [
+      ['findings', 'findingView', true],
+      ['evaluationStatus', 'evaluationStatusView', false],
+      ['coverageDecisionBases', 'coverageDecisionBasisView', false],
+      ['semanticDependencies', 'semanticDependencyView', false],
+      ['materializedDependencies', 'materializedDependencyView', false]
+    ]
+  ],
+  [
+    'entryProjection',
+    [
+      ['findings', 'findingView', true],
+      ['evaluationStatus', 'evaluationStatusView', false],
+      ['occurrences', 'findingOccurrenceView', false],
+      ['coverageDecisionEvidence', 'coverageDecisionEvidenceView', false],
+      ['evidenceIndex', 'evidenceView', false],
+      ['entryDependencies', 'entryDependencyView', false],
+      ['sharedUnavailabilityCauses', 'sharedUnavailabilityCauseView', true]
+    ]
+  ]
+]
+for (const [name, arrays] of PROJECTIONS) {
+  const node = definitions[name]
+  if (
+    !closedOf(
+      node,
+      arrays.map(([member]) => member)
+    )
+  ) {
+    fail(`${String(name)}: not its arrays`)
+    continue
+  }
+  for (const [member, view, reserved] of arrays) {
+    const rows = node.properties[member]
+    const owner = rows?.items?.properties?.owner
+    if (
+      rows?.type !== 'array' ||
+      !closedOf(rows.items, ['owner', 'record']) ||
+      !isDeepStrictEqual(reserved ? orNull(owner) : owner, ref('unitView')) ||
+      !isDeepStrictEqual(rows.items.properties.record, ref(view))
+    ) {
+      fail(
+        `${String(name)}.${String(member)}: not rows of an owner${reserved ? ' or none' : ''} and a ${String(view)}`
+      )
+    }
+  }
+}
+
+// Each code's Finding and Finding Key take the checks, reasons, severity,
+// blocking flag, and suggestion of its Finding Registry row, and the
+// `details` members its Check Registry rows give it (D15:2230, 2232, 2309).
+const findingRows = read('registries/finding-v0.json').value.rows
+const checkRows = read('registries/check-v0.json').value.rows
+const findings = definitions.findingView?.oneOf ?? []
+const keys = definitions.findingKeyView?.oneOf ?? []
+if (findings.length !== findingRows.length || keys.length !== findingRows.length) {
+  fail('findingView: not one branch per Finding Registry code')
+}
+for (const [index, row] of findingRows.entries()) {
+  const finding = findings[index]
+  const given = checkRows
+    .flatMap(check => check.findingPayloadStrategy.details)
+    .filter(entry => entry.code === row.code)
+  const members = given[0]?.members ?? []
+  if (given.some(entry => !isDeepStrictEqual(entry.members, members))) {
+    fail(`${row.code}: the Check Registry gives its details different members`)
+  }
+  const reasoned = row.allowedReasons.length > 0
+  const keyNames = [
+    'specification',
+    'phase',
+    'check',
+    'code',
+    'subject',
+    ...(reasoned ? ['reason'] : [])
+  ]
+  // Both views name the code's one Finding Key definition.
+  const name = `findingKey:${String(row.code)}`
+  const form = definitions[name]
+  if (
+    !isDeepStrictEqual(keys[index], ref(name)) ||
+    !isDeepStrictEqual(finding?.properties?.key, ref(name)) ||
+    !closedOf(form, keyNames) ||
+    !isDeepStrictEqual(form.properties.specification, ref('versionedIdentity')) ||
+    !isDeepStrictEqual(form.properties.phase, ref('phaseId')) ||
+    form.properties.code.const !== row.code ||
+    !isDeepStrictEqual(strings(form.properties.check), row.allowedCheckIds) ||
+    (reasoned && !isDeepStrictEqual(strings(form.properties.reason), row.allowedReasons))
+  ) {
+    fail(`${name}: not its key, or not the key both views name`)
+  }
+  const names = [
+    'key',
+    'severity',
+    'blocking',
+    ...(members.length > 0 ? ['details'] : []),
+    ...(row.suggestionKind === 'none' ? [] : ['suggestion'])
+  ]
+  if (
+    !closedOf(finding, names) ||
+    finding.properties.severity.const !== row.severity ||
+    finding.properties.blocking.const !== row.blocking ||
+    (members.length > 0 && !closedOf(finding.properties.details, members))
+  ) {
+    fail(`findingView ${row.code}: not its severity, blocking flag, details, or suggestion`)
+  }
+}
+
+// Each evidence kind's Evidence: its members, and the origins whose row
+// permits it (D15:2493).
+const EVIDENCE = [
+  ['entry-source', ['kind', 'origin', 'source'], ['locator', 'path', 'span']],
+  ['configuration-value', ['kind', 'origin', 'source', 'value'], ['locator', 'span']],
+  ['profile-selector', ['kind', 'origin', 'selector'], []],
+  ['specification-input', ['kind', 'origin', 'component'], []],
+  ['artifact-input', ['kind', 'origin', 'component'], []],
+  ['verification-input', ['kind', 'origin', 'component'], []],
+  ['implementation-capability', ['kind', 'origin', 'component'], []]
+]
+const originRows = read('registries/safe-origin-kind-v0.json').value.rows
+const evidenceForms = definitions.evidenceView?.oneOf ?? []
+if (evidenceForms.length !== EVIDENCE.length) {
+  fail('evidenceView: not one branch per evidence kind')
+}
+for (const [index, [kind, required, optional]] of EVIDENCE.entries()) {
+  const form = evidenceForms[index]
+  const permitting = originRows
+    .filter(row => row.permittedEvidenceKinds.includes(kind))
+    .map(row => row.id)
+  if (
+    !closedOf(form, required, optional) ||
+    form.properties.kind.const !== kind ||
+    !isDeepStrictEqual(strings(form.properties.origin), permitting)
+  ) {
+    fail(`evidenceView ${String(kind)}: not its members and the origins that permit it`)
+  }
+}
+
+// The profile view: the twelve semantic groups in their order, and its
+// policy section exactly the specification's bounds, each a count
+// (D15:1214-1237).
+const profileView = definitions.profileView
+if (!closedOf(profileView, profile.semanticGroups)) {
+  fail('profileView: not the semantic groups in their order')
+}
+const bounds = []
+
+/**
+ * Collect the bounds of a closed policy section.
+ *
+ * @param node - A node of the section.
+ * @param path - Its dotted path.
+ */
+function section(node, path) {
+  if (node?.type === 'object') {
+    const names = Object.keys(node.properties ?? {})
+    if (node.additionalProperties !== false || !isDeepStrictEqual(node.required, names)) {
+      fail(`profileView: ${path} is not a closed object`)
+    }
+    for (const name of names) {
+      section(node.properties[name], path ? `${path}.${name}` : name)
+    }
+  } else if (node?.pattern === '^(0|[1-9][0-9]*)$') {
+    bounds.push(path)
+  } else {
+    fail(`profileView: ${path} is not a count`)
+  }
+}
+section(profileView?.properties?.requiredPolicies?.properties?.projectProfileResolution, '')
+if (
+  !isDeepStrictEqual(
+    bounds.toSorted((a, b) => a.localeCompare(b)),
+    profile.resourceBounds.toSorted((a, b) => a.localeCompare(b))
+  )
+) {
+  fail('profileView: the policy section does not hold exactly the specification bounds')
+}
+// The materialized slots, the common ones first (D15:2508), and each group's
+// semantic inputs in their order (D15:2517): never a slot that only decides
+// whether the group is established, such as `profile-selector`,
+// `verification-input`, or `implementation-capability`.
+const MATERIALIZED_SLOTS = [
+  'specification-input',
+  'intent-surface-class-vocabulary',
+  'locale-canonicalization-data',
+  'artifact-collection',
+  'verification-input',
+  'implementation-capability',
+  'configuration-value',
+  'profile-selector'
+]
+const LOCALE_INPUTS = [
+  'specification-input',
+  'locale-canonicalization-data',
+  'artifact-collection',
+  'configuration-value'
+]
+const POLICY_INPUTS = ['artifact-collection', 'configuration-value']
+const SEMANTIC_INPUTS = {
+  profileSpecification: [],
+  projectIdentity: ['configuration-value'],
+  localeCanonicalization: ['specification-input', 'locale-canonicalization-data'],
+  projectLocales: LOCALE_INPUTS,
+  localeNegotiation: LOCALE_INPUTS,
+  messageFallback: LOCALE_INPUTS,
+  coverage: [
+    'specification-input',
+    'intent-surface-class-vocabulary',
+    'locale-canonicalization-data',
+    'artifact-collection',
+    'configuration-value'
+  ],
+  requiredPolicies: POLICY_INPUTS,
+  optionalPolicies: POLICY_INPUTS,
+  targets: LOCALE_INPUTS,
+  deploymentGroups: LOCALE_INPUTS,
+  delivery: ['specification-input', 'configuration-value']
+}
+if (
+  !isDeepStrictEqual(
+    strings(definitions.materializedDependencyView?.properties?.slot),
+    MATERIALIZED_SLOTS
+  )
+) {
+  fail('materializedDependencyView: not the materialized slots in their order')
+}
+const semantic = definitions.semanticDependencyView?.oneOf ?? []
+if (
+  semantic.length !== profile.semanticGroups.length ||
+  !isDeepStrictEqual(Object.keys(SEMANTIC_INPUTS), profile.semanticGroups)
+) {
+  fail('semanticDependencyView: not one branch per semantic group')
+}
+for (const [index, group] of profile.semanticGroups.entries()) {
+  const form = semantic[index]
+  if (
+    !closedOf(form, ['group', 'inputs']) ||
+    form.properties.group.const !== group ||
+    !isDeepStrictEqual(form.properties.inputs.const, SEMANTIC_INPUTS[group])
+  ) {
+    fail(`semanticDependencyView ${group}: not its group and semantic inputs`)
+  }
+}
+
 if (failures.length > 0) {
   for (const message of failures) {
     console.error(message)
@@ -1095,5 +1417,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `case schema agrees: ${KINDS.length} manifest kinds, ${BOUNDARIES.length} boundary kinds with ${BOUNDARIES.reduce((sum, [, row]) => sum + row.length, 0)} reasons in ${precedenceRows} precedence rows, ${reasons.length} construction reasons, ${OBLIGATIONS.length} obligations`
+  `case schema agrees: ${KINDS.length} manifest kinds, ${BOUNDARIES.length} boundary kinds with ${BOUNDARIES.reduce((sum, [, row]) => sum + row.length, 0)} reasons in ${precedenceRows} precedence rows, ${reasons.length} construction reasons, ${OBLIGATIONS.length} obligations, and the expected outcome with ${findingRows.length} Finding codes, ${EVIDENCE.length} evidence kinds, and ${bounds.length} policy bounds`
 )
