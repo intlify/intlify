@@ -7,14 +7,14 @@
   "profile-resolution-specification-input": {
     "candidate": "profile-resolution-specification-input",
     "input": {
-      "path": "fixtures/resolver/015-entry-json-invalid/profile-resolution-specification-input.input.json",
+      "path": "fixtures/resolver/015-storefront-checked/profile-resolution-specification-input.input.json",
       "digest": "sha256:29efa9cd6918d41a8c406026d6969fa32d62916a3b4ff74a6a6a53c97e462031"
     }
   },
   "intent-surface-class-vocabulary": {
     "candidate": "intent-surface-class-vocabulary",
     "input": {
-      "path": "fixtures/resolver/015-entry-json-invalid/intent-surface-class-vocabulary.input.json",
+      "path": "fixtures/resolver/015-storefront-checked/intent-surface-class-vocabulary.input.json",
       "digest": "sha256:51504cd3920b5c7491873d30843ea8c38357b5aa6efb047d55d99861fc921922"
     }
   },
@@ -42,39 +42,39 @@
     "input": {
       "members": [
         {
-          "path": "fixtures/resolver/015-entry-json-invalid/profile-resolution-artifact-collection.input.members.0.json",
+          "path": "fixtures/resolver/015-storefront-checked/profile-resolution-artifact-collection.input.members.0.json",
           "digest": "sha256:c5002913cb5ffbc231c24fb57b62e35aa10ff58328f088adfad2c3d4bdd95efd"
         },
         {
-          "path": "fixtures/resolver/015-entry-json-invalid/profile-resolution-artifact-collection.input.members.1.json",
+          "path": "fixtures/resolver/015-storefront-checked/profile-resolution-artifact-collection.input.members.1.json",
           "digest": "sha256:29947d60624dc77d10ac39ddb6c3b0880a0f33000b65b1091cf332fd82cc8b07"
         },
         {
-          "path": "fixtures/resolver/015-entry-json-invalid/profile-resolution-artifact-collection.input.members.2.json",
+          "path": "fixtures/resolver/015-storefront-checked/profile-resolution-artifact-collection.input.members.2.json",
           "digest": "sha256:3f45f418ac8f7662fbc58dc291dbdfc604896e550f4cb919d4e0c120a782c196"
         },
         {
-          "path": "fixtures/resolver/015-entry-json-invalid/profile-resolution-artifact-collection.input.members.3.json",
+          "path": "fixtures/resolver/015-storefront-checked/profile-resolution-artifact-collection.input.members.3.json",
           "digest": "sha256:8de280cf9ced57e2234ee6a2bd9d4396f62c210d1be9a00f285083f66e9585c9"
         },
         {
-          "path": "fixtures/resolver/015-entry-json-invalid/profile-resolution-artifact-collection.input.members.4.json",
+          "path": "fixtures/resolver/015-storefront-checked/profile-resolution-artifact-collection.input.members.4.json",
           "digest": "sha256:24a47a577ace4aa92cd418ed9a682300458282cb7cf0586f3d17b44150f897d1"
         },
         {
-          "path": "fixtures/resolver/015-entry-json-invalid/profile-resolution-artifact-collection.input.members.5.json",
+          "path": "fixtures/resolver/015-storefront-checked/profile-resolution-artifact-collection.input.members.5.json",
           "digest": "sha256:b7cf7251ab6187284e6903d5ef9e799909198f9ea34e642343913444f3dbc8cd"
         },
         {
-          "path": "fixtures/resolver/015-entry-json-invalid/profile-resolution-artifact-collection.input.members.6.json",
+          "path": "fixtures/resolver/015-storefront-checked/profile-resolution-artifact-collection.input.members.6.json",
           "digest": "sha256:77ed7cfe132ae9dd7bb0a97e894f631292645f91e5425443f919fe109559bb97"
         },
         {
-          "path": "fixtures/resolver/015-entry-json-invalid/profile-resolution-artifact-collection.input.members.7.json",
+          "path": "fixtures/resolver/015-storefront-checked/profile-resolution-artifact-collection.input.members.7.json",
           "digest": "sha256:1fac380ec7a7889da205c977cb22a6eaa8e64258822e0b79425e0c690926606d"
         },
         {
-          "path": "fixtures/resolver/015-entry-json-invalid/profile-resolution-artifact-collection.input.members.8.json",
+          "path": "fixtures/resolver/015-storefront-checked/profile-resolution-artifact-collection.input.members.8.json",
           "digest": "sha256:40ea3903c97a032201653732612de7ca1e8be0def2a322a9e6b629a9bf074b94"
         }
       ]
@@ -83,7 +83,7 @@
   "resource-limit-policy-verification": {
     "candidate": "resource-limit-policy-verification",
     "input": {
-      "path": "fixtures/resolver/015-entry-json-invalid/resource-limit-policy-verification.input.json",
+      "path": "fixtures/resolver/015-storefront-checked/resource-limit-policy-verification.input.json",
       "digest": "sha256:9f3cf769035c73792733d38b11a25f623cf0d94a0ca775922a25526ddc396fc4"
     }
   },

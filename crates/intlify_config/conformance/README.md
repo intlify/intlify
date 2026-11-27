@@ -15,8 +15,9 @@ This crate writes the schema and the index from its own values, as it writes the
 cargo test -p intlify_config --all-features --lib conformance
 
 # rewrite the schemas, the index, and the cases after a construction artifact
-# changes; it prints the two schemas' file digests to pin in
-# src/conformance/index.rs and src/conformance/case.rs
+# changes, and remove the case and fixture files it no longer writes; it
+# prints the two schemas' file digests to pin in src/conformance/index.rs and
+# src/conformance/case.rs
 cargo run -p intlify_config --features conformance --example generate_conformance_suite -- --write
 
 # open the suite at an explicit index and run its cases: the runner has no

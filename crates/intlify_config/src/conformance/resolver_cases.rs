@@ -55,6 +55,9 @@ use super::resolution::resolved;
 const CASES: &str = "cases/resolver";
 const FIXTURES: &str = "fixtures/resolver";
 
+/// The storefront, whose bodies the other cases share.
+const STOREFRONT: &str = "015-storefront-checked";
+
 /// Where the suite holds the committed canonicalization data, below its
 /// root.
 pub(crate) const DATA: &str = "fixtures/resolver/locale-data";
@@ -615,7 +618,12 @@ pub(crate) fn cases() -> Result<Cases, serde_json::Error> {
         .collect::<Vec<_>>();
     let mut kept = BTreeMap::new();
     let mut listing = Vec::new();
-    for case in all(constructed) {
+    // The storefront's bodies, which the other cases share, are written once
+    // below the storefront's own directory, whichever case sorts first; the
+    // listing keeps the cases in the order of their IDs.
+    let mut cases = all(constructed);
+    cases.sort_by_key(|case| case.id != STOREFRONT);
+    for case in cases {
         let mut entries = Map::new();
         for (side, entry) in case.sides() {
             let value = match entry {
@@ -694,6 +702,7 @@ pub(crate) fn cases() -> Result<Cases, serde_json::Error> {
             bytes: manifest,
         });
     }
+    listing.sort_by(|a, b| a["id"].as_str().cmp(&b["id"].as_str()));
     Ok(Cases { files, listing })
 }
 

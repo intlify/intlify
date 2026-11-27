@@ -8,7 +8,7 @@
   },
   "commonInvocationInputFixture": {
     "path": "fixtures/resolver/015-entry-json-invalid.common.json",
-    "digest": "sha256:5556dc872f673a261a8ec5447597b0c6bc85bfe0063fa8a0899a0182520fe37e"
+    "digest": "sha256:5ba6906a13f39748140b9d3176f3266c916fd0acd0f76e1dcfdb3209008e8f57"
   },
   "entries": {
     "file": {

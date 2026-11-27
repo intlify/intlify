@@ -8,7 +8,7 @@
   },
   "commonInvocationInputFixture": {
     "path": "fixtures/resolver/015-reporting-shared-limit-exceeded.common.json",
-    "digest": "sha256:421ac45c1e57aff739aa7291c2ac53680bfc9ea9beeb0a01a5ff4ecfcbd793b0"
+    "digest": "sha256:973331bd804cd7f097a582363eb8f1a1892452f80456c056a57509ca9f22bf22"
   },
   "entries": {
     "file": {

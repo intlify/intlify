@@ -8,7 +8,7 @@
   },
   "commonInvocationInputFixture": {
     "path": "fixtures/resolver/015-reporting-entry-limit-exceeded.common.json",
-    "digest": "sha256:ac1569df55e5a3d30de580d0380de181e8cafd04b4f5080aed27a0cf01182d0c"
+    "digest": "sha256:c1c22d8b359a51b4d1a76ce9ea880f402acec264d97df6f987faae212876e4f8"
   },
   "entries": {
     "file": {

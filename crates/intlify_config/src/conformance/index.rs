@@ -263,6 +263,11 @@ impl From<Artifact> for SuiteFile {
     }
 }
 
+/// The directories below the suite root whose every file the generator
+/// writes: a file there that it does not write is stale, a case or a body
+/// the suite no longer holds.
+pub const WRITTEN_DIRECTORIES: [&str; 2] = ["cases", "fixtures"];
+
 /// Write the Suite Index Schema, the Case Schema, the Suite Index, which pins
 /// both and lists the cases, and then each case's manifest, fixture, and the
 /// bodies its fixture keeps in files of their own.
@@ -459,7 +464,8 @@ fn index(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
+    use std::path::Path;
 
     use super::*;
     use crate::construction::admission::DRAFT_7;
@@ -514,6 +520,50 @@ mod tests {
             assert!(!artifact.bytes.ends_with(b"\n\n"), "{path}");
             assert!(!artifact.bytes.contains(&b'\r'), "{path}");
         }
+    }
+
+    /// The case and fixture directories hold exactly the files the suite
+    /// writes, so a case or a body it no longer holds leaves no file behind,
+    /// and the suite writes no other file outside them than the schemas and
+    /// the index.
+    #[test]
+    fn the_case_and_fixture_directories_hold_only_the_written_files() {
+        fn held(directory: &Path, root: &Path, files: &mut BTreeSet<String>) {
+            for entry in std::fs::read_dir(directory).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    held(&path, root, files);
+                } else {
+                    let components = path.strip_prefix(root).unwrap().components();
+                    let names = components
+                        .map(|component| component.as_os_str().to_string_lossy().into_owned())
+                        .collect::<Vec<_>>();
+                    files.insert(names.join("/"));
+                }
+            }
+        }
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("conformance");
+        let mut found = BTreeSet::new();
+        for directory in WRITTEN_DIRECTORIES {
+            held(&root.join(directory), &root, &mut found);
+        }
+        let below = |path: &String| {
+            WRITTEN_DIRECTORIES
+                .iter()
+                .any(|directory| path.starts_with(&format!("{directory}/")))
+        };
+        let (written, others): (Vec<_>, Vec<_>) = artifacts()
+            .unwrap()
+            .into_iter()
+            .map(|file| file.path)
+            .partition(below);
+        let written = written.into_iter().collect::<BTreeSet<_>>();
+        // Every other file the suite writes is a committed schema or the index.
+        assert_eq!(others, COMMITTED.map(|(path, _)| path.to_owned()));
+        let stale = found.difference(&written).collect::<Vec<_>>();
+        let missing = written.difference(&found).collect::<Vec<_>>();
+        assert!(stale.is_empty(), "not written: {stale:?}");
+        assert!(missing.is_empty(), "not committed: {missing:?}");
     }
 
     #[test]
