@@ -3,7 +3,7 @@
 
 //! Design 015's Resolution Evidence projections: what reporting finalization
 //! makes of the slices each diagnostic domain committed (D15:1162-1184,
-//! 2143).
+//! 2144).
 //!
 //! Finalization only orders. Every record keeps the owner and bytes its slice
 //! committed it with, and no record is added, dropped, or moved to the other
@@ -263,7 +263,7 @@ mod tests {
     /// its accounting view. A Python script wrote each view from D15:2473-2519
     /// and framed it apart from this crate, reading only each row's strategy,
     /// scope, projection, severity, and blocking state from the committed
-    /// registries (`.plans/drafts/025-pr7/t2-vectors.py`; D15:3444).
+    /// registries (`.plans/drafts/025-pr7/t2-vectors.py`; D15:3455).
     #[test]
     fn each_record_kinds_accounting_view_is_its_frozen_vector() {
         let vectors: Value =
@@ -340,7 +340,7 @@ mod tests {
     /// bodies, keys, secret-resolving locators, and direct digests are absent,
     /// the position each was submitted at changes nothing, and an injected
     /// collision keeps the two keys apart by their ordinals (D15:826, 828,
-    /// 834, 3367).
+    /// 835, 3503).
     #[test]
     fn rejected_inputs_leave_nothing_raw_in_retained_records() {
         const CANARIES: [&str; 5] = [
@@ -428,7 +428,7 @@ mod tests {
     /// The index takes the Evidence comparisons, not the order of the slices
     /// that first referred to each Evidence, which differ for at least one of
     /// the invocations; each Evidence has one index record (D15:841-843,
-    /// 2505; plan 025 interpretation #250).
+    /// 2506; plan 025 interpretation #250).
     #[test]
     fn the_evidence_index_takes_the_evidence_order() {
         let mut reordered = false;

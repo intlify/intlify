@@ -3,7 +3,7 @@
 
 //! The Finding Registry's disclosure policies: one for each of design 015's
 //! seven evidence kinds, in a table beside the registry's rows (D15:721,
-//! 2233, 2249; Decision 015-192).
+//! 2234, 2250; Decision 015-192).
 //!
 //! A policy names the members every Evidence of its kind has and each
 //! component its view can retain: a leaf variant of a member of D15:2493's
@@ -281,7 +281,7 @@ impl PathShape {
 
     /// Evidence order: the origin's rank, then the roles by rank with a
     /// shorter equal prefix first, then the key, `safe-key` first (D15:824,
-    /// 827). `None` when a rank is not a shortest decimal string.
+    /// 828). `None` when a rank is not a shortest decimal string.
     pub(crate) fn order(&self, other: &Self) -> Option<Ordering> {
         let ranks = |shape: &Self| {
             shape

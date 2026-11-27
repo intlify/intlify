@@ -20,7 +20,7 @@
 //! domain reports them even when a terminal marker follows, since the values
 //! that prove them stay admitted, and without them passes only once every
 //! Snapshot bound holds, never on a suffix no inspection reached (D15:2007,
-//! 2365; plan 025 decision #266). The root-value bounds count the marker-free
+//! 2366; plan 025 decision #266). The root-value bounds count the marker-free
 //! tree as they count a file of the same value (D15:1890) and report alike,
 //! and a document exists only when every check holds.
 //!
@@ -33,7 +33,7 @@
 //! maps a span by it. Positions share their prefixes, as a file's facts'
 //! paths do, so the edges Phase 1 holds grow with the nodes on the
 //! candidates' paths, never with the candidates times their depth (D15:777,
-//! 1834, 1851; plan 025 decision #299). A marker and a
+//! 1835, 1852; plan 025 decision #299). A marker and a
 //! string are the values at their positions, a key past the single-string
 //! bound is its member's key, and a total is the root's value. The Evidence
 //! names the call-site source and the span the admitted sidecar maps for the
@@ -856,7 +856,7 @@ mod tests {
         assert_eq!(document.counts(), None);
     }
 
-    /// D15:2130, 3479: a Snapshot records no raw-byte, parser-token,
+    /// D15:2130, 3490: a Snapshot records no raw-byte, parser-token,
     /// strict-syntax, or duplicate-member unit, a file no Snapshot-bound
     /// unit, and both the owner, the JSON-compatible domain, and the five
     /// root-value bounds (Decision 015-202).
@@ -962,7 +962,7 @@ mod tests {
     }
 
     /// Under the largest bound the terminal marker's Finding reports the
-    /// witness `u64::MAX`, the bound's limit plus one (D15:890, 2357, 3448).
+    /// witness `u64::MAX`, the bound's limit plus one (D15:890, 2357, 3459).
     #[test]
     fn the_terminal_marker_reports_u64_max_under_the_largest_bound() {
         let mut limits = limits();
@@ -1643,7 +1643,7 @@ mod tests {
         );
     }
 
-    /// D15:777, 793-799, 3541: programmatic Entry Source Evidence holds the
+    /// D15:777, 793-799, 3552: programmatic Entry Source Evidence holds the
     /// present empty path for a marker at the root, the complete path to a
     /// marker inside the value, the longest safely established prefix when a
     /// further edge would need dynamic behavior, an unsafe member of that
@@ -1700,7 +1700,7 @@ mod tests {
         );
     }
 
-    /// D15:797, 801, 3541: Materialized Value Evidence names one source with
+    /// D15:797, 801, 3552: Materialized Value Evidence names one source with
     /// that source's own admitted locator, `safe-label`, `safe-uri`, or none,
     /// and its required Portable Value Locator, exact or redacted, with the
     /// span where the sidecar maps one and without it where it does not.
@@ -2092,7 +2092,7 @@ mod tests {
     /// order, construct one `IntlifyConfig`, and exactly when the checks that
     /// gate profile projection admitted the whole root; a value with a
     /// structural failure constructs none through either entry (D15:396,
-    /// 2130, 2142, 3329, 3339).
+    /// 2131, 2143, 3465, 3475).
     #[test]
     fn both_entries_converge_on_one_intlify_config_only_after_structural_admission() {
         for value in [minimal_config(), complete_config()] {
@@ -2122,7 +2122,7 @@ mod tests {
     /// root of another type, a missing member of the root and of a
     /// declaration, a member's value, an array element, an undeclared
     /// member's key at the root and nested in a declaration, a target, and a
-    /// group (D15:3539), a malformed Profile ID's key, and a selector no
+    /// group (D15:3550), a malformed Profile ID's key, and a selector no
     /// declaration has, beside the declarations.
     fn locations() -> Vec<(Value, &'static str)> {
         let mut unversioned = minimal_config();

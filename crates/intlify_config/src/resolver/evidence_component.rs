@@ -708,7 +708,7 @@ mod tests {
     /// Rejected keys of one JSON type are one `redacted-key`. Unequal
     /// projections stay apart under one digest with ordinals in record byte
     /// order, and otherwise the complete digest decides, against that order
-    /// (D15:826, 839, 3492).
+    /// (D15:826, 839, 3503).
     #[test]
     fn redacted_keys_group_and_order_by_digest_then_ordinal() {
         let key = |source| ComponentPath::artifact_member(Key::Unsafe(source)).unwrap();

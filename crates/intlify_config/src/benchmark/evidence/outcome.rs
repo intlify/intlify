@@ -168,7 +168,7 @@ pub(in crate::benchmark) fn require_observable(
 /// and bindings in the shared domain, the Entry projection in the entry
 /// domain. Whether the outcome is checked and whether its bundle is complete
 /// follow from the profile and the terminal states (D15:1153-1154,
-/// 1176-1185, 2775, 2794; plan 025 interpretation #261).
+/// 1177-1186, 2776, 2799; plan 025 interpretation #261).
 pub(in crate::benchmark) fn observe(resolved: &Resolved) -> Result<Observation, OutputFailure> {
     let outcome = require_observable(resolved)?;
     let specification = resolved.specification;

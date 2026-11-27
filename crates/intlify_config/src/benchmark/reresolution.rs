@@ -13,7 +13,7 @@
 //! match to the replay result, and admits nothing at a pre-invocation
 //! boundary (D15:2776). The storage the result borrows is made before the
 //! start mark, and the result is copied out after the end mark (D15:2750,
-//! 2824). A stale set or a resolver defect is a benchmark failure (D15:2831).
+//! 2829). A stale set or a resolver defect is a benchmark failure (D15:2831).
 //!
 //! The semantic checksum covers the Shared projection, and the profile view
 //! with each binding's tuple and `C(member)` when the replay has them, in

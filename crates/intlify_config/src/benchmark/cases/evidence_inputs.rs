@@ -288,7 +288,7 @@ pub(in crate::benchmark) enum EvidenceRecipe {
     Storefront,
     /// The example without its project default and with an invalid target
     /// locale: blocking Findings after materialization, neither of which
-    /// holds the other back (D15:1908, 2368, 3571; plan 025 interpretation
+    /// holds the other back (D15:1908, 2368, 3582; plan 025 interpretation
     /// #252).
     Blocked,
     /// The example with [`DENSE`] more targets, each requesting a locale
@@ -307,7 +307,7 @@ pub(in crate::benchmark) enum EvidenceRecipe {
     /// string a lone surrogate: two Entry Findings, one of the duplicate
     /// members, whose two occurrences each relate the other two, and one of
     /// the string that is no JSON-compatible value, and the statuses that
-    /// wait on both name both as causes; no value (D15:3565; plan 025
+    /// wait on both name both as causes; no value (D15:3576; plan 025
     /// decision #264).
     Inadmissible,
 }

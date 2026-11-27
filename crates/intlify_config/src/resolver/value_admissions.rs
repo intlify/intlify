@@ -7,7 +7,7 @@
 //! or entry of the path, so its result cannot tell them apart, while each of
 //! its candidates has a result of its own (D15:2185, 2204). Reading a value
 //! from its candidates therefore keeps a failure of one element out of its
-//! siblings (D15:394, 2368, 3465).
+//! siblings (D15:394, 2368, 3476).
 //!
 //! A value's candidates are its own checks. The check of an identity map's
 //! key is kept apart, by the entry's value: an entry without an admitted key

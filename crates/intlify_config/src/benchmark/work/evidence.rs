@@ -77,7 +77,7 @@ impl LogicalWork {
 
     /// The workload of the Entry projection stage in the units and at the
     /// stages of the bounds it applies (D15:1835-1840, 1852, 1947-1957,
-    /// 2796): what the Entry domain committed under its eleven
+    /// 2801): what the Entry domain committed under its eleven
     /// `diagnostics.entry` counts, and the complete invocation under its six
     /// `evidenceMetadata` counts.
     pub(super) fn entry_evidence(&mut self, resolved: &entry::Resolved) -> Result<(), WorkFailure> {

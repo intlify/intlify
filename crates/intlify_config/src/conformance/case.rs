@@ -543,7 +543,7 @@ const JSON_NORMALIZED: [&str; 6] = [
     "implementation-capability",
 ];
 
-/// The owners a traceability record or a manifest may name (D15:3420).
+/// The owners a traceability record or a manifest may name (D15:3431).
 pub(crate) const VERIFICATION_OWNERS: [&str; 14] = [
     "intlify_config",
     "016",

@@ -16,7 +16,7 @@
 //! and its Finding payload strategy.
 //!
 //! 015 leaves the IDs of kinds, scopes, and checks to the registry (D15:2174,
-//! 2175). A kind's ID is its name in kebab case. A singleton's owning scope is
+//! 2176). A kind's ID is its name in kebab case. A singleton's owning scope is
 //! its own kind; every other kind names the field, map, or collection its
 //! keys belong to. A check ID reads `<area>.<subject>.<check>` like 015's
 //! examples, with the phase's area first, and a rule ID is the check ID after
@@ -56,7 +56,7 @@
 //! first unit requires no check (D15:2370, 2517). Profile selection selects a
 //! declaration once structural admission admitted its boundary and its
 //! `resourceLimits` reference, and the later phases read its other fields one
-//! by one (D15:2132, 2368, 3465; plan 025 interpretation #218): a row of a
+//! by one (D15:2132, 2368, 3476; plan 025 interpretation #218): a row of a
 //! later phase lists the structural checks of the fields its units read
 //! unless a check it lists already waits on them. The checks of the
 //! declaration's reference counts list those of `policies` and of the Target
@@ -1246,7 +1246,7 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         // selection: its Profile ID, the selector naming it, and the structural
         // checks of its boundary and `resourceLimits` reference, which no check
         // of profile selection reports (D15:2132). No one reference's failure
-        // holds the count or the total back (D15:1919, 1923, 1925, 3479).
+        // holds the count or the total back (D15:1919, 1923, 1925, 3490).
         K::CapabilityTargetProfileReference => &[&[
             "structural.profile.required-field",
             "structural.profile.field-value",
@@ -1430,7 +1430,7 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
         // its read on both, each payload's read on it, each count on its
         // payload's read, the dataset on every count, and only the comparison
         // with the slot on the slot and the dataset (D15:2009, 2134, 2150,
-        // 2365).
+        // 2366).
         K::CanonicalizationData => &[
             CONFIRMED_POLICY,
             CONFIRMED_POLICY,
@@ -1628,7 +1628,7 @@ const fn prerequisite_ids(kind: SubjectKind) -> &'static [&'static [&'static str
             "target.requested-locales.directed",
         ]],
         // A Group ID's checks need its admitted key, and its member count an
-        // array to count (D15:2185, 3479).
+        // array to count (D15:2185, 3490).
         K::Group => &[&[
             "structural.group-key.field-value",
             "group.groups.within-bound",
@@ -1990,7 +1990,7 @@ fn owned_dependencies(kind: SubjectKind) -> Vec<OwnedDependency> {
 /// The ordinary Evidence record kinds the units of `check` of `kind` may own:
 /// the `possibleEvidenceRecordKinds` of its Check Registry row, which
 /// reporting finalization verifies each record's owner against (D15:2144,
-/// 3224). A check its kind does not run has no row, so its units may own
+/// 3229). A check its kind does not run has no row, so its units may own
 /// none.
 pub(crate) fn possible_record_kinds(kind: SubjectKind, check: Check) -> Vec<RecordKind> {
     kind.checks()
@@ -2306,7 +2306,7 @@ const fn derivation(kind: SubjectKind, check: Check) -> Derivation {
 /// requires and the capability makes available. An exceeded policy bound
 /// also names its subject kind, a capability bound's path holds its group,
 /// and the reporting bound's reason names its domain (D15:2356, 2357, 2359,
-/// 2359).
+/// 2360).
 pub(crate) const fn details_members(code: Code) -> &'static [DetailsMember] {
     use Code as C;
     use DetailsMember as M;

@@ -4,7 +4,7 @@
 //! Design 015's Redacted evidence token: the token record of an Evidence
 //! component that is not disclosed, and the token itself, with the collision
 //! ordinals that keep unequal records with one digest apart (D15:723,
-//! 2454-2468; Decisions 015-182 and 015-183).
+//! 2455-2469; Decisions 015-182 and 015-183).
 //!
 //! A token replaces one component: a Portable Source Identity that its owner
 //! does not mark non-secret, an unsafe member segment of a Logical input path
@@ -525,8 +525,8 @@ mod tests {
 
     /// Every pair of a token kind and a Safe Origin Kind that can carry it
     /// has a frozen preimage and token, written apart from this crate from
-    /// D15:723 and 2455-2469 (`.plans/drafts/025-pr7/t2-vectors.py`; D15:3444,
-    /// 3362).
+    /// D15:723 and 2455-2469 (`.plans/drafts/025-pr7/t2-vectors.py`; D15:3455,
+    /// 3498).
     #[test]
     fn every_kind_and_origin_that_carries_a_token_is_frozen() {
         let vectors: serde_json::Value =
@@ -640,7 +640,7 @@ mod tests {
             tokens.token(PROFILE, &second)
         );
         // Equal projections under different origins are different tokens
-        // (D15:3487), as are the two path-member kinds.
+        // (D15:3498), as are the two path-member kinds.
         assert_ne!(
             tokens.token(PROFILE, &first),
             tokens.token(PROFILE, &programmatic)
@@ -680,7 +680,7 @@ mod tests {
         assert_eq!(tokens.comparisons(), 21);
     }
 
-    /// D15:3487: a subject record and an evidence record with one digest form
+    /// D15:3498: a subject record and an evidence record with one digest form
     /// no colliding set.
     #[test]
     fn subject_and_evidence_records_never_share_a_set() {

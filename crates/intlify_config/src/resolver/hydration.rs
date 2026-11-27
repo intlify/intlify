@@ -40,7 +40,7 @@
 //! Target ID that takes both roles is observed at each of its occurrences in
 //! one role beside those in the other.
 //!
-//! Each relation and each endpoint is read on its own (D15:2150, 2368, 3570).
+//! Each relation and each endpoint is read on its own (D15:2150, 2368, 3581).
 //! The bound counts what was submitted, a relation that failed and one under
 //! an entry whose key failed included. A relation with an endpoint that failed
 //! has no identity and is keyed by its Subject content projection, so such
@@ -574,7 +574,7 @@ impl Default for Taken {
 /// takes one role in its group, waiting only on the bytes of the endpoints
 /// that name it there. One that takes both is observed at each of its
 /// occurrences in one role, beside its occurrences in the other (D15:2250,
-/// 2387), through `observer` when there is one.
+/// 2388), through `observer` when there is one.
 fn single_roles(
     evaluation: &mut Evaluation,
     (id, observer): (&DeploymentGroupId, Option<&DeclarationObserver<'_>>),

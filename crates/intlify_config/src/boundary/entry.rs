@@ -515,7 +515,7 @@ pub(crate) mod tests {
     /// A stable configuration-root identity plus a logical source slot
     /// establishes the file's identity with no locator, and the same pair
     /// under any locator: the locator takes no part in it (D15:742, 789,
-    /// 3388).
+    /// 3524).
     #[test]
     fn a_root_identity_and_slot_establish_the_file_identity_without_a_locator() {
         const ROOTED: &str = "intlify-file-source.v0:root-7f3a#intlify.config";
@@ -934,7 +934,7 @@ pub(crate) mod tests {
 
     /// A Programmatic Entry locator candidate that is not admitted is absence,
     /// and each locator stays with its own source: neither fills the other's
-    /// absence (D15:748, 3528).
+    /// absence (D15:748, 3539).
     #[test]
     fn a_programmatic_locator_that_is_not_admitted_is_absence() {
         let programmatic = Programmatic::new();

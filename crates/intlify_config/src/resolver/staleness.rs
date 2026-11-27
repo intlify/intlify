@@ -29,7 +29,7 @@
 //! identity/revision pair over unequal raw bytes, Snapshot, or call-site
 //! source, or one exact identity, compared as its string in whichever role
 //! either set supplies it, with unequal non-secret marks (D15:735, 2586,
-//! 2589). Any other difference is `invocation-stale`. A difference within one
+//! 2590). Any other difference is `invocation-stale`. A difference within one
 //! set, such as an entry and its sidecar marking one identity unequally, is
 //! the boundary's to judge, so a set is always `fresh` against an equal one.
 
@@ -381,7 +381,7 @@ mod tests {
         assert_eq!(staleness(&snapshot, &earlier), InvocationStale);
     }
 
-    /// D15:2584, 3563: a Programmatic Entry's identity, alone or with its
+    /// D15:2584, 3574: a Programmatic Entry's identity, alone or with its
     /// mark, and its locator are compared, and so are its sidecar's presence,
     /// identity alone or with its mark, locator, source, mappings, and
     /// candidates.
@@ -556,7 +556,7 @@ mod tests {
         assert_eq!(staleness(&snapshot, &later), Corrupt);
     }
 
-    /// D15:2584, 3563: a set whose Phase 1 blocked before a value existed
+    /// D15:2584, 3574: a set whose Phase 1 blocked before a value existed
     /// compares as any other, its sidecar's presence included.
     #[test]
     fn a_set_whose_phase_1_blocked_still_compares() {
@@ -590,7 +590,7 @@ mod tests {
         assert_eq!(staleness(&earlier, &later), InvocationStale);
     }
 
-    /// D15:2588, 3558: editing a declaration the selector does not select
+    /// D15:2588, 3569: editing a declaration the selector does not select
     /// makes the file invocation stale, though the checked profile stays
     /// equal.
     #[test]

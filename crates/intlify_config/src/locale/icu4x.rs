@@ -858,7 +858,7 @@ mod tests {
         (found, bound.is_ok())
     }
 
-    /// D15:3395 over the committed artifact: each `localeData` bound admits
+    /// D15:3406 over the committed artifact: each `localeData` bound admits
     /// the artifact's exact value, and one below it is that bound's Finding
     /// alone, with its path, its value, and the exact total, except the
     /// payload length's first-over witness (Decision 015-157).

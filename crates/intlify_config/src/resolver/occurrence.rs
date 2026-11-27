@@ -1004,7 +1004,7 @@ mod tests {
     /// Path admission reaches the primary and every related Evidence: a
     /// Logical input path past a bound is absent wherever it is, and a value
     /// locator past one among the related refuses the candidate (D15:777,
-    /// 1851; plan 025 decisions #232 and #236).
+    /// 1852; plan 025 decisions #232 and #236).
     #[test]
     fn path_admission_reaches_the_primary_and_every_related_evidence() {
         let mut evaluation = Evaluation::default();

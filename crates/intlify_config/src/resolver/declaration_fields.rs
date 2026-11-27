@@ -7,7 +7,7 @@
 //! its value, absent where an optional one is, or the causes of its absence.
 //! What structural admission did not admit suppresses only the work that
 //! reads it, while its independently admitted siblings continue (D15:394,
-//! 2367, 3340); an undeclared member of the declaration belongs to no field.
+//! 2368, 3476); an undeclared member of the declaration belongs to no field.
 //!
 //! The checks decide: a field they admitted and the analysis did not, or a
 //! required one they admitted though it is absent, is a resolver bug.
@@ -423,7 +423,7 @@ mod tests {
     }
 
     /// A field structural admission rejected is unavailable with the
-    /// Findings under it, and its siblings stay admitted (D15:2368, 3465).
+    /// Findings under it, and its siblings stay admitted (D15:2368, 3476).
     #[test]
     fn a_rejected_field_holds_back_only_itself() {
         let mut config = minimal_config();

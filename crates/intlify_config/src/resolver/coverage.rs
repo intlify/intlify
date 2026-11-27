@@ -34,12 +34,12 @@
 //! A rule or item structural admission did not admit holds back only what
 //! needs it (D15:2366, 2368). The rule count and each selector count take
 //! every occurrence they name, a selector count waiting only when every
-//! selector it would read failed (D15:1902-1904, 2185, 3479). An item that
+//! selector it would read failed (D15:1902-1904, 2185, 3490). An item that
 //! failed has no subject, and its rule's other items are checked. Its rule
 //! has no domain, and a rule that is no object has no subject at all. The
 //! cells need every rule's domain and mode, the table every cell, and the
 //! policy all of `coverage`, and none of them is ever partial (D15:1610,
-//! 2426, 3409).
+//! 2427, 3545).
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -647,7 +647,7 @@ pub(crate) fn resolve_coverage<Id: Clone, P: Provider>(
     let owner = unit(CoverageSubject::Table, Check::CompleteTable);
     // An unknown mode blocks the table whichever cells take it, a rule's even
     // where narrower rules decide all its cells, or where its selector failed
-    // and it holds no domain (D15:2427, 3732).
+    // and it holds no domain (D15:2427, 3743).
     let modes = modes_of(
         rules
             .iter()
@@ -2234,7 +2234,7 @@ mod tests {
     /// Identical rules share their units but are each a raw parent of their
     /// own: a locale repeated in their selector is found at each rule's
     /// items, each beside the other items of its own rule (D15:1568, 2191,
-    /// 2387).
+    /// 2388).
     #[test]
     fn identical_rules_are_each_a_parent_of_their_own_items() {
         let repeated = json!({"requestedLocales": ["fr", "fr"], "mode": "fallback-allowed"});
@@ -2267,7 +2267,7 @@ mod tests {
 
     /// Identical rules can spell their sets in different orders, so each
     /// rule's own items locate a subject's Findings, not the first rule's
-    /// positions (D15:517, 2191, 2388, 3478).
+    /// positions (D15:517, 2191, 2388, 3489).
     #[test]
     fn identical_rules_in_different_orders_are_found_at_their_own_items() {
         let declaration = declared(json!({"rules": [
@@ -2448,7 +2448,7 @@ mod tests {
     /// `surface-class-duplicate`. Every raw item counts before either is
     /// rejected; the rule has no normalized domain, though the rule beside it
     /// has one; and every cell and the table wait on the Finding, so no cell,
-    /// Basis, or mapping is left (D15:517, 1568, 2427, 3534).
+    /// Basis, or mapping is left (D15:517, 1568, 2427, 3545).
     #[test]
     fn a_selector_repeating_a_member_leaves_no_rule_domain_or_partial_table() {
         type Repeat = fn(&RuleContent) -> Unit;
@@ -2978,7 +2978,7 @@ mod tests {
     /// Coverage Decision Evidence keeps every mapping in its order, and only
     /// a moved rule's mappings follow it to the new index; the rule that
     /// stays in place, and the default, keep their Evidence (D15:1606, 1608,
-    /// 1609, 1611, 3406).
+    /// 1610, 1612, 3542).
     #[test]
     fn reordering_rules_moves_only_the_mappings_of_the_rules_that_moved() {
         let stays = json!({

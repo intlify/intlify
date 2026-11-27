@@ -184,7 +184,7 @@ impl<'s> ResolvedTargets<'s> {
 /// selected declaration's, when there is one. Each check of a target waits on
 /// its Target ID's bounds. The subset, the effective default, and the
 /// directions are checked independently of each other, over the values of its
-/// set that were admitted (D15:2185, 3479); only the directions wait on the
+/// set that were admitted (D15:2185, 3490); only the directions wait on the
 /// Target Profile, so an invalid one stops what needs it alone (D15:2368), and
 /// the resolved target needs every one. Without a map to read there is no
 /// target, and no unit.
@@ -265,7 +265,7 @@ impl Checks<'_, '_> {
         let admitted = own.admitted.clone();
         // The identities of the target's set that were admitted: a check
         // over them waits only when every element is excluded (D15:2185,
-        // 3354).
+        // 3490).
         let counted = own.requested.counted().cloned();
         // A target locale the project's set holds is in it whatever else
         // the set lacks, and one it does not hold is unproved while it lacks
@@ -1304,7 +1304,7 @@ mod tests {
     }
 
     /// With no element of its set admitted, a target's checks over its
-    /// values have none to read and wait on why (D15:2185, 3479).
+    /// values have none to read and wait on why (D15:2185, 3490).
     #[test]
     fn a_target_without_an_admitted_locale_waits_on_its_elements() {
         let mut inputs = Inputs::new();

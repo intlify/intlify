@@ -398,7 +398,7 @@ pub(super) mod tests {
     /// Both source-revision domains, each over a one-field record of the
     /// exact bytes: frozen preimages and digests that a Python script computed
     /// apart from this crate from D15:744 and the field framing
-    /// (`.plans/drafts/025-pr7/t2-vectors.py`; D15:3444).
+    /// (`.plans/drafts/025-pr7/t2-vectors.py`; D15:3455).
     #[test]
     fn both_revision_domains_digest_their_frozen_preimages() {
         let vectors: serde_json::Value =
@@ -696,7 +696,7 @@ pub(super) mod tests {
     /// Identities outside the form: no `:`, an empty payload, a tag without
     /// `.v` and a version, an empty name, a name that begins or ends with `.`
     /// or `-` or holds an uppercase letter or `_`, and a version with a
-    /// leading zero (D15:744, 3514).
+    /// leading zero (D15:744, 3525).
     pub(in crate::boundary) const UNSTABLE: [&str; 21] = [
         "", "a.v0", "a.v0:", ":", ":p", "a:p", "a.v:p", "a.vx:p", "a.V0:p", ".v0:p", ".a.v0:p",
         "a..v0:p", "-a.v0:p", "a-.v0:p", "A.v0:p", "aB.v0:p", "a_b.v0:p", "a b.v0:p", "a.v01:p",
@@ -704,7 +704,7 @@ pub(super) mod tests {
     ];
 
     /// The contrasts: a name with `.` and `-` inside, a longer or zero
-    /// version, and payloads that hold a further `:` (D15:744, 3514).
+    /// version, and payloads that hold a further `:` (D15:744, 3525).
     pub(in crate::boundary) const STABLE: [(&str, &str, &str); 7] = [
         ("x.y-z.v3:p", "x.y-z.v3", "p"),
         ("a.v12:p", "a.v12", "p"),
@@ -718,7 +718,7 @@ pub(super) mod tests {
     /// What a host knows of a source, none of which alone establishes a pair:
     /// a normalized path, a URI, a modification timestamp, filesystem
     /// metadata, a process-local object address, a stack frame, and a value
-    /// random per invocation (D15:742, 3513).
+    /// random per invocation (D15:742, 3524).
     pub(in crate::boundary) const HOST_FACTS: [&str; 14] = [
         "config/intlify.json",
         "/repository/intlify.config.json",
@@ -777,7 +777,7 @@ pub(super) mod tests {
 
     /// Every pair applies one form: each spelling outside it is the row's
     /// unstable identity, and each contrast is admitted with the first `:`
-    /// as the end of its tag (D15:744, 3514).
+    /// as the end of its tag (D15:744, 3525).
     #[test]
     fn every_pair_applies_the_identity_form() {
         for identity in UNSTABLE {
@@ -809,7 +809,7 @@ pub(super) mod tests {
 
     /// None of a host's facts establishes any pair, as its identity or as
     /// its revision, while the content-derived revision of each pair still
-    /// establishes it under a stable identity (D15:742, 744, 3513).
+    /// establishes it under a stable identity (D15:742, 744, 3524).
     #[test]
     fn no_host_fact_alone_establishes_a_pair() {
         for fact in HOST_FACTS {

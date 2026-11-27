@@ -334,7 +334,7 @@ mod tests {
     /// Unmarked identities compare by every digest byte and then by the
     /// ordinal: the digests here differ only in their last byte and run
     /// against the origins' order, and the second ordinal of the lower digest
-    /// precedes the first of the higher (D15:736, 3495).
+    /// precedes the first of the higher (D15:736, 3506).
     #[test]
     fn redacted_identities_order_by_every_digest_byte_then_the_ordinal() {
         let digest = LastByte(&[("configuration-programmatic", 1), ("configuration-file", 2)]);
@@ -380,7 +380,7 @@ mod tests {
 
     /// An unmarked identity's payload and the direct digest of it or of the
     /// whole identity reach neither the token's record nor its view
-    /// (D15:723, 736, 3495).
+    /// (D15:723, 736, 3506).
     #[test]
     fn an_unmarked_identity_keeps_no_payload_or_digest_of_it() {
         let payload = "t2-canary-source-payload";
@@ -408,7 +408,7 @@ mod tests {
 
     /// A `safe-opaque` identity is the owner's exact bytes: its domain and
     /// payload stay apart, and no decoding, normalization, collation, or case
-    /// folding merges or reorders two of them (D15:735, 740, 3494).
+    /// folding merges or reorders two of them (D15:735, 740, 3505).
     #[test]
     fn a_safe_opaque_identity_is_compared_as_exact_bytes() {
         let safe =
@@ -451,7 +451,7 @@ mod tests {
 
     /// The identity a source keeps does not move with its revision, whatever
     /// the source's bytes are, those that are no text included (D15:740, 744,
-    /// 3369).
+    /// 3505).
     #[test]
     fn a_safe_opaque_identity_is_unchanged_across_source_revisions() {
         let largest = Bound::new(u64::MAX - 1).unwrap();

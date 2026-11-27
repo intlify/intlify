@@ -2,7 +2,7 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! The Programmatic Entry Snapshot vectors an independent implementation
-//! checks (D15:3444).
+//! checks (D15:3455).
 //!
 //! Each vector is one canonical Snapshot in a JSON notation, with its framing
 //! `S`, its content digest, and what it counts under the nine

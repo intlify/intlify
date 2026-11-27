@@ -48,9 +48,9 @@
 //! ([`profile_keys`]), whatever else of it or of the root they rejected
 //! (D15:2132, 2185, 2364; plan 025 interpretation #218). Profile projection
 //! needs a complete `IntlifyConfig`, the whole root ([`whole`]) (D15:2143,
-//! 2367). The semantic phases read the selected declaration from what each
+//! 2368). The semantic phases read the selected declaration from what each
 //! candidate left at its value ([`ValueAdmissions`]), since a unit keyed by a
-//! path with `*` cannot tell its elements apart (D15:2185, 2368, 3465).
+//! path with `*` cannot tell its elements apart (D15:2185, 2368, 3476).
 
 use std::cell::OnceCell;
 use std::collections::BTreeMap;
@@ -195,7 +195,7 @@ impl EntryKey {
 /// A field: its logical path from its entry, in the schema's member names
 /// and `*` for an array element or an entry of a map whose keys are not
 /// identities, and where one raw candidate of its unit looked (D15:2181,
-/// 2184). Paths order segment by segment by their bytes, a shorter exact
+/// 2185). Paths order segment by segment by their bytes, a shorter exact
 /// prefix first.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Field {
@@ -222,7 +222,7 @@ impl Field {
 /// Otherwise the causes: each such unit's blocking results, and the causes
 /// of each not evaluated. A missing required member, an undeclared member,
 /// or a failure elsewhere in the declaration suppresses only what reads it
-/// (D15:2368, 3466).
+/// (D15:2368, 3477).
 pub(crate) fn selectable(evaluation: &Evaluation, id: &str) -> Admitted<()> {
     evaluation.admitted_within(|unit| match &unit.subject {
         Subject::Structural(subject @ StructuralSubject::ProfileField(_, field))
@@ -245,7 +245,7 @@ pub(crate) fn selectable(evaluation: &Evaluation, id: &str) -> Admitted<()> {
 /// `IntlifyConfig` and so a profile projection need: every structural check
 /// evaluated without a blocking result. Otherwise the causes: every blocking
 /// result of those checks, and the causes of each not evaluated (D15:2143,
-/// 2367).
+/// 2368).
 pub(crate) fn whole(evaluation: &Evaluation) -> Admitted<()> {
     evaluation.admitted_within(|unit| {
         matches!(
@@ -1292,7 +1292,7 @@ mod tests {
     /// reference, `anyOf`, and its branches' three), and an alias is one. Each
     /// failing entry is a separate occurrence of one Finding, each at its own
     /// value, and the entry that passes beside them is a candidate with no
-    /// occurrence (D15:1888, 2185, 3479).
+    /// occurrence (D15:1888, 2185, 3490).
     #[test]
     fn the_entries_of_a_map_without_identity_keys_count_and_join_one_finding() {
         for (fallback, path, valid, each, safe) in [
@@ -1700,7 +1700,7 @@ mod tests {
     /// A value under two unsafe keys is located by a path that keeps every
     /// safe member and takes the pinned `value-path-member` token for each
     /// unsafe one. The locator is no RFC 6901 pointer, and its span still
-    /// finds the value (D15:757, 791, 3520).
+    /// finds the value (D15:757, 791, 3531).
     #[test]
     fn a_locator_takes_the_pinned_token_for_each_unsafe_member() {
         let mut value = minimal_config();
@@ -1748,7 +1748,7 @@ mod tests {
     /// A member missing under an unsafe key is observed at its nearest
     /// locatable owner, the redacted entry, followed by its schema-defined
     /// name. The key's own Finding keeps its span while neither the key nor
-    /// its direct digest is retained (D15:791, 3521).
+    /// its direct digest is retained (D15:791, 3532).
     #[test]
     fn a_member_missing_under_an_unsafe_key_keeps_its_field_name() {
         let mut value = minimal_config();
@@ -1832,7 +1832,7 @@ mod tests {
     /// An unknown member is observed at its own key at every depth, the
     /// members above it kept as their classes allow and its own name
     /// redacted: 015 classifies every unknown member as unsafe, so no exact
-    /// pointer can name one (D15:777, 791, 3539).
+    /// pointer can name one (D15:777, 791, 3550).
     #[test]
     fn an_unknown_member_is_redacted_at_its_key_at_every_depth() {
         let mut value = minimal_config();
@@ -1947,7 +1947,7 @@ mod tests {
     /// fragment are admitted: a failure elsewhere in it, a missing required
     /// member, or an undeclared member leaves it selectable, while the whole
     /// root waits on every structural Finding; a unit not evaluated holds it
-    /// back with its causes (D15:2132, 2143, 2368, 3466; plan 025
+    /// back with its causes (D15:2132, 2143, 2368, 3477; plan 025
     /// interpretation #218).
     #[test]
     fn a_declaration_is_selectable_once_its_boundary_and_resource_limits_are_admitted() {

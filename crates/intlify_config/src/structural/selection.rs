@@ -343,7 +343,7 @@ impl<Policy: DeserializeOwned, Target> StructuralAnalysis<Policy, Target> {
         // A declaration boundary is its value as an object under its admitted
         // key, evaluated against the declaration's schema. A missing required
         // member, an undeclared member, or a failure below suppresses only
-        // what reads it (D15:2132, 2368, 3466; plan 025 interpretation #218).
+        // what reads it (D15:2132, 2368, 3477; plan 025 interpretation #218).
         let boundary_evaluated = evaluation.fragments.iter().any(|fragment| {
             fragment.subject == subject
                 && fragment.schema == self.binding.declaration_schema

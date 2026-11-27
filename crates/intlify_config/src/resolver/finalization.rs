@@ -4,7 +4,7 @@
 //! Design 015's reporting finalization checks: what Phase 15 verifies of the
 //! records the earlier stages fixed before it returns an outcome, and the
 //! mandatory reserve that the outcome's reserved records take (D15:1186,
-//! 1611, 2143, 2385, 2518).
+//! 1612, 2144, 2386, 2519).
 //!
 //! Finalization only orders: it cannot create or deduplicate a candidate,
 //! assign or change an ordinal, key, owner, or byte size, repair a mapping, or
@@ -420,7 +420,7 @@ mod tests {
 
     /// A record of the other domain's kind, or owned by a unit whose Check
     /// Registry row does not list its kind, is a resolver bug (D15:2144,
-    /// 2518, 3224).
+    /// 2519, 3229).
     #[test]
     fn a_record_outside_its_domain_or_its_owners_row_is_a_resolver_bug() {
         blocked().outcome(None, identity(), |_, _, outcome| {
@@ -765,7 +765,7 @@ mod tests {
     /// other only when the domain that omits it ends at the decision table,
     /// which owns both: past the Entry domain alone the Basis stays, past the
     /// Shared domain alone the Evidence stays, and past both neither does
-    /// (D15:1186, 1610, 1612, 2144, 3583).
+    /// (D15:1186, 1610, 1612, 2144, 3594).
     #[test]
     fn decision_evidence_covers_each_basis_exactly_once_both_domains_are_complete() {
         let inputs = reporting(&Inputs::complete(), &[], &[]);
@@ -827,7 +827,7 @@ mod tests {
     /// A Coverage Decision Evidence record whose source its Basis does not
     /// admit, beside or in place of the cell's own, and one for a cell with
     /// no Basis are resolver bugs: each mapping references one retained Basis
-    /// and one decision source that Basis admits (D15:1612, 2144, 3535).
+    /// and one decision source that Basis admits (D15:1612, 2144, 3546).
     #[test]
     fn decision_evidence_with_an_extra_source_or_no_basis_is_a_resolver_bug() {
         let mut inputs = reporting(&Inputs::complete(), &[], &[]);
@@ -925,7 +925,7 @@ mod tests {
     /// returned: a candidate that observed nothing, or a reserve past the
     /// capability's, leaves the invocation without an outcome, and the
     /// candidate leaves a replay without a result (D15:2144, 2386, 2519,
-    /// 2659).
+    /// 2660).
     #[test]
     fn an_invocation_without_finalizations_checks_has_no_outcome() {
         reporting(&Inputs::complete(), &[], &[]).entered_under(

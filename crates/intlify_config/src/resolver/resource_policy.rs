@@ -35,7 +35,7 @@
 //! capability are, and the `configurationInput` ones at the materialized
 //! root, each string past the bound, the declarations, each declared Profile
 //! ID's key, or the selector under the policy's bound (D15:791, 813, 817,
-//! 1884). Every Finding of Phase 4 carries occurrence Evidence.
+//! 1885). Every Finding of Phase 4 carries occurrence Evidence.
 
 use std::collections::BTreeMap;
 
@@ -259,8 +259,8 @@ pub(crate) struct ReferenceOccurrence {
 
 /// The canonical bytes of the references that have them: an exact total,
 /// since one that failed structural admission has none to add (D15:1925,
-/// 1997, 2006). Not evaluated only when every value is excluded, with the
-/// causes of each (D15:2185, 3479).
+/// 1998, 2007). Not evaluated only when every value is excluded, with the
+/// causes of each (D15:2185, 3490).
 fn reference_total(references: &[ReferenceOccurrence]) -> Admitted<Tally> {
     let admitted = references
         .iter()
@@ -290,7 +290,7 @@ pub(crate) struct PolicyReferences<'a> {
     pub(crate) slots: Vec<(PolicySlot, Admitted<&'a PolicyReference>)>,
     /// The object's own checks: an undeclared member is in no slot, so it
     /// stops no reference, and both semantic groups wait on it (D15:2185,
-    /// 2367; plan 025 interpretation #346).
+    /// 2368; plan 025 interpretation #346).
     pub(crate) object: Admitted<()>,
 }
 
@@ -632,7 +632,7 @@ struct Inspected {
 /// what it measures. A reference that failed structural admission has no bytes
 /// the bounds protect, so it holds no confirmation back; a recheck's Finding
 /// does, and so does a complete input it cannot measure (D15:1737, 1925, 2152,
-/// 2367; plan 025 decision #342).
+/// 2368; plan 025 decision #342).
 pub(crate) fn admit_resource_policy(
     evaluation: &mut Evaluation,
     capability: &ImplementationCapability,
@@ -725,7 +725,7 @@ fn admit_and_compare(
     )?;
     let limits = &capability.bootstrap_only().artifact_bootstrap;
     // The scan reads the whole collection, not through the reference (D15:835,
-    // 836).
+    // 837).
     let scan = Observation {
         primary: collection_root()?,
         related: vec![capability_bound(CapabilityBound::BootstrapOnly(
@@ -1150,7 +1150,7 @@ fn artifact_bounds(
     let occurrences = occurrence_bounds(evaluation, stage, limits, submitted.members)?;
     // The declaration's count and total never gate the decision for the
     // selected reference. Both count over the whole declaration (D15:1919,
-    // 1922).
+    // 1923).
     let count = bounded_at(
         evaluation,
         stage.unit(ArtifactSubject::References),
@@ -1981,7 +1981,7 @@ mod tests {
                 "{check:?}"
             );
             // The work it protects, and every check after it, waits on it,
-            // while what was proved before it stands (D15:2007, 3476).
+            // while what was proved before it stands (D15:2007, 3487).
             let rank = BOOTSTRAP.iter().position(|each| *each == check).unwrap();
             for earlier in &BOOTSTRAP[..rank] {
                 assert_eq!(
@@ -2002,7 +2002,7 @@ mod tests {
 
     /// A candidate without the section counts only the four rules of its
     /// body: at that total its body is admitted as far as the missing
-    /// section, and one below it the body is not evaluated (D15:3468).
+    /// section, and one below it the body is not evaluated (D15:3479).
     #[test]
     fn the_validation_total_without_the_section_is_bounded_at_four() {
         let sectionless = envelope_of(
@@ -2054,7 +2054,7 @@ mod tests {
 
     /// Several candidates of the closest mismatch tier are one reason whose
     /// related Evidence is the same in every submission order: no candidate
-    /// is chosen, and a farther tier is not used (D15:1735, 2250, 3468).
+    /// is chosen, and a farther tier is not used (D15:1735, 2250, 3479).
     #[test]
     fn several_candidates_of_one_tier_are_related_evidence_of_one_reason() {
         let policy = |identity: &str, revision: &str| {
@@ -2889,7 +2889,7 @@ mod tests {
 
     /// The root's totals and the structural analysis are rechecked at the
     /// materialized root, beside the admitted policy (D15:791, 1881-1884,
-    /// 1887, 2249).
+    /// 1888, 2250).
     #[test]
     fn the_roots_totals_and_the_analysis_are_rechecked_at_the_root() {
         type Edit = fn(&mut ConfigurationInputLimits);
@@ -2929,7 +2929,7 @@ mod tests {
     /// The declarations are rechecked at the root's `profiles`, and each
     /// Profile ID past the policy's bound at its key's token, which keeps the
     /// classification the capability's bound gives it (D15:777, 791, 1886,
-    /// 1886, 2249).
+    /// 1887, 2250).
     #[test]
     fn the_declarations_and_each_long_profile_id_are_rechecked_at_their_tokens() {
         let (inputs, policy) = rechecking_input(|limits| {
@@ -3114,7 +3114,7 @@ mod tests {
     /// The declaration's reference count and bytes, and each reference, are
     /// rechecked at the declaration and at each reference's value, as under
     /// the capability, beside the admitted policy (D15:791, 1919, 1922, 1923,
-    /// 2249).
+    /// 2250).
     #[test]
     fn the_declarations_reference_rechecks_are_observed_beside_the_policy() {
         type Edit = fn(&mut ArtifactAdmissionLimits);
@@ -3386,7 +3386,7 @@ mod tests {
     }
 
     /// The total is of the references with bytes, exact, and is not evaluated
-    /// only when none has any (D15:1925, 2007, 3479).
+    /// only when none has any (D15:1925, 2007, 3490).
     #[test]
     fn the_total_waits_only_when_every_reference_is_excluded() {
         let of = |bytes| ReferenceOccurrence {

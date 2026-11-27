@@ -402,7 +402,7 @@ mod tests {
         raw
     }
 
-    /// D15:1147, 2586, 2590, 2660, 3548: each Specification Input member's
+    /// D15:1147, 2586, 2590, 2660, 3559: each Specification Input member's
     /// identity and revision is retained in the Materialized Resolution Input
     /// Set, reproduced, and compared. Another value of any one of the sixteen
     /// gives another set, an `invocation-stale` invocation, and a replay that

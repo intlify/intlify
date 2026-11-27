@@ -409,7 +409,7 @@ fn place(mut root: Node, path: &[Slot], node: Node) -> Option<Node> {
 /// `bound` at `limit`, each unit counted as the bound's row counts it
 /// (D15:868, 1797-1805): the node that overruns it, the edge for a
 /// collection entry or traversal unit, and for a key the object that owns
-/// it, as no Snapshot key can be a marker (D15:4026). `None` when the tree
+/// it, as no Snapshot key can be a marker (D15:4037). `None` when the tree
 /// fits. Walked without recursion, each visited node's place kept to read a
 /// path back (plan 025 decision #298).
 fn first_overrun(root: &Node, bound: SnapshotBound, limit: u64) -> Option<Vec<Slot>> {
@@ -756,7 +756,7 @@ mod tests {
         assert!(*admitted.root() == *expected, "{bound:?}");
     }
 
-    /// D15:868, 1797-1805, 4026: inspecting in traversal order, each edge
+    /// D15:868, 1797-1805, 4037: inspecting in traversal order, each edge
     /// before the node it holds, the binding puts the terminal marker where
     /// the first node overruns a bound, where the first edge overruns a
     /// collection entry or traversal unit, and, for a key that overruns a

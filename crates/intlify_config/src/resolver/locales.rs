@@ -210,7 +210,7 @@ impl KnownSet {
 
     /// The identities a count over the set reads: one without an identity has
     /// none to add, so the count waits only when no element has one (D15:2185,
-    /// 3354).
+    /// 3490).
     pub(crate) fn counted(&self) -> Admitted<&LocaleSet> {
         match &self.missing {
             Some(causes) if self.known.as_slice().is_empty() => Err(causes.clone()),
@@ -312,7 +312,7 @@ impl<'a> AliasFields<'a> {
 
 /// One entry of `messageFallback`: its key, a spelling whatever its sequence
 /// is, and its sequence candidate by candidate, or why it has none (D15:1520,
-/// 2367). Phase 7 spells the key; Phase 8 reads the sequence.
+/// 2368). Phase 7 spells the key; Phase 8 reads the sequence.
 #[derive(Debug, Clone)]
 pub(crate) struct FallbackField<'a> {
     pub(crate) key: &'a str,
@@ -1050,7 +1050,7 @@ mod tests {
 
     /// A spelling without an identity is missing from the set, beside what
     /// was never spelled; a check that spans the set waits on all of it, and
-    /// a count over it only when nothing has an identity (D15:2185, 3479).
+    /// a count over it only when nothing has an identity (D15:2185, 3490).
     #[test]
     fn a_known_set_holds_the_identities_and_why_the_others_have_none() {
         let excluded = stand_in(Slot::Coverage);

@@ -114,7 +114,7 @@ pub(crate) enum EntryInvariant {
     /// A Snapshot holds a bootstrap marker its boundary refuses: one that a
     /// node follows in canonical traversal order, or whose witness is not
     /// its bound's limit plus one under the bounds Phase 1 reads (D15:868,
-    /// 869).
+    /// 870).
     UnadmittedMarker,
 }
 
@@ -146,7 +146,7 @@ pub(crate) struct EntryFile<'a> {
 /// An entry as the phases after `entry-admission` observe it: the Safe
 /// Origin Kinds its slots fix, the classification of the members on a
 /// value's path, and the source and span that name a value in it (D15:205,
-/// 776, 790, 800, 804): a file, or a programmatic entry.
+/// 777, 791, 801, 805): a file, or a programmatic entry.
 pub(crate) trait ConfigurationEntry {
     /// The Safe Origin Kind of its configuration (D15:205).
     fn origin(&self) -> SafeOriginKind;
@@ -221,7 +221,7 @@ impl EntryFile<'_> {
     /// Entry Source Evidence at the internal path `path` when one was
     /// established, the root when it has no step, and at `span`, its Logical
     /// input path projected only within the path bounds of `paths` (D15:769,
-    /// 780-786; plan 025 decision #299).
+    /// 781-787; plan 025 decision #299).
     fn evidence(
         &self,
         path: Option<&[PathStep]>,
@@ -423,7 +423,7 @@ fn duplicates(
 
 /// The Findings of the values outside the JSON-compatible domain, one for
 /// each reason, with a candidate for each value at its token (D15:256,
-/// 2289).
+/// 2290).
 fn incompatible(
     file: &EntryFile<'_>,
     facts: &Inadmissible,
@@ -451,7 +451,7 @@ fn incompatible(
 /// The root-value bounds' Findings, in check-rank order: each total of
 /// `violations`, observed at the root, and the single-string bound at each of
 /// `long_strings`, each beside the capability's bound (D15:1877, 1885,
-/// 2203). `at` gives the primary Evidence of a long string, or of the root
+/// 2204). `at` gives the primary Evidence of a long string, or of the root
 /// for `None`, so either entry reports them alike (D15:1890).
 pub(super) fn root_value_bounds<L>(
     violations: &[LimitViolation],

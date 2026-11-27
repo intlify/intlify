@@ -1653,7 +1653,7 @@ mod tests {
         }
     }
 
-    /// The two admission steps' 13 cases follow the kinds' (D15:3390): the
+    /// The two admission steps' 13 cases follow the kinds' (D15:3401): the
     /// common step, a file entry, and a programmatic entry each have an
     /// admitted case and a refused one. Each traces the shared decisions and
     /// its step's; a refused one traces the pair of each of its failures,

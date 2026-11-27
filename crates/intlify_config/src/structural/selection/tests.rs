@@ -391,7 +391,7 @@ fn a_declarations_id_bytes_are_its_decoded_names() {
 /// The declaration boundary is its value as an object under its admitted
 /// key: an object missing its required members has a boundary but no
 /// `resourceLimits` reference, and an undeclared member leaves the boundary
-/// admitted (D15:2132, 3466; plan 025 interpretation #218).
+/// admitted (D15:2132, 3477; plan 025 interpretation #218).
 #[test]
 fn selected_declaration_boundary_and_resource_reference_are_independent_prerequisites() {
     let bound = limits().max_profile_id_bytes;

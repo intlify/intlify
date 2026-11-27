@@ -15,10 +15,10 @@
 //! one (`malformed-container`), or one the adapter could not inspect without
 //! running its behavior (`unsafe-host-inspection`). Tests and conformance
 //! supply every report without a live host; inspecting one is the adapter's
-//! work (D15:3147, 3799). The report is checked in 015's order, an absent one
+//! work (D15:3147, 3810). The report is checked in 015's order, an absent one
 //! first, then those two, before any bound of a member (D15:3160). A refused
 //! container yields nothing, while a formal one keeps its invalid members for
-//! the resolver's Findings (D15:3170, 3447). The boundary never counts the
+//! the resolver's Findings (D15:3170, 3458). The boundary never counts the
 //! submitted occurrences: their number is the resolver's, under the Resource
 //! Limit Policy's `artifactAdmission` (D15:1850).
 

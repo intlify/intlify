@@ -924,7 +924,7 @@ mod tests {
             )]
         );
         // It is observed at the field's value, beside the policy (D15:791,
-        // 2249).
+        // 2250).
         assert_eq!(
             evaluation
                 .occurrence_candidates()
@@ -1482,7 +1482,7 @@ mod tests {
             None
         );
         // A target's spellings are observed at their own tokens (D15:791,
-        // 2410): the browser's corrected `EN` and each spelling of `en`
+        // 2411): the browser's corrected `EN` and each spelling of `en`
         // beside the other, then the server's corrected default.
         let en = |check| {
             unit(

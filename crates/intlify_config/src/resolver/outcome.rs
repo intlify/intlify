@@ -117,7 +117,7 @@ pub(crate) struct Checked<'e, 's> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Outcome<'e, 's> {
     /// The Resolver Construction Identity both outcomes carry (D15:1151,
-    /// 1155).
+    /// 1156).
     pub(crate) identity: ConstructionIdentity,
     pub(crate) checked: Option<Checked<'e, 's>>,
     pub(crate) evidence: ResolutionEvidence<'e>,
@@ -340,7 +340,7 @@ pub(crate) fn finalize<'e, 's, Id: AsRef<str>>(
 /// a blocking Finding (D15:2143, 2370). Without an entry there is no Entry
 /// projection and no outcome, so neither the bundle's checks nor the
 /// mandatory reserve, which holds the outcome envelope, apply (D15:2144,
-/// 2518).
+/// 2519).
 ///
 /// # Errors
 ///
@@ -524,7 +524,7 @@ pub(crate) mod tests {
     /// `complete`'s profile without its project default and with a target
     /// locale that is no locale. The two are independent: the default's
     /// Finding holds back what inherits it, and Phase 7 still finds the
-    /// target's locale (D15:2368, 3571; plan 025 interpretation #252).
+    /// target's locale (D15:2368, 3582; plan 025 interpretation #252).
     pub(crate) fn blocked() -> Inputs {
         let mut inputs = Inputs::complete();
         let declaration = inputs.declaration();
@@ -539,7 +539,7 @@ pub(crate) mod tests {
     /// 015's example with every input it needs is checked: the outcome
     /// carries the identity, a complete bundle with both projections and no
     /// Finding, and the profile view Phase 14 projects with the invocation's
-    /// bindings (D15:1151, 1153, 3566).
+    /// bindings (D15:1151, 1153, 3577).
     #[test]
     fn the_example_is_checked_with_its_identity_and_a_complete_bundle() {
         let inputs = reporting(&Inputs::complete(), &[], &[]);
@@ -566,7 +566,7 @@ pub(crate) mod tests {
     /// A non-canonical spelling is a warning that suggests its canonical
     /// replacement: the outcome stays checked, the Shared projection holding
     /// the Finding and the Entry projection its occurrence (D15:1158, 2309,
-    /// 3441).
+    /// 3577).
     #[test]
     fn a_non_canonical_spelling_leaves_the_outcome_checked_with_its_warning() {
         let mut inputs = reporting(&Inputs::complete(), &[], &[]);
@@ -601,7 +601,7 @@ pub(crate) mod tests {
 
     /// A file that is no JSON is blocked without a Shared projection: its
     /// complete bundle holds the blocking Entry Findings, and their keys are
-    /// the shared-unavailability causes (D15:1154, 1166, 2370, 3565).
+    /// the shared-unavailability causes (D15:1154, 1166, 2370, 3576).
     #[test]
     fn a_file_that_is_no_json_is_blocked_without_a_shared_projection() {
         reporting(&Inputs::complete(), &[], &[]).outcome(
@@ -666,7 +666,7 @@ pub(crate) mod tests {
         });
     }
 
-    /// D15:2299, 2300, 3552: a missing `project-profile` assertion is the
+    /// D15:2299, 2300, 3563: a missing `project-profile` assertion is the
     /// blocking `project-profile-specification-input-incomplete` Finding,
     /// whose details name the slot, and another Profile Specification
     /// identity or revision is the blocking
@@ -800,7 +800,7 @@ pub(crate) mod tests {
     /// every unit after entry; those waiting on the missing default are not
     /// evaluated, with its key among their causes. The projection retains only
     /// the dependencies and decision records admission established (D15:1154,
-    /// 1185, 2369, 3442, 3444).
+    /// 1186, 2370, 3578, 3580).
     #[test]
     fn findings_after_materialization_block_the_outcome_beside_a_shared_projection() {
         blocked().outcome(None, identity(), |evaluation, _, outcome| {
@@ -837,7 +837,7 @@ pub(crate) mod tests {
             // dependency of every slot, each established group's semantic
             // dependency while the owners of the others wait, and the
             // decision table's records once the table is complete (D15:1186,
-            // 1609, 2516, 3444).
+            // 1610, 2517, 3580).
             let retained = |kind| -> Vec<(Unit, Value)> {
                 let records = shared.records.iter();
                 records
@@ -905,7 +905,7 @@ pub(crate) mod tests {
     /// warning's occurrence, the Shared one past its `maxRecords` or, at the
     /// second warning, its `maxFindings`, or both. The complete Entry
     /// projection keeps the occurrences of the Shared Findings omitted with
-    /// the Shared suffix (D15:1158, 1186, 2409, 3568, 3575).
+    /// the Shared suffix (D15:1158, 1186, 2409, 3579, 3586).
     #[test]
     fn an_exhausted_domain_blocks_an_outcome_no_finding_blocks() {
         let occurrences = (entry("maxFindingOccurrences"), 1);
@@ -961,8 +961,8 @@ pub(crate) mod tests {
     /// Entry occurrences: either domain holds at three, a Shared `maxFindings`
     /// of one holding the merged Finding, and refuses the Finding's slice at
     /// two, keeping only what the units before it committed, while the other
-    /// domain keeps its whole projection (D15:1947, 1963, 1971, 2212, 3575,
-    /// 3452).
+    /// domain keeps its whole projection (D15:1947, 1963, 1971, 2212, 3586,
+    /// 3588).
     #[test]
     fn each_domain_counts_every_finding_candidate_before_equal_keys_merge() {
         let mut inputs = Inputs::complete();
@@ -1043,7 +1043,7 @@ pub(crate) mod tests {
     /// An Entry overrun before materialization keeps the reserved terminal
     /// Finding and state and the reserved cause naming the terminal Finding,
     /// and commits no record of the omitted suffix, the cause records of the
-    /// Phase 1 Findings among them (D15:2015, 2409, 3580).
+    /// Phase 1 Findings among them (D15:2015, 2409, 3591).
     #[test]
     fn an_entry_overrun_without_a_value_reserves_the_cause_of_its_absence() {
         let inputs = reporting(&Inputs::complete(), &[(entry("maxRecords"), 1)], &[]);
@@ -1084,7 +1084,7 @@ pub(crate) mod tests {
     }
 
     /// Reordering every set, object, and the collection changes no Finding
-    /// Key, Finding order, status, or cause (D15:3574).
+    /// Key, Finding order, status, or cause (D15:3585).
     #[test]
     fn reordering_the_inputs_keeps_the_findings_statuses_and_causes() {
         let reported = |inputs: &Inputs| {
@@ -1115,7 +1115,7 @@ pub(crate) mod tests {
     /// and unavailability causes, and how many Entry records of each kind
     /// each unit owns. An Entry locator, an occurrence key, and the source's
     /// revision may change, so no other part of an Entry record is compared
-    /// (D15:2390, 3478).
+    /// (D15:2390, 3489).
     #[derive(Debug, PartialEq)]
     struct Unmoved {
         shared: Option<(Owned, Option<(Value, Value)>)>,
@@ -1157,7 +1157,7 @@ pub(crate) mod tests {
     /// a target's, the Profile, Target, and Group ID maps, a group's members
     /// and relations, the coverage rules and their selectors, the alias and
     /// fallback maps, and the artifact collection, each holding invalid or
-    /// not yet identifiable members (D15:2185, 2390, 3478).
+    /// not yet identifiable members (D15:2185, 2390, 3489).
     #[test]
     fn permuting_any_unordered_collection_keeps_subjects_tokens_causes_and_owners() {
         type Edit = fn(&mut Inputs);
@@ -1268,7 +1268,7 @@ pub(crate) mod tests {
     /// capability in Phase 1, past three of the collection's bounds in Phase
     /// 4 whatever order its members were submitted in, and past bounds of the
     /// locales, coverage rules, and group members in the phases after it
-    /// (D15:2000, 2007, 2009, 3476).
+    /// (D15:2000, 2007, 2009, 3487).
     #[test]
     fn several_resource_violations_give_the_same_findings_in_any_order() {
         let bound = |group, name| BoundId { group, name };
@@ -1567,7 +1567,7 @@ pub(crate) mod tests {
         (shown(outcome), charged.sum(), entry.terminal.is_some())
     }
 
-    /// D15:2212, 3233, 3581: a file and a Snapshot of its value charge their
+    /// D15:2212, 3233, 3592: a file and a Snapshot of its value charge their
     /// Entry projections differently, so an Entry `maxTotalCanonicalBytes` at
     /// the smaller total holds that entry's whole Entry projection and its
     /// profile, and refuses a slice of the other's, while each keeps the
@@ -1727,7 +1727,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// D15:2370, 3233, 3543: a root-value bound that stops either entry
+    /// D15:2370, 3233, 3554: a root-value bound that stops either entry
     /// before materialization blocks both without a Shared projection, with
     /// the same Entry Finding Keys and shared-unavailability causes and the
     /// same status for each unit both record; only each entry's own checks,

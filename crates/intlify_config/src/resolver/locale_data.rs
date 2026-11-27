@@ -5,7 +5,7 @@
 //! boundary, as the checks of its singleton subject (D15:1991). Each of the
 //! nine `bootstrapOnly.localeData` bounds is a check of its own, reporting
 //! `project-profile-bootstrap-limit-exceeded` with the bound's capability path
-//! (D15:2357, 3481; Decision 015-160).
+//! (D15:2357, 3492; Decision 015-160).
 //!
 //! The checks run in the bounds' order, except that a bound measured from a
 //! decoded payload follows the read that decodes it (D15:2009): the two bounds
@@ -491,9 +491,9 @@ pub(crate) mod tests {
         (bound.check(), Code::BootstrapLimitExceeded)
     }
 
-    /// D15:3395: each bound admits its exact value, and the next is its own
+    /// D15:3406: each bound admits its exact value, and the next is its own
     /// check's Finding with its capability path and total, the payload length
-    /// its first-over witness (D15:3984), leaving unevaluated only what needs
+    /// its first-over witness (D15:3995), leaving unevaluated only what needs
     /// the bound.
     #[test]
     fn each_bound_admits_its_limit_and_reports_the_next() {
