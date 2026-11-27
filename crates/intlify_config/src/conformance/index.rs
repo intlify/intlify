@@ -525,13 +525,17 @@ mod tests {
     /// The case and fixture directories hold exactly the files the suite
     /// writes, so a case or a body it no longer holds leaves no file behind,
     /// and the suite writes no other file outside them than the schemas and
-    /// the index.
+    /// the index. Neither holds a symbolic link, which could lead outside the
+    /// suite or around a cycle.
     #[test]
     fn the_case_and_fixture_directories_hold_only_the_written_files() {
         fn held(directory: &Path, root: &Path, files: &mut BTreeSet<String>) {
             for entry in std::fs::read_dir(directory).unwrap() {
-                let path = entry.unwrap().path();
-                if path.is_dir() {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                let kind = entry.file_type().unwrap();
+                assert!(!kind.is_symlink(), "{} is a symbolic link", path.display());
+                if kind.is_dir() {
                     held(&path, root, files);
                 } else {
                     let components = path.strip_prefix(root).unwrap().components();
@@ -545,7 +549,10 @@ mod tests {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("conformance");
         let mut found = BTreeSet::new();
         for directory in WRITTEN_DIRECTORIES {
-            held(&root.join(directory), &root, &mut found);
+            let top = root.join(directory);
+            let kind = std::fs::symlink_metadata(&top).unwrap().file_type();
+            assert!(!kind.is_symlink(), "{directory} is a symbolic link");
+            held(&top, &root, &mut found);
         }
         let below = |path: &String| {
             WRITTEN_DIRECTORIES

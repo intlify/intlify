@@ -18,7 +18,10 @@
 //! which the runner pins in `src/conformance/index.rs` and
 //! `src/conformance/case.rs`. A file below the case and fixture directories
 //! that the suite no longer holds is stale: `--write` removes it, with any
-//! directory it leaves empty, and `--check` reports it.
+//! directory it leaves empty, and `--check` reports it. Both directories are
+//! read before anything is written or removed, and a symbolic link there,
+//! which the suite never holds, stops the generator: following it could write
+//! or remove a file outside the suite.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -52,6 +55,17 @@ fn main() -> ExitCode {
         }
     };
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(ROOT);
+    let mut held = Vec::new();
+    for directory in intlify_config::conformance_support::WRITTEN_DIRECTORIES {
+        let top = root.join(directory);
+        match held_below(&top) {
+            Ok(files) => held.push((top, files)),
+            Err(error) => {
+                eprintln!("could not read {}: {error}", top.display());
+                return ExitCode::FAILURE;
+            }
+        }
+    }
     let mut stale = false;
     for artifact in &artifacts {
         let path = root.join(&artifact.path);
@@ -78,21 +92,15 @@ fn main() -> ExitCode {
         .iter()
         .map(|artifact| artifact.path.as_str())
         .collect::<BTreeSet<_>>();
-    for directory in intlify_config::conformance_support::WRITTEN_DIRECTORIES {
-        let mut held = Vec::new();
-        if let Err(error) = files_below(&root.join(directory), &mut held) {
-            eprintln!("could not read {}: {error}", root.join(directory).display());
-            return ExitCode::FAILURE;
-        }
-        held.sort();
-        for path in held
+    for (top, files) in &held {
+        for path in files
             .iter()
             .filter(|path| !written.contains(relative(path, &root).as_str()))
         {
             if !write {
                 eprintln!("{} is not written; rerun with --write", path.display());
                 stale = true;
-            } else if let Err(error) = remove(path, &root.join(directory)) {
+            } else if let Err(error) = remove(path, top) {
                 eprintln!("could not remove {}: {error}", path.display());
                 return ExitCode::FAILURE;
             } else {
@@ -111,17 +119,49 @@ fn main() -> ExitCode {
     }
 }
 
-/// Collect every file below `directory`, at any depth.
+/// Every file below `top`, a directory the suite writes, in path order, or
+/// none while it does not exist. A symbolic link, `top` included, is an
+/// error rather than a path to follow.
+fn held_below(top: &Path) -> std::io::Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
+    match std::fs::symlink_metadata(top) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error),
+        Ok(metadata) if metadata.file_type().is_symlink() => return Err(linked(top)),
+        Ok(_) => files_below(top, &mut files)?,
+    }
+    files.sort();
+    Ok(files)
+}
+
+/// Collect every file below `directory`, at any depth, refusing a symbolic
+/// link instead of following it.
 fn files_below(directory: &Path, files: &mut Vec<PathBuf>) -> std::io::Result<()> {
     for entry in std::fs::read_dir(directory)? {
-        let path = entry?.path();
-        if path.is_dir() {
+        let entry = entry?;
+        let path = entry.path();
+        let kind = entry.file_type()?;
+        if kind.is_symlink() {
+            return Err(linked(&path));
+        }
+        if kind.is_dir() {
             files_below(&path, files)?;
         } else {
             files.push(path);
         }
     }
     Ok(())
+}
+
+/// The error for a symbolic link where the suite holds its files.
+fn linked(path: &Path) -> std::io::Error {
+    std::io::Error::new(
+        std::io::ErrorKind::InvalidInput,
+        format!(
+            "{} is a symbolic link, which the suite never holds",
+            path.display()
+        ),
+    )
 }
 
 /// Remove the file at `path`, then each directory it leaves empty, up to but
