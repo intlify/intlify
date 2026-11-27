@@ -1,0 +1,1 @@
+{"kind":"trust-policy","schemaRevision":"0","specification":{"identity":"intlify-design-018","revision":"0"},"body":{"identity":"storefront-trust","revision":"1","content":{"authority":"trusted-local-host"}},"integrityDigest":"sha256:a2a600cbaa1b89d38253c69c61988bfd5f6d724ceb9294565f3f0681dacb1be0"}

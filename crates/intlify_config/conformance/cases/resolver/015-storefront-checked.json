@@ -1,0 +1,45 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver",
+  "id": "015-storefront-checked",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "commonInvocationInputFixture": {
+    "path": "fixtures/resolver/015-storefront-checked.common.json",
+    "digest": "sha256:5556dc872f673a261a8ec5447597b0c6bc85bfe0063fa8a0899a0182520fe37e"
+  },
+  "entries": {
+    "file": {
+      "entryAdmissionInputFixture": {
+        "path": "fixtures/resolver/015-storefront-checked.file-input.json",
+        "digest": "sha256:021f174825738e88b686cdc66d18d4983d9c1097eaa5bdb9818b0f66c711df5e"
+      },
+      "expectedOutcomeFixture": {
+        "path": "fixtures/resolver/015-storefront-checked.file-expected.json",
+        "digest": "sha256:b667343ecdc257896901fbfd05c15ff397936bb15142f4abbac3fff5928d0f1d"
+      }
+    },
+    "programmatic": {
+      "entryAdmissionInputFixture": {
+        "path": "fixtures/resolver/015-storefront-checked.programmatic-input.json",
+        "digest": "sha256:dcf1803ebbb19971b6cb9a70176ddec31b9eea6fd454487f57048f4dee9fce2c"
+      },
+      "expectedOutcomeFixture": {
+        "path": "fixtures/resolver/015-storefront-checked.programmatic-expected.json",
+        "digest": "sha256:f03386d41cdb280c5209150cb0b883418eadade86a1d08a811aa1923ef048990"
+      }
+    }
+  },
+  "traceability": {
+    "decisionIds": [
+      "015-037",
+      "015-060",
+      "015-064",
+      "015-066"
+    ],
+    "ruleIds": [],
+    "checkIds": []
+  }
+}

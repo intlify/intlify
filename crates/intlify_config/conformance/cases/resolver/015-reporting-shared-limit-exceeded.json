@@ -1,0 +1,48 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver",
+  "id": "015-reporting-shared-limit-exceeded",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "commonInvocationInputFixture": {
+    "path": "fixtures/resolver/015-reporting-shared-limit-exceeded.common.json",
+    "digest": "sha256:421ac45c1e57aff739aa7291c2ac53680bfc9ea9beeb0a01a5ff4ecfcbd793b0"
+  },
+  "entries": {
+    "file": {
+      "entryAdmissionInputFixture": {
+        "path": "fixtures/resolver/015-reporting-shared-limit-exceeded.file-input.json",
+        "digest": "sha256:2a08d81da4d28647a9e85b7c7c78c5a741f2ae9c4670c4a0ec3aaf6beeefc054"
+      },
+      "expectedOutcomeFixture": {
+        "path": "fixtures/resolver/015-reporting-shared-limit-exceeded.file-expected.json",
+        "digest": "sha256:de50004999297bf49ad127d851009e93b996d9cff9eadecd512aa9d771f4468d"
+      }
+    },
+    "programmatic": {
+      "entryAdmissionInputFixture": {
+        "path": "fixtures/resolver/015-reporting-shared-limit-exceeded.programmatic-input.json",
+        "digest": "sha256:f3cc7d7c23f83cb4eb93f5210987e475f00ce5b2a77db7ea939c5e67739e40b7"
+      },
+      "expectedOutcomeFixture": {
+        "path": "fixtures/resolver/015-reporting-shared-limit-exceeded.programmatic-expected.json",
+        "digest": "sha256:92b10a6021da7eca25d6fd455d9616817d5d853fcd9b591adab717e130df5a04"
+      }
+    }
+  },
+  "traceability": {
+    "decisionIds": [
+      "015-060",
+      "015-067",
+      "015-069"
+    ],
+    "ruleIds": [
+      "015.reporting.diagnostic-domain.complete"
+    ],
+    "checkIds": [
+      "reporting.diagnostic-domain.complete"
+    ]
+  }
+}

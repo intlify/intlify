@@ -123,7 +123,7 @@ impl<Id: Eq> Supported<Id> {
     }
 }
 
-#[cfg(feature = "benchmark")]
+#[cfg(any(feature = "benchmark", feature = "conformance"))]
 impl<Id> Supported<Id> {
     /// Every supported specification with the dataset it admits, in order.
     pub(crate) fn entries(&self) -> &[SemanticPins<Id>] {

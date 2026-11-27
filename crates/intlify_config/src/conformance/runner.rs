@@ -67,6 +67,7 @@ use serde_json::{json, Map, Value};
 use crate::construction::admission::{ComponentAdmission, ConstructionAdmission, DRAFT_7};
 use crate::construction::component::{file_digest, strict_json};
 use crate::construction::registry::{self, RegistryRole};
+use crate::construction::resolver::{build, ConstructedResolver};
 use crate::construction::root::{self, RootPackage, RootRole};
 use crate::construction::validator::schema::Schema;
 use crate::construction::{authority_set, capability, profile};
@@ -79,6 +80,7 @@ use super::fixture::{references, Bodies};
 use super::index::{
     Member, SCHEMA_DIGEST, SCHEMA_IDENTITY, SCHEMA_PATH, SCHEMA_REVISION, SUITE_REVISION,
 };
+use super::resolution;
 
 /// Why a suite does not open: a Conformance harness failure (D15:2858).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -104,11 +106,14 @@ pub enum HarnessFailure {
     /// the semantic digest it declares, or a manifest it lists is out of
     /// order, listed twice, or has another `id` or `manifestKind`.
     NotRevisionZero(Member),
-    /// The Resolver Input Admission Case with this ID cannot run: its
-    /// `resolverConstruction` names no construction case the suite lists, one
-    /// that does not construct, or another identity than the one constructed,
-    /// or the capability value or the canonical Snapshot the harness admits
-    /// before the boundary is refused (D15:3158, 3162).
+    /// The Resolver Input Admission Case or Resolver Case with this ID cannot
+    /// run: its `resolverConstruction` names no construction case the suite
+    /// lists, one that does not construct, or another identity than the one
+    /// constructed; for an input admission case, the capability value or the
+    /// canonical Snapshot the harness admits before the boundary is refused;
+    /// for a Resolver Case, an expected outcome names another identity, or an
+    /// entry's inputs are not admitted as its fixtures give them (D15:3158,
+    /// 3162, 3219, 3252).
     InvalidCase(String),
 }
 
@@ -151,6 +156,8 @@ pub struct Opened {
     construction: Vec<ListedCase>,
     /// Each input admission case, in the order of its array.
     admission: Vec<AdmissionCase>,
+    /// Each Resolver Case, in the order of its array.
+    resolver: Vec<ResolverCase>,
 }
 
 /// A case the suite lists: its ID, its fixture, and what it expects.
@@ -170,8 +177,30 @@ struct AdmissionCase {
     constructed: Constructed,
 }
 
-/// One case run: what it expects, and what the implementation did, in the
-/// same form.
+/// A Resolver Case the suite lists: its ID, the construction case it names
+/// and the identity it states, its common input fixture, and each paired
+/// entry, the file entry first (D15:3174-3216).
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ResolverCase {
+    id: String,
+    construction: String,
+    reference: String,
+    common: Value,
+    entries: Vec<ResolverEntry>,
+}
+
+/// One paired entry of a Resolver Case: its side, its admission input
+/// fixture, and the outcome it expects.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ResolverEntry {
+    side: &'static str,
+    fixture: Value,
+    expected: Value,
+}
+
+/// One outcome of a run, a case or a Resolver Case's entry, its duties, or
+/// its pair: what it expects, and what the implementation did, in the same
+/// form.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Outcome {
     pub id: String,
@@ -188,7 +217,8 @@ impl Outcome {
 }
 
 impl Opened {
-    /// Run each case, in the order of the index's arrays.
+    /// Run each case, in the order of the index's arrays, a Resolver Case
+    /// once its entries ran as their outcomes.
     #[must_use]
     pub fn run(&self) -> Vec<Outcome> {
         let construction = self.construction.iter().map(|case| Outcome {
@@ -206,8 +236,87 @@ impl Opened {
                 &admission.constructed,
             ),
         });
-        construction.chain(admission).collect()
+        let mut resolvers = BTreeMap::new();
+        let mut resolver = Vec::new();
+        for case in &self.resolver {
+            let constructed = resolvers
+                .entry(case.construction.as_str())
+                .or_insert_with(|| built(&self.construction, &case.construction, &self.bodies))
+                .as_ref()
+                .expect("the runner established the case's construction");
+            resolver.extend(self.resolver_outcomes(case, constructed));
+        }
+        construction.chain(admission).chain(resolver).collect()
     }
+
+    /// What each paired entry of `case` resolves to on `constructed` beside
+    /// what it expects, the duties its outcome breaks beside none, and, when
+    /// both entries are paired and resolve, whether they agree where 015
+    /// makes them agree (D15:3227, 3229, 3233): `<id>/<side>`,
+    /// `<id>/<side>/duties`, then `<id>/pair`. An entry the resolver does not
+    /// resolve, which only a defect of the resolver makes, fails its own
+    /// outcomes and has no pair.
+    fn resolver_outcomes(
+        &self,
+        case: &ResolverCase,
+        constructed: &ConstructedResolver,
+    ) -> Vec<Outcome> {
+        let mut outcomes = Vec::new();
+        let mut resolved = Vec::new();
+        for entry in &case.entries {
+            let id = format!("{}/{}", case.id, entry.side);
+            let done = resolution::resolved(
+                &case.common,
+                &entry.fixture,
+                &self.bodies,
+                constructed,
+                &case.reference,
+            );
+            let (actual, duties) = match &done {
+                Ok(done) => (
+                    done.outcome.clone(),
+                    json!(resolution::duties(&done.outcome)),
+                ),
+                Err(unrunnable) => {
+                    let unrunnable = json!({ "unrunnable": format!("{unrunnable:?}") });
+                    (unrunnable.clone(), unrunnable)
+                }
+            };
+            outcomes.push(Outcome {
+                id: id.clone(),
+                expected: entry.expected.clone(),
+                actual,
+            });
+            outcomes.push(Outcome {
+                id: format!("{id}/duties"),
+                expected: json!([]),
+                actual: duties,
+            });
+            resolved.push(done.ok());
+        }
+        if let [Some(file), Some(programmatic)] = resolved.as_slice() {
+            let materialized =
+                file.materialized.is_some() && file.materialized == programmatic.materialized;
+            outcomes.push(Outcome {
+                id: format!("{}/pair", case.id),
+                expected: json!(true),
+                actual: json!(resolution::paired(
+                    &file.outcome,
+                    &programmatic.outcome,
+                    materialized
+                )),
+            });
+        }
+        outcomes
+    }
+}
+
+/// The resolver the construction case `id` of `construction` builds, `None`
+/// when the suite lists no such case or construction refuses its input.
+fn built(construction: &[ListedCase], id: &str, bodies: &Bodies) -> Option<ConstructedResolver> {
+    let case = construction.iter().find(|case| case.id == id)?;
+    let root = root::ConstructionRoot::built_in().expect("the built-in construction root verifies");
+    build(root, construction::input(&case.fixture, bodies)).ok()
 }
 
 /// Open the suite whose Suite Index is at `index`.
@@ -237,6 +346,8 @@ pub fn open(index: &Path) -> Result<Opened, HarnessFailure> {
         construction: Vec::new(),
         constructions: BTreeMap::new(),
         admission: Vec::new(),
+        resolvers: BTreeMap::new(),
+        resolver: Vec::new(),
     };
     for member in Member::ALL {
         closure.verify(member, &value[member.name()])?;
@@ -246,6 +357,7 @@ pub fn open(index: &Path) -> Result<Opened, HarnessFailure> {
         bodies: closure.bodies,
         construction: closure.construction,
         admission: closure.admission,
+        resolver: closure.resolver,
     })
 }
 
@@ -490,6 +602,10 @@ struct Closure<'a> {
     /// What each construction case an admission case names constructs, once.
     constructions: BTreeMap<String, Option<Constructed>>,
     admission: Vec<AdmissionCase>,
+    /// The resolver each construction case a Resolver Case names builds,
+    /// once.
+    resolvers: BTreeMap<String, Option<ConstructedResolver>>,
+    resolver: Vec<ResolverCase>,
 }
 
 impl Closure<'_> {
@@ -607,6 +723,71 @@ impl Closure<'_> {
         if kind == ManifestKind::ResolverInputAdmission {
             self.admission_case(&manifest)?;
         }
+        if kind == ManifestKind::Resolver {
+            self.resolver_case(&manifest)?;
+        }
+        Ok(())
+    }
+
+    /// List a Resolver Case with its fixtures, once the construction case it
+    /// names builds a resolver, each expected outcome names the identity the
+    /// case states, and the boundaries admit each paired entry's inputs as its
+    /// fixtures give them, which they refuse under an identity other than the
+    /// constructed one; a case that does not meet them cannot run (D15:3219,
+    /// 3252).
+    fn resolver_case(&mut self, manifest: &Value) -> Result<(), HarnessFailure> {
+        let id = text(&manifest["id"]).to_owned();
+        let invalid = || HarnessFailure::InvalidCase(id.clone());
+        let construction = &manifest["resolverConstruction"];
+        let case_id = text(&construction["caseId"]).to_owned();
+        let reference = text(&construction["identityReference"]).to_owned();
+        let common = self.fixture(
+            &manifest["commonInvocationInputFixture"],
+            "commonInvocationInputFixture",
+        )?;
+        let mut entries = Vec::new();
+        for side in ["file", "programmatic"] {
+            let entry = &manifest["entries"][side];
+            if entry.get("unpaired").is_some() {
+                continue;
+            }
+            let fixture = self.fixture(
+                &entry["entryAdmissionInputFixture"],
+                "entryAdmissionInputFixture",
+            )?;
+            let expected =
+                self.fixture(&entry["expectedOutcomeFixture"], "expectedOutcomeFixture")?;
+            if expected["resolverConstructionIdentity"] != reference.as_str() {
+                return Err(invalid());
+            }
+            entries.push(ResolverEntry {
+                side,
+                fixture,
+                expected,
+            });
+        }
+        if !self.resolvers.contains_key(&case_id) {
+            let built = built(&self.construction, &case_id, &self.bodies);
+            self.resolvers.insert(case_id.clone(), built);
+        }
+        let constructed = self.resolvers[&case_id].as_ref().ok_or_else(invalid)?;
+        for entry in &entries {
+            resolution::admissible(
+                &common,
+                &entry.fixture,
+                &self.bodies,
+                constructed,
+                &reference,
+            )
+            .map_err(|_| invalid())?;
+        }
+        self.resolver.push(ResolverCase {
+            id,
+            construction: case_id,
+            reference,
+            common,
+            entries,
+        });
         Ok(())
     }
 
@@ -680,9 +861,9 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::conformance::admission_cases;
     use crate::conformance::construction_cases::{self, CONSTRUCTED};
     use crate::conformance::index::PATH;
+    use crate::conformance::{admission_cases, resolver_cases};
     use crate::construction::generate;
 
     /// Every body the committed suite holds, in the order the runner verifies
@@ -1109,9 +1290,11 @@ mod tests {
     fn written_cases() -> BTreeSet<String> {
         let construction = construction_cases::cases().unwrap().files;
         let admission = admission_cases::cases().unwrap().files;
+        let resolver = resolver_cases::cases().unwrap().files;
         construction
             .into_iter()
             .chain(admission)
+            .chain(resolver)
             .map(|file| file.path)
             .collect()
     }
@@ -1173,8 +1356,8 @@ mod tests {
     impl Suite {
         /// Write each manifest's bytes below `cases/` and list it in the
         /// member's array, in the order given. Listing construction cases
-        /// lists no input admission case, since each committed one names a
-        /// committed construction case.
+        /// lists no input admission case and no Resolver Case, since each
+        /// committed one names a committed construction case.
         fn list(&self, member: Member, manifests: &[(&str, Vec<u8>)]) {
             let entries = manifests
                 .iter()
@@ -1188,6 +1371,7 @@ mod tests {
                 index[member.name()] = Value::Array(entries);
                 if member == Member::ResolverConstructionCases {
                     index[Member::ResolverInputAdmissionCases.name()] = json!([]);
+                    index[Member::ResolverCases.name()] = json!([]);
                 }
             });
         }
@@ -1513,11 +1697,35 @@ mod tests {
         let outcomes = open(&committed().join(PATH)).unwrap().run();
         let construction = construction_cases::cases().unwrap().listing;
         let admission = admission_cases::cases().unwrap().listing;
-        let listed = construction
+        let mut listed = construction
             .iter()
             .chain(&admission)
             .map(|entry| entry["id"].as_str().unwrap().to_owned())
             .collect::<Vec<_>>();
+        // A Resolver Case runs each paired entry and its duties, then the
+        // pair when both entries are paired.
+        let resolver = resolver_cases::cases().unwrap();
+        for entry in &resolver.listing {
+            let path = entry["path"].as_str().unwrap();
+            let manifest = &resolver
+                .files
+                .iter()
+                .find(|file| file.path == path)
+                .unwrap()
+                .bytes;
+            let manifest: Value = serde_json::from_slice(manifest).unwrap();
+            let id = entry["id"].as_str().unwrap();
+            let paired = ["file", "programmatic"]
+                .into_iter()
+                .filter(|side| manifest["entries"][side].get("unpaired").is_none())
+                .collect::<Vec<_>>();
+            for side in &paired {
+                listed.extend([format!("{id}/{side}"), format!("{id}/{side}/duties")]);
+            }
+            if paired.len() == 2 {
+                listed.push(format!("{id}/pair"));
+            }
+        }
         let ids = outcomes
             .iter()
             .map(|outcome| outcome.id.clone())
@@ -1533,6 +1741,218 @@ mod tests {
                 outcome.actual
             );
         }
+    }
+
+    /// The committed suite with the Resolver Case `id` as its only case
+    /// besides the construction cases, its manifest changed by `change`,
+    /// which may write fixtures below the suite root.
+    fn resolver_suite(id: &str, change: impl FnOnce(&Suite, &mut Value)) -> Suite {
+        let suite = Suite::new();
+        let path = format!("cases/resolver/{id}.json");
+        let mut manifest: Value = serde_json::from_slice(&suite.read(&path)).unwrap();
+        change(&suite, &mut manifest);
+        suite.list(Member::ResolverCases, &[(id, bytes(&manifest))]);
+        suite.change_index(|index| {
+            index[Member::ResolverInputAdmissionCases.name()] = json!([]);
+        });
+        suite
+    }
+
+    /// Replace the fixture the manifest names at `pointer` with a copy that
+    /// `change` changes, written beside it.
+    fn change_fixture(
+        suite: &Suite,
+        manifest: &mut Value,
+        pointer: &str,
+        change: impl FnOnce(&mut Value),
+    ) {
+        let path = manifest.pointer(pointer).unwrap()["path"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let mut fixture: Value = serde_json::from_slice(&suite.read(&path)).unwrap();
+        change(&mut fixture);
+        let changed = path.replace(".json", ".changed.json");
+        let bytes = bytes(&fixture);
+        suite.write(&changed, &bytes);
+        *manifest.pointer_mut(pointer).unwrap() =
+            json!({ "path": changed, "digest": file_digest(&bytes).as_str() });
+    }
+
+    /// The outcomes of the run whose IDs name `id`.
+    fn outcomes_of(suite: &Suite, id: &str) -> Vec<Outcome> {
+        suite
+            .open()
+            .unwrap()
+            .run()
+            .into_iter()
+            .filter(|outcome| outcome.id.starts_with(&format!("{id}/")))
+            .collect()
+    }
+
+    const STOREFRONT: &str = "015-storefront-checked";
+
+    /// A Resolver Case runs each paired entry and its duties, then the pair
+    /// when both entries are paired; one that names no construction case
+    /// the suite lists, one that does not construct, or another identity,
+    /// or whose expected outcome names another identity, cannot run
+    /// (D15:3219).
+    #[test]
+    fn a_resolver_case_runs_under_an_established_construction_only() {
+        let invalid = Err(HarnessFailure::InvalidCase(STOREFRONT.to_owned()));
+        let outcomes = outcomes_of(&resolver_suite(STOREFRONT, |_, _| {}), STOREFRONT);
+        let ids = outcomes
+            .iter()
+            .map(|outcome| outcome.id.trim_start_matches(STOREFRONT))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            ids,
+            [
+                "/file",
+                "/file/duties",
+                "/programmatic",
+                "/programmatic/duties",
+                "/pair"
+            ]
+        );
+        assert!(outcomes.iter().all(Outcome::passed));
+        let file_only = "015-entry-json-invalid";
+        let outcomes = outcomes_of(&resolver_suite(file_only, |_, _| {}), file_only);
+        assert_eq!(outcomes.len(), 2);
+        assert!(outcomes.iter().all(Outcome::passed));
+        let construction = |case: &str| {
+            let case = case.to_owned();
+            resolver_suite(STOREFRONT, move |_, manifest| {
+                manifest["resolverConstruction"]["caseId"] = json!(case);
+            })
+        };
+        assert_eq!(construction("015-c").open(), invalid);
+        assert_eq!(
+            construction("015-construction-registry-package-missing").open(),
+            invalid
+        );
+        let mut other = construction_cases::identity().unwrap().into_bytes();
+        other[5] = if other[5] == b'A' { b'B' } else { b'A' };
+        let other = String::from_utf8(other).unwrap();
+        let stated = other.clone();
+        let another = resolver_suite(STOREFRONT, move |_, manifest| {
+            manifest["resolverConstruction"]["identityReference"] = json!(stated);
+        });
+        assert_eq!(another.open(), invalid);
+        let expected = resolver_suite(STOREFRONT, move |suite, manifest| {
+            change_fixture(
+                suite,
+                manifest,
+                "/entries/programmatic/expectedOutcomeFixture",
+                |outcome| outcome["resolverConstructionIdentity"] = json!(other),
+            );
+        });
+        assert_eq!(expected.open(), invalid);
+    }
+
+    /// A pair whose entries reach two Materialized Resolution Input Sets
+    /// agrees in its construction identity only: each entry passes against
+    /// its own expectation, and the pair passes (D15:3233).
+    #[test]
+    fn a_pair_that_reaches_two_sets_agrees_in_its_identity_only() {
+        let default = "cases/resolver/015-locale-default-not-in-project.json";
+        let suite = resolver_suite(STOREFRONT, |suite, manifest| {
+            let other: Value = serde_json::from_slice(&suite.read(default)).unwrap();
+            manifest["entries"]["programmatic"] = other["entries"]["programmatic"].clone();
+        });
+        let outcomes = outcomes_of(&suite, STOREFRONT);
+        assert_eq!(outcomes.len(), 5);
+        assert!(outcomes.iter().all(Outcome::passed), "{outcomes:?}");
+    }
+
+    /// A Resolver Case's entry runs only on inputs its boundaries admit as
+    /// its fixtures give them: each candidate the ID its slot fixes, each
+    /// input admitted, and each locator canonical; otherwise the case cannot
+    /// run (D15:3252).
+    #[test]
+    fn a_resolver_case_s_inputs_are_admitted_as_given() {
+        let invalid = Err(HarnessFailure::InvalidCase(STOREFRONT.to_owned()));
+        let entry = |side: &'static str, change: fn(&mut Value)| {
+            resolver_suite(STOREFRONT, move |suite, manifest| {
+                let pointer = format!("/entries/{side}/entryAdmissionInputFixture");
+                change_fixture(suite, manifest, &pointer, change);
+            })
+        };
+        let locator = entry("file", |fixture| {
+            fixture["configuration-file"]["input"]["locator"]["payload"] =
+                json!("./intlify.config.json");
+        });
+        assert_eq!(locator.open(), invalid);
+        let identity = entry("programmatic", |fixture| {
+            let input = &mut fixture["configuration-programmatic"]["input"];
+            input.as_object_mut().unwrap().remove("identity");
+        });
+        assert_eq!(identity.open(), invalid);
+        let candidate = resolver_suite(STOREFRONT, |suite, manifest| {
+            change_fixture(
+                suite,
+                manifest,
+                "/commonInvocationInputFixture",
+                |fixture| {
+                    fixture["implementation-capability"]["candidate"] =
+                        json!("intent-surface-class-vocabulary");
+                },
+            );
+        });
+        assert_eq!(candidate.open(), invalid);
+    }
+
+    /// A Resolver Case's fixtures are verified before any case runs: each
+    /// has its declared digest and the form the Case Schema gives it.
+    #[test]
+    fn a_resolver_case_s_fixtures_are_verified_before_any_case_runs() {
+        let digest = resolver_suite(STOREFRONT, |_, manifest| {
+            manifest["entries"]["file"]["expectedOutcomeFixture"]["digest"] = other_digest();
+        });
+        let path = format!("fixtures/resolver/{STOREFRONT}.file-expected.json");
+        assert_eq!(digest.open(), Err(HarnessFailure::DigestMismatch(path)));
+        for pointer in [
+            "/commonInvocationInputFixture",
+            "/entries/file/entryAdmissionInputFixture",
+            "/entries/programmatic/expectedOutcomeFixture",
+        ] {
+            let suite = resolver_suite(STOREFRONT, |suite, manifest| {
+                change_fixture(suite, manifest, pointer, |fixture| {
+                    fixture["unknown"] = json!(true);
+                });
+            });
+            let changed = suite.open();
+            let named = |path: &String| path.ends_with(".changed.json");
+            assert!(
+                matches!(&changed, Err(HarnessFailure::SchemaInvalid(path)) if named(path)),
+                "{pointer}: {changed:?}"
+            );
+        }
+    }
+
+    /// An entry whose expected outcome the resolver does not meet opens and
+    /// runs, and only that entry's outcome does not pass.
+    #[test]
+    fn an_entry_whose_outcome_differs_does_not_pass() {
+        let suite = resolver_suite(STOREFRONT, |suite, manifest| {
+            change_fixture(
+                suite,
+                manifest,
+                "/entries/file/expectedOutcomeFixture",
+                |outcome| {
+                    outcome["resolutionEvidence"]["shared"]["evaluationStatus"]
+                        .as_array_mut()
+                        .unwrap()
+                        .pop();
+                },
+            );
+        });
+        let failed = outcomes_of(&suite, STOREFRONT)
+            .into_iter()
+            .filter(|outcome| !outcome.passed())
+            .map(|outcome| outcome.id)
+            .collect::<Vec<_>>();
+        assert_eq!(failed, [format!("{STOREFRONT}/file")]);
     }
 
     /// A case whose expectation construction does not meet opens and runs,

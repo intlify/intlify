@@ -1,0 +1,48 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver",
+  "id": "015-locale-default-not-in-project",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "commonInvocationInputFixture": {
+    "path": "fixtures/resolver/015-locale-default-not-in-project.common.json",
+    "digest": "sha256:5556dc872f673a261a8ec5447597b0c6bc85bfe0063fa8a0899a0182520fe37e"
+  },
+  "entries": {
+    "file": {
+      "entryAdmissionInputFixture": {
+        "path": "fixtures/resolver/015-locale-default-not-in-project.file-input.json",
+        "digest": "sha256:c643ce246ff079e321060274e80a8b1d9b02508939b05e7fec07fbe8272ba388"
+      },
+      "expectedOutcomeFixture": {
+        "path": "fixtures/resolver/015-locale-default-not-in-project.file-expected.json",
+        "digest": "sha256:89b240a74264d1493d58fccc5c4b2f18fa5a7bd2d91d02182fca0cdfd7717f8b"
+      }
+    },
+    "programmatic": {
+      "entryAdmissionInputFixture": {
+        "path": "fixtures/resolver/015-locale-default-not-in-project.programmatic-input.json",
+        "digest": "sha256:7d6f7bd694b44a057dd4a959070c5cd2d21864b877ecc708f8ce916aae1bd5bf"
+      },
+      "expectedOutcomeFixture": {
+        "path": "fixtures/resolver/015-locale-default-not-in-project.programmatic-expected.json",
+        "digest": "sha256:a999354675835d961ae6543bb02eb4c6236ec626ab6808fa9c002339618c3869"
+      }
+    }
+  },
+  "traceability": {
+    "decisionIds": [
+      "015-028"
+    ],
+    "ruleIds": [
+      "015.locale.default-requested.member",
+      "015.target.effective-default.supported"
+    ],
+    "checkIds": [
+      "locale.default-requested.member",
+      "target.effective-default.supported"
+    ]
+  }
+}

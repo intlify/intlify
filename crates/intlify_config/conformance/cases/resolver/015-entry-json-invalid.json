@@ -1,0 +1,44 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver",
+  "id": "015-entry-json-invalid",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "commonInvocationInputFixture": {
+    "path": "fixtures/resolver/015-entry-json-invalid.common.json",
+    "digest": "sha256:5556dc872f673a261a8ec5447597b0c6bc85bfe0063fa8a0899a0182520fe37e"
+  },
+  "entries": {
+    "file": {
+      "entryAdmissionInputFixture": {
+        "path": "fixtures/resolver/015-entry-json-invalid.file-input.json",
+        "digest": "sha256:c6d11c62712a918c7b7a53e375ab9a5b2d57ce2ac06c47ddf2a76e11d299f660"
+      },
+      "expectedOutcomeFixture": {
+        "path": "fixtures/resolver/015-entry-json-invalid.file-expected.json",
+        "digest": "sha256:86d6bdfffff017c0cfdb3ed6483f3e5b3c9e9c8a0fa21c70d46a2cbd8caa1d6c"
+      }
+    },
+    "programmatic": {
+      "unpaired": {
+        "reason": "raw-json-syntax",
+        "verificationOwner": "intlify_config"
+      }
+    }
+  },
+  "traceability": {
+    "decisionIds": [
+      "015-037",
+      "015-065",
+      "015-202"
+    ],
+    "ruleIds": [
+      "015.entry.input.well-formed-json"
+    ],
+    "checkIds": [
+      "entry.input.well-formed-json"
+    ]
+  }
+}

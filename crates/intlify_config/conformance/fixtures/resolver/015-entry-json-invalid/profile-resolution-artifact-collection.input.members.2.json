@@ -1,0 +1,1 @@
+{"kind":"source-admission-policy","schemaRevision":"0","specification":{"identity":"intlify-design-018","revision":"0"},"body":{"identity":"storefront-source","revision":"1","content":{"sourceApproval":"authenticated-sufficient"}},"integrityDigest":"sha256:32b5a9b6af4f524a2ea5925c55b6320e58829f33e014b75af33442f0230c1d74"}

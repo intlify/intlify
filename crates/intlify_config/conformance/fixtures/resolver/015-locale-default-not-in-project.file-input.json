@@ -1,0 +1,26 @@
+{
+  "configuration-file": {
+    "candidate": "configuration-file",
+    "input": {
+      "bytes": {
+        "path": "fixtures/resolver/015-locale-default-not-in-project/configuration-file.input.bytes.json",
+        "digest": "sha256:289c37dd5672fa5a32e9502b3efdba3764fbbcfd430a0c64ed1ad622c33574e7"
+      },
+      "identity": "intlify-file-source.v0:storefront/intlify.config.json",
+      "nonSecret": true,
+      "revision": "sha256:d7929e9cd6840549af90f7278f7a940193bb8762332c7085fb50c15df9558de0",
+      "locator": {
+        "variant": "relative-path",
+        "payload": "intlify.config.json",
+        "nonSecret": true
+      }
+    }
+  },
+  "profile-selector-cli": {
+    "candidate": "profile-selector-cli",
+    "input": {
+      "report": "string",
+      "value": "app"
+    }
+  }
+}

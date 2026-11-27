@@ -2,8 +2,12 @@
 // @author kazuya kawaguchi (a.k.a. kazupon)
 
 //! Write the conformance suite's Suite Index, its schema, the Case Schema,
-//! the construction cases' manifests, fixtures, and changed bodies, and the
-//! input admission cases' manifests, fixtures, and raw inputs.
+//! the construction cases' manifests, fixtures, and changed bodies, the
+//! input admission cases' manifests, fixtures, and raw inputs, and the
+//! Resolver Cases' manifests, fixtures, raw inputs, expected outcomes, and
+//! copy of the locale data. Each expected outcome is what the resolver does
+//! with its entry, a candidate for review rather than output accepted
+//! because the implementation produced it.
 //!
 //! The index pins each construction root member, authority, and Registry
 //! Package member by the file digest of the bytes this crate writes, so it is

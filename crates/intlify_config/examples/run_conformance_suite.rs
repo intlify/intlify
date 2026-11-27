@@ -8,9 +8,9 @@
 //! Suite Index Schema at its fixed path below that root and what the index
 //! names, and nothing else; there is no default index. It prints each body it
 //! verified with its file digest, or the Conformance harness failure that
-//! stopped it, and then each case with whether the implementation did what
-//! the case expects. It fails when the suite does not open or a case does not
-//! pass.
+//! stopped it, and then each outcome, a case or a Resolver Case's entry, its
+//! duties, or its pair, with whether the implementation did what it expects.
+//! It fails when the suite does not open or an outcome does not pass.
 
 use std::path::Path;
 use std::process::ExitCode;
@@ -52,7 +52,7 @@ fn main() -> ExitCode {
             );
         }
     }
-    println!("{} cases run, {failed} failed", outcomes.len());
+    println!("{} outcomes, {failed} failed", outcomes.len());
     if failed == 0 {
         ExitCode::SUCCESS
     } else {

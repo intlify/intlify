@@ -12,7 +12,11 @@
 
 use std::collections::BTreeMap;
 
-use serde_json::Value;
+use serde_json::{json, Map, Value};
+
+use crate::construction::component::{file_digest, strict_json};
+
+use super::index::SuiteFile;
 
 /// The verified bodies, by their suite-root-relative paths.
 pub(crate) type Bodies = BTreeMap<String, Vec<u8>>;
@@ -68,11 +72,83 @@ pub(crate) fn decode(hex: &str) -> Vec<u8> {
         .collect()
 }
 
+/// `fixture` of case `id` as it is written below `directory`: each raw input
+/// that is strict UTF-8 JSON a file named for where the fixture holds it, in
+/// the case's own directory, unless an earlier case wrote the same bytes,
+/// whose file it references. A decoded input holds no raw input.
+pub(crate) fn written(
+    directory: &str,
+    id: &str,
+    fixture: &Value,
+    files: &mut Vec<SuiteFile>,
+    kept: &mut BTreeMap<Vec<u8>, String>,
+) -> Value {
+    fn walk(
+        value: &Value,
+        at: &str,
+        directory: &str,
+        id: &str,
+        files: &mut Vec<SuiteFile>,
+        kept: &mut BTreeMap<Vec<u8>, String>,
+    ) -> Value {
+        match value {
+            Value::Object(members) if members.len() == 1 && members.contains_key("json") => {
+                value.clone()
+            }
+            Value::Object(members) if members.len() == 1 && members.contains_key("bytes") => {
+                let bytes = decode(members["bytes"].as_str().expect("raw bytes are hex"));
+                if strict_json(&bytes).is_none() {
+                    return value.clone();
+                }
+                let path = kept
+                    .entry(bytes.clone())
+                    .or_insert_with(|| {
+                        let path = format!("{directory}/{id}/{at}.json");
+                        files.push(SuiteFile {
+                            path: path.clone(),
+                            bytes: bytes.clone(),
+                        });
+                        path
+                    })
+                    .clone();
+                json!({ "path": path, "digest": file_digest(&bytes).as_str() })
+            }
+            Value::Object(members) => Value::Object(
+                members
+                    .iter()
+                    .map(|(name, member)| {
+                        let at = if at.is_empty() {
+                            name.clone()
+                        } else {
+                            format!("{at}.{name}")
+                        };
+                        (name.clone(), walk(member, &at, directory, id, files, kept))
+                    })
+                    .collect::<Map<_, _>>(),
+            ),
+            Value::Array(items) => Value::Array(
+                items
+                    .iter()
+                    .enumerate()
+                    .map(|(index, item)| {
+                        walk(item, &format!("{at}.{index}"), directory, id, files, kept)
+                    })
+                    .collect(),
+            ),
+            other => other.clone(),
+        }
+    }
+    walk(fixture, "", directory, id, files, kept)
+}
+
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
-
     use super::*;
+    use crate::resolver::evidence_source::hex;
+
+    fn raw(bytes: &[u8]) -> Value {
+        json!({ "bytes": hex(bytes) })
+    }
 
     #[test]
     fn hexadecimal_and_a_reference_give_their_bytes() {
@@ -101,5 +177,47 @@ mod tests {
             .map(|reference| reference["path"].as_str().unwrap())
             .collect::<Vec<_>>();
         assert_eq!(paths, ["one", "two", "three"]);
+    }
+
+    /// A raw input that is strict UTF-8 JSON is a file named for where the
+    /// fixture holds it, written once for the same bytes; any other stays
+    /// hexadecimal, and a decoded value is kept as it is.
+    #[test]
+    fn a_raw_input_of_strict_json_is_a_file_of_its_own() {
+        let mut files = Vec::new();
+        let mut kept = BTreeMap::new();
+        let fixture = json!({
+            "capability": { "json": { "bytes": "7b7d" } },
+            "input": { "manifest": raw(b"{}"), "members": [raw(b"{"), raw(b"{}")] },
+        });
+        let first = written(
+            "fixtures/admission",
+            "015-a",
+            &fixture,
+            &mut files,
+            &mut kept,
+        );
+        let reference = json!({
+            "path": "fixtures/admission/015-a/input.manifest.json",
+            "digest": file_digest(b"{}").as_str(),
+        });
+        assert_eq!(first["capability"], fixture["capability"]);
+        assert_eq!(first["input"]["manifest"], reference);
+        assert_eq!(first["input"]["members"], json!([raw(b"{"), reference]));
+        assert_eq!(files.len(), 1);
+        assert_eq!(
+            files[0].path,
+            "fixtures/admission/015-a/input.manifest.json"
+        );
+        assert_eq!(files[0].bytes, b"{}");
+        let again = written(
+            "fixtures/admission",
+            "015-b",
+            &json!({ "input": raw(b"{}") }),
+            &mut files,
+            &mut kept,
+        );
+        assert_eq!(again["input"], reference);
+        assert_eq!(files.len(), 1);
     }
 }

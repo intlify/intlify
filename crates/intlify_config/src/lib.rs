@@ -158,7 +158,7 @@ mod boundary;
 #[allow(dead_code)]
 mod benchmark;
 
-#[cfg(any(test, feature = "benchmark"))]
+#[cfg(any(test, feature = "benchmark", feature = "conformance"))]
 #[allow(dead_code)]
 mod profile_fixtures;
 

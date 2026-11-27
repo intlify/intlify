@@ -938,7 +938,33 @@
       "digest": "sha256:e94aae4679348f350be89e270aa59f12dc14ba931ec1cb91e0281362dce9e15b"
     }
   ],
-  "resolverCases": [],
+  "resolverCases": [
+    {
+      "id": "015-entry-json-invalid",
+      "path": "cases/resolver/015-entry-json-invalid.json",
+      "digest": "sha256:6ec6cbfa1dac5def044d41742d0a5182b6c97da0621cfaeea1a93df944b97feb"
+    },
+    {
+      "id": "015-locale-default-not-in-project",
+      "path": "cases/resolver/015-locale-default-not-in-project.json",
+      "digest": "sha256:dab576b70ca527ac734e6b46b2408653b2ccc8f2b8cbe7d88bdcd44bcf7d10e6"
+    },
+    {
+      "id": "015-reporting-entry-limit-exceeded",
+      "path": "cases/resolver/015-reporting-entry-limit-exceeded.json",
+      "digest": "sha256:8bc09c66de5270fdd16b041a1729901e6e7ec4d59fb5f9b99e5860282ac3ec9e"
+    },
+    {
+      "id": "015-reporting-shared-limit-exceeded",
+      "path": "cases/resolver/015-reporting-shared-limit-exceeded.json",
+      "digest": "sha256:772656a22ec7d64f38188fd834557d0da92251fc17a7974c7ca008b011416d30"
+    },
+    {
+      "id": "015-storefront-checked",
+      "path": "cases/resolver/015-storefront-checked.json",
+      "digest": "sha256:c2a6a676e4733177cf97830196b2cf02582e0f38efb9d0ac53ded6b46627717f"
+    }
+  ],
   "handoffVectors": [],
   "conditionalObligations": []
 }
