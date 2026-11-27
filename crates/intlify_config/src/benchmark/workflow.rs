@@ -48,6 +48,7 @@ use crate::boundary::locator::{LocatorCandidate, LocatorVariant};
 use crate::boundary::selector::SelectorReport;
 use crate::boundary::snapshot::SnapshotReport;
 use crate::boundary::step::Component;
+use crate::boundary::text::TextInput;
 use crate::boundary::verification::VerificationAssertion;
 use crate::construction::identity::ConstructionIdentity;
 use crate::construction::resolver::{build, ConstructedResolver};
@@ -146,7 +147,7 @@ impl RawInvocation {
         members: &'a [&'a [u8]],
     ) -> SubmittedInvocation<'a, impl FnOnce(Bound, Bound) -> Result<Icu4xData, EnvelopeReason> + 'a>
     {
-        let own = |slot: Kind| Some(slot.id());
+        let own = |slot: Kind| Some(TextInput::Text(slot.id()));
         let (manifest, payloads) = (self.manifest, &self.payloads);
         let common = Submitted {
             specification: Component {
@@ -218,7 +219,7 @@ impl RawInvocation {
             }
         };
         SubmittedInvocation {
-            construction_identity: Some(&self.reference),
+            construction_identity: Some(TextInput::Text(&self.reference)),
             common,
             entry,
         }
@@ -856,7 +857,7 @@ pub(in crate::benchmark) mod tests {
         assert_eq!(locator, (LocatorVariant::SafeLabel, "storefront-app", true));
         assert!(value.call_site.is_none());
         let origins = (entry.programmatic.origin, entry.selector.origin);
-        let own = |kind: Kind| Some(kind.id());
+        let own = |kind: Kind| Some(TextInput::Text(kind.id()));
         let slots = (
             Kind::ConfigurationProgrammatic,
             Kind::ProfileSelectorProgrammatic,

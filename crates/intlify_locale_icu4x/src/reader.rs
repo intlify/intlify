@@ -154,6 +154,11 @@ impl DecodedManifest {
         manifest::decode(bytes, max_bytes, max_depth).map(|manifest| Self { manifest })
     }
 
+    /// The manifest as the boundary decoded it.
+    pub const fn manifest(&self) -> &LocaleCanonicalizationDataArtifact {
+        &self.manifest
+    }
+
     /// Where the caller finds the payload of `role`, relative to the
     /// manifest's location, before anything past the boundary is checked: a
     /// caller that supplies every payload with the manifest selects them by
@@ -576,14 +581,15 @@ pub(crate) mod tests {
         );
     }
 
-    /// The addresses are known at the boundary, even of a manifest whose
-    /// integrity does not hold.
+    /// The addresses, and the manifest as decoded, are known at the
+    /// boundary, even of a manifest whose integrity does not hold.
     #[test]
     fn the_decoded_manifest_names_the_addresses_before_it_is_verified() {
         let mut value: Value = serde_json::from_slice(WIDE).unwrap();
         value["dataset"]["identity"] = json!("another-dataset");
         let tampered = serde_json::to_vec(&value).unwrap();
         let decoded = DecodedManifest::decode(&tampered, u64::MAX, u64::MAX).unwrap();
+        assert_eq!(serde_json::to_value(decoded.manifest()).unwrap(), value);
         assert_eq!(
             decoded.address(Role::Conformance).as_str(),
             "conformance.json"

@@ -1,0 +1,44 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-entry-source-admitted",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "programmatic-entry-identity-revision",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-entry-source-admitted.json",
+    "digest": "sha256:6f4a2da420096347fb08cacd0d710bac5a67c8bbfa043d594a159f7aca229adc"
+  },
+  "expected": {
+    "admitted": true,
+    "normalizedInput": {
+      "identity": "intlify-programmatic-entry.v0:storefront",
+      "nonSecret": false,
+      "revision": "sha256:1dcd2e02d5702083fb37800e12fca137b28d2b85ccddc89f378a06638607db7e"
+    },
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-123",
+      "015-149"
+    ],
+    "ruleIds": [
+      "015.input-admission.programmatic-entry-identity-revision.missing-entry-identity",
+      "015.input-admission.programmatic-entry-identity-revision.missing-entry-revision",
+      "015.input-admission.programmatic-entry-identity-revision.over-bound-entry-identity",
+      "015.input-admission.programmatic-entry-identity-revision.over-bound-entry-revision",
+      "015.input-admission.programmatic-entry-identity-revision.unstable-entry-identity",
+      "015.input-admission.programmatic-entry-identity-revision.unbound-entry-revision",
+      "015.input-admission.programmatic-entry-identity-revision.snapshot-identity-mismatch"
+    ],
+    "checkIds": []
+  }
+}

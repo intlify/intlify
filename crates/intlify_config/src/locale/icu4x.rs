@@ -45,6 +45,23 @@ pub(crate) struct Icu4xData {
 }
 
 impl Icu4xData {
+    /// The manifest the boundary admitted, which the conformance harness
+    /// writes as part of the admitted value (D15:3267).
+    #[cfg(any(test, feature = "conformance"))]
+    pub(crate) const fn manifest(&self) -> &DecodedManifest {
+        &self.manifest
+    }
+
+    /// Whether the caller supplied the payload at the address the manifest
+    /// names for `role`.
+    #[cfg(any(test, feature = "conformance"))]
+    pub(crate) const fn supplies(&self, role: Role) -> bool {
+        match role {
+            Role::Conformance => self.conformance.is_some(),
+            Role::Markers => self.markers.is_some(),
+        }
+    }
+
     /// The boundary: an absent manifest is `missing-input`, and then its
     /// bytes and depth, under `bytes` and `depth`, before anything is decoded,
     /// and its closed decoding. Of `payloads`, the bytes the caller supplied

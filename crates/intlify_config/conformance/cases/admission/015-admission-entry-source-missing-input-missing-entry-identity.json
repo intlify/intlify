@@ -1,0 +1,35 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-entry-source-missing-input-missing-entry-identity",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "programmatic-entry-identity-revision",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-entry-source-missing-input-missing-entry-identity.json",
+    "digest": "sha256:7bd5a1b7f282d93b7f9c12ed55b92ccfa9a44fe765131b43a22f7181f8cbfc8a"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failureReason": "missing-entry-identity",
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-123",
+      "015-149"
+    ],
+    "ruleIds": [
+      "015.input-admission.programmatic-entry-identity-revision.missing-entry-identity"
+    ],
+    "checkIds": []
+  }
+}

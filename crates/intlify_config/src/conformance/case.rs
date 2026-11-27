@@ -64,7 +64,7 @@ pub(crate) const PATH: &str = "schemas/case-v0.schema.json";
 
 /// The Case Schema's file digest, which the runner pins.
 pub(crate) const DIGEST: &str =
-    "sha256:d01599c8f072903a8d9a058cf05b26da1007c39a58c601ab81bb3dcc708884ee";
+    "sha256:fee287f3d7200b62cd162011e25f61795c89c9a2bd861f5f834272e959748cbc";
 
 /// A case or Handoff Vector ID: `015-` and lowercase kebab-case.
 pub(crate) const CASE_ID_PATTERN: &str = "^015-[a-z0-9]+(?:-[a-z0-9]+)*$";
@@ -903,6 +903,182 @@ fn selector(definitions: &mut Map<String, Value>) {
     );
 }
 
+/// The input fixture of each boundary kind in the table, by the name of its
+/// definition (D15:3162, 3252).
+pub(crate) const ADMISSION_FIXTURES: [(&str, &str); 13] = [
+    (
+        "profile-resolution-specification-input",
+        "specificationInputFixture",
+    ),
+    (
+        "intent-surface-class-vocabulary-artifact",
+        "vocabularyInputFixture",
+    ),
+    (
+        "locale-canonicalization-data-artifact",
+        "canonicalizationDataInputFixture",
+    ),
+    (
+        "submitted-profile-resolution-artifact-collection",
+        "collectionInputFixture",
+    ),
+    (
+        "resource-limit-policy-verification-input",
+        "verificationInputFixture",
+    ),
+    ("safe-origin-kind", "originInputFixture"),
+    ("external-profile-selector-binding", "selectorInputFixture"),
+    ("file-source-identity-revision", "fileSourceInputFixture"),
+    (
+        "programmatic-entry-identity-revision",
+        "entrySourceInputFixture",
+    ),
+    ("programmatic-entry-snapshot", "snapshotInputFixture"),
+    (
+        "programmatic-call-site-evidence-input",
+        "callSiteInputFixture",
+    ),
+    ("implementation-capability", "capabilityInputFixture"),
+    (
+        "resolver-construction-identity-reference",
+        "constructionIdentityInputFixture",
+    ),
+];
+
+/// The input fixtures of the boundary kinds in the table (D15:3162, 3252). A
+/// boundary that reads capability bounds holds the capability value beside
+/// its input, a decoded value the harness admits first; the Verification
+/// Input also holds the assertion the boundary takes as a parameter. An
+/// omitted input is an absent one, but for the selector and the call-site
+/// sidecar, whose absence is admitted and has no normalized form of its own
+/// here: an absent selector is the `absent` report, and an absent sidecar is
+/// an entry's (D15:3168). A refused input must be representable:
+/// bytes are any byte sequence, a Snapshot node any object, and a report any
+/// of its closed forms, the unsafe host inspection included.
+fn admission_fixtures(definitions: &mut Map<String, Value>) {
+    let text = || json!({ "type": "string" });
+    let flag = || json!({ "type": "boolean" });
+    let unsafe_host = || closed(&[("hostInspection", constant("unsafe"))]);
+    let capability = || ("capability", definition("json"));
+    let reads = |input: Value| closed_with(&[capability()], &[("input", input)]);
+    let edge = json!({
+        "oneOf": [
+            closed(&[("key", text())]),
+            closed(&[(
+                "keyUtf16",
+                json!({ "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 65535 } }),
+            )]),
+            closed(&[("index", json!({ "type": "number" }))]),
+        ]
+    });
+    let mapping = closed(&[
+        ("path", json!({ "type": "array", "items": edge })),
+        ("role", text()),
+        (
+            "span",
+            closed(&[
+                ("start", json!({ "type": "number" })),
+                ("end", json!({ "type": "number" })),
+            ]),
+        ),
+    ]);
+    definitions.insert(
+        "locatorCandidate".into(),
+        closed(&[
+            ("variant", text()),
+            ("payload", text()),
+            ("nonSecret", flag()),
+        ]),
+    );
+    let sidecar = closed_with(
+        &[
+            ("nonSecret", flag()),
+            ("source", definition("bytesInput")),
+            ("mappings", json!({ "type": "array", "items": mapping })),
+        ],
+        &[
+            ("identity", text()),
+            ("revision", text()),
+            ("locator", definition("locatorCandidate")),
+        ],
+    );
+    let mut selector_reports = definitions["admittedSelector"]["oneOf"]
+        .as_array()
+        .expect("the admitted selector is a choice of reports")
+        .clone();
+    selector_reports.push(closed(&[("report", constant("unrepresentable"))]));
+    selector_reports.push(closed(&[("report", constant("unsafe"))]));
+    let pair = |content: (&'static str, Value)| {
+        closed_with(
+            &[("nonSecret", flag()), content],
+            &[("identity", text()), ("revision", text())],
+        )
+    };
+    let forms = [
+        reads(definition("bytesInput")),
+        reads(definition("bytesInput")),
+        reads(closed(&[
+            ("manifest", definition("bytesInput")),
+            (
+                "payloads",
+                json!({ "type": "object", "additionalProperties": definition("reference") }),
+            ),
+        ])),
+        reads(json!({
+            "oneOf": [
+                closed(&[("members", json!({ "type": "array", "items": definition("bytesInput") }))]),
+                closed(&[("container", constant("malformed"))]),
+                unsafe_host(),
+            ]
+        })),
+        closed_with(
+            &[
+                (
+                    "assertion",
+                    closed(&[
+                        ("identity", token()),
+                        ("revision", token()),
+                        ("semanticDigest", digest()),
+                    ]),
+                ),
+                capability(),
+            ],
+            &[("input", definition("bytesInput"))],
+        ),
+        closed_with(
+            &[("slot", strings(SafeOriginKind::ALL.map(SafeOriginKind::id)))],
+            &[("candidate", json!({}))],
+        ),
+        closed(&[
+            capability(),
+            ("input", json!({ "oneOf": selector_reports })),
+        ]),
+        closed(&[
+            capability(),
+            ("input", pair(("bytes", definition("bytesInput")))),
+        ]),
+        closed(&[
+            capability(),
+            ("input", pair(("snapshot", definition("snapshot")))),
+        ]),
+        reads(json!({
+            "oneOf": [
+                closed(&[("snapshot", json!({ "type": "object" })), ("digest", text())]),
+                unsafe_host(),
+            ]
+        })),
+        closed(&[
+            capability(),
+            ("input", json!({ "oneOf": [sidecar, unsafe_host()] })),
+        ]),
+        closed_with(&[], &[("input", definition("json"))]),
+        closed_with(&[], &[("input", definition("json"))]),
+    ];
+    for ((_, name), form) in ADMISSION_FIXTURES.into_iter().zip(forms) {
+        definitions.insert(name.into(), form);
+    }
+}
+
 /// A locator in its admitted canonical form, or its absence.
 fn locator() -> Value {
     let variants = [
@@ -980,6 +1156,7 @@ fn step_failures(slots: &[(SafeOriginKind, &[&str])]) -> Value {
 fn input_admission(definitions: &mut Map<String, Value>) {
     snapshot_node(definitions);
     selector(definitions);
+    admission_fixtures(definitions);
     let refused = |failure: Value| {
         closed(&[
             ("admitted", json!({ "const": false })),
@@ -1601,6 +1778,35 @@ mod tests {
         for sample in samples() {
             assert!(validators.admits(&sample), "{sample}");
         }
+    }
+
+    /// The Case Schema adds no default that 015 does not name (D15:3241): no
+    /// schema in it has a `default`. A member's name or a constant may spell
+    /// `default`, and neither is a schema.
+    #[test]
+    fn the_case_schema_adds_no_default() {
+        fn defaults(schema: &Value) -> usize {
+            match schema {
+                Value::Object(members) => members
+                    .iter()
+                    .map(|(name, value)| match name.as_str() {
+                        "default" => 1,
+                        "const" | "enum" => 0,
+                        "properties" | "definitions" => {
+                            value.as_object().unwrap().values().map(defaults).sum()
+                        }
+                        _ => defaults(value),
+                    })
+                    .sum(),
+                Value::Array(items) => items.iter().map(defaults).sum(),
+                _ => 0,
+            }
+        }
+        assert_eq!(defaults(&schema().unwrap()), 0);
+        let mut defaulted = schema().unwrap();
+        defaulted["definitions"]["selectorInputFixture"]["properties"]["input"]["default"] =
+            Value::Null;
+        assert_eq!(defaults(&defaulted), 1);
     }
 
     /// Each kind is a closed object: every member is required, nothing else
@@ -2599,6 +2805,217 @@ mod tests {
             let mut changed = fixture.clone();
             change(&mut changed);
             assert!(!validators.admits(&changed), "change {index}");
+        }
+    }
+
+    /// Every fixture of the committed input admission cases has its kind's
+    /// form, a refused input's included, and has none with a member outside
+    /// it (D15:3162, 3252).
+    #[test]
+    fn each_admission_fixture_has_its_kind_s_form() {
+        let cases = super::super::admission_cases::cases().unwrap();
+        let file = |path: &str| -> Value {
+            let file = cases.files.iter().find(|file| file.path == path).unwrap();
+            serde_json::from_slice(&file.bytes).unwrap()
+        };
+        let validators =
+            ADMISSION_FIXTURES.map(|(kind, definition)| (kind, Validators::of(definition)));
+        for entry in &cases.listing {
+            let manifest = file(entry["path"].as_str().unwrap());
+            let fixture = file(manifest["inputFixture"]["path"].as_str().unwrap());
+            let (_, validators) = validators
+                .iter()
+                .find(|(kind, _)| manifest["boundaryKind"] == *kind)
+                .unwrap();
+            assert!(validators.admits(&fixture), "{}", entry["id"]);
+            let mut unknown = fixture.clone();
+            unknown["unknown"] = json!({});
+            assert!(!validators.admits(&unknown), "{}", entry["id"]);
+        }
+    }
+
+    /// An input fixture holds what its boundary reads in the form 015 gives
+    /// it: the capability value beside the input of a boundary that reads
+    /// bounds, bytes where a boundary reads bytes, the selector's report and
+    /// the call-site input always, a candidate as any value, and a refused
+    /// Snapshot as any object, while the programmatic pair's Snapshot is
+    /// canonical (D15:3162, 3250, 3252).
+    #[test]
+    fn an_admission_fixture_holds_what_its_boundary_reads() {
+        let capability = json!({ "json": {} });
+        let digest = format!("sha256:{}", "0".repeat(64));
+        let sidecar = |mapping: Value| {
+            json!({
+                "capability": capability,
+                "input": { "nonSecret": true, "source": { "bytes": "" }, "mappings": [mapping] },
+            })
+        };
+        let mapping = json!({ "path": [], "role": "node", "span": { "start": 0, "end": 1 } });
+        for (definition, fixture) in [
+            (
+                "specificationInputFixture",
+                json!({ "capability": capability }),
+            ),
+            (
+                "canonicalizationDataInputFixture",
+                json!({ "capability": capability, "input": {
+                    "manifest": { "bytes": "" },
+                    "payloads": { "a": { "path": "a", "digest": digest } },
+                } }),
+            ),
+            (
+                "collectionInputFixture",
+                json!({ "capability": capability, "input": { "members": [{ "bytes": "" }] } }),
+            ),
+            (
+                "originInputFixture",
+                json!({ "slot": "configuration-file", "candidate": [1] }),
+            ),
+            (
+                "selectorInputFixture",
+                json!({ "capability": capability, "input": { "report": "invalid-type", "type": "array" } }),
+            ),
+            (
+                "snapshotInputFixture",
+                json!({ "capability": capability, "input": {
+                    "snapshot": { "undefined": null, "extra": 1 },
+                    "digest": "sha256:",
+                } }),
+            ),
+            ("callSiteInputFixture", sidecar(mapping.clone())),
+            (
+                "callSiteInputFixture",
+                sidecar(
+                    json!({ "path": [{ "keyUtf16": [55296] }, { "index": 0.5 }], "role": "value", "span": { "start": 1.5, "end": -1 } }),
+                ),
+            ),
+            ("capabilityInputFixture", json!({})),
+            (
+                "constructionIdentityInputFixture",
+                json!({ "input": { "json": 1 } }),
+            ),
+        ] {
+            assert!(
+                Validators::of(definition).admits(&fixture),
+                "{definition} {fixture}"
+            );
+        }
+        for (definition, fixture) in [
+            (
+                "specificationInputFixture",
+                json!({ "input": { "bytes": "" } }),
+            ),
+            (
+                "specificationInputFixture",
+                json!({ "capability": {}, "input": { "bytes": "" } }),
+            ),
+            (
+                "specificationInputFixture",
+                json!({ "capability": capability, "input": { "json": {} } }),
+            ),
+            (
+                "vocabularyInputFixture",
+                json!({ "capability": capability, "input": { "bytes": "7B" } }),
+            ),
+            (
+                "canonicalizationDataInputFixture",
+                json!({ "capability": capability, "input": { "manifest": { "bytes": "" } } }),
+            ),
+            (
+                "canonicalizationDataInputFixture",
+                json!({ "capability": capability, "input": {
+                    "manifest": { "bytes": "" },
+                    "payloads": { "a": { "bytes": "" } },
+                } }),
+            ),
+            (
+                "collectionInputFixture",
+                json!({ "capability": capability, "input": { "container": "other" } }),
+            ),
+            (
+                "collectionInputFixture",
+                json!({ "capability": capability, "input": { "members": [{ "json": {} }] } }),
+            ),
+            (
+                "verificationInputFixture",
+                json!({ "capability": capability, "input": { "bytes": "" } }),
+            ),
+            (
+                "verificationInputFixture",
+                json!({ "assertion": { "identity": "a", "revision": "0" }, "capability": capability }),
+            ),
+            (
+                "originInputFixture",
+                json!({ "candidate": "configuration-file" }),
+            ),
+            ("originInputFixture", json!({ "slot": "unknown-slot" })),
+            ("selectorInputFixture", json!({ "capability": capability })),
+            (
+                "selectorInputFixture",
+                json!({ "capability": capability, "input": { "report": "string" } }),
+            ),
+            (
+                "selectorInputFixture",
+                json!({ "capability": capability, "input": { "report": "other" } }),
+            ),
+            (
+                "fileSourceInputFixture",
+                json!({ "capability": capability, "input": { "bytes": { "bytes": "" } } }),
+            ),
+            (
+                "entrySourceInputFixture",
+                json!({ "capability": capability, "input": {
+                    "nonSecret": true,
+                    "snapshot": { "snapshot": { "undefined": null }, "digest": digest },
+                } }),
+            ),
+            (
+                "snapshotInputFixture",
+                json!({ "capability": capability, "input": { "snapshot": [], "digest": "x" } }),
+            ),
+            (
+                "snapshotInputFixture",
+                json!({ "capability": capability, "input": { "hostInspection": "safe" } }),
+            ),
+            ("callSiteInputFixture", json!({ "capability": capability })),
+            (
+                "callSiteInputFixture",
+                sidecar(
+                    json!({ "path": [{ "key": "a", "index": 0 }], "role": "node", "span": { "start": 0, "end": 1 } }),
+                ),
+            ),
+            (
+                "callSiteInputFixture",
+                sidecar(
+                    json!({ "path": [{ "keyUtf16": [65536] }], "role": "node", "span": { "start": 0, "end": 1 } }),
+                ),
+            ),
+            (
+                "callSiteInputFixture",
+                sidecar(json!({ "path": [], "role": "node", "span": { "start": 0 } })),
+            ),
+            (
+                "callSiteInputFixture",
+                json!({ "capability": capability, "input": {
+                    "nonSecret": true,
+                    "source": { "bytes": "" },
+                    "mappings": [],
+                    "locator": { "variant": "safe-label", "payload": "a" },
+                } }),
+            ),
+            (
+                "capabilityInputFixture",
+                json!({ "capability": capability, "input": { "json": {} } }),
+            ),
+            (
+                "constructionIdentityInputFixture",
+                json!({ "input": "rci0_" }),
+            ),
+        ] {
+            assert!(
+                !Validators::of(definition).admits(&fixture),
+                "{definition} {fixture}"
+            );
         }
     }
 }

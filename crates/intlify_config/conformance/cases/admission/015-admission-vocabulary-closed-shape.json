@@ -1,0 +1,35 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-vocabulary-closed-shape",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "intent-surface-class-vocabulary-artifact",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-vocabulary-closed-shape.json",
+    "digest": "sha256:edcdbd4365112681a07a183e58404e2f0bbbe0c10710a58a443ae422100ab045"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failureReason": "malformed-envelope",
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-099",
+      "015-138"
+    ],
+    "ruleIds": [
+      "015.input-admission.intent-surface-class-vocabulary-artifact.malformed-envelope"
+    ],
+    "checkIds": []
+  }
+}

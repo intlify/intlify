@@ -1,0 +1,1 @@
+{"kind":"approval-policy","schemaRevision":0,"specification":{"identity":"intlify-design-021","revision":"0"},"body":{"identity":"storefront-approval","revision":"1","content":{"localizedApproval":"required"}},"integrityDigest":"sha256:de5acf5b1da156c38aaa9a34563663b2b1719af9e831b6bf2ba2ecaa7e86c186"}

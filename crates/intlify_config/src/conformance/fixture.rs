@@ -58,7 +58,7 @@ pub(crate) fn references(fixture: &Value) -> Vec<&Value> {
 
 /// The bytes of lowercase hexadecimal, two digits a byte, as the Case Schema
 /// makes it.
-fn decode(hex: &str) -> Vec<u8> {
+pub(crate) fn decode(hex: &str) -> Vec<u8> {
     hex.as_bytes()
         .chunks(2)
         .map(|pair| {

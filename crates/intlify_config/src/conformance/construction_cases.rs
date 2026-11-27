@@ -439,13 +439,23 @@ fn refused(row: PrecedenceRow) -> Value {
     Value::Object(expected)
 }
 
+/// The committed construction vector's identity, which an independent
+/// checker derives: what the constructing case expects, and the identity
+/// every input admission case names with it.
+pub(crate) fn identity() -> Result<String, serde_json::Error> {
+    let vectors: Value = serde_json::from_slice(VECTORS)?;
+    Ok(vectors["constructionIdentity"]["text"]
+        .as_str()
+        .expect("the construction vector presents its identity")
+        .to_owned())
+}
+
 /// What the constructing case expects: the committed construction vector's
 /// identity.
 fn constructed() -> Result<Value, serde_json::Error> {
-    let vectors: Value = serde_json::from_slice(VECTORS)?;
     Ok(json!({
         "constructed": true,
-        "resolverConstructionIdentity": vectors["constructionIdentity"]["text"],
+        "resolverConstructionIdentity": identity()?,
         "resolverInvoked": false,
     }))
 }

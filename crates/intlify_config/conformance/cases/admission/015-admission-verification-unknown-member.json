@@ -1,0 +1,35 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-verification-unknown-member",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "resource-limit-policy-verification-input",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-verification-unknown-member.json",
+    "digest": "sha256:b9a460eae5f50601f27d5fc4f6d77d95453ca1ea39b253eefe9b1fbb9d7705cc"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failureReason": "unknown-member",
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-120",
+      "015-121"
+    ],
+    "ruleIds": [
+      "015.input-admission.resource-limit-policy-verification-input.unknown-member"
+    ],
+    "checkIds": []
+  }
+}

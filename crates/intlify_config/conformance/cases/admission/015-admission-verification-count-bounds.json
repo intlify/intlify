@@ -1,0 +1,35 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-verification-count-bounds",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "resource-limit-policy-verification-input",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-verification-count-bounds.json",
+    "digest": "sha256:d058710c3b6a89fef5327bf17f07db05dcaf8b3906f8c29f1f3387c7610dd913"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failureReason": "over-bound-input",
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-120",
+      "015-121"
+    ],
+    "ruleIds": [
+      "015.input-admission.resource-limit-policy-verification-input.over-bound-input"
+    ],
+    "checkIds": []
+  }
+}

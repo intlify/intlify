@@ -1,0 +1,68 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-verification-admitted",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "resource-limit-policy-verification-input",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-verification-admitted.json",
+    "digest": "sha256:02d8ac840202f132063d84d8a31cba3e8692d17d885c1b05d64a52e985efd6ed"
+  },
+  "expected": {
+    "admitted": true,
+    "normalizedInput": {
+      "json": {
+        "identity": "intlify-test-verification-input",
+        "integrityDigest": "sha256:165e9d5c381ef5b3d2d526212cf836cf94d7d832a3609b9585d20ba4e3267c45",
+        "kind": "resource-limit-policy-verification-input",
+        "mode": "exact-pin",
+        "pins": [
+          {
+            "identity": "intlify-test-limits-a",
+            "kind": "resource-limit-policy",
+            "revision": "1",
+            "semanticDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+            "specificationRevision": "0"
+          },
+          {
+            "identity": "intlify-test-limits-b",
+            "kind": "resource-limit-policy",
+            "revision": "1",
+            "semanticDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+            "specificationRevision": "0"
+          }
+        ],
+        "revision": "0",
+        "schemaRevision": "0"
+      }
+    },
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-120",
+      "015-121"
+    ],
+    "ruleIds": [
+      "015.input-admission.resource-limit-policy-verification-input.missing-input",
+      "015.input-admission.resource-limit-policy-verification-input.over-bound-input",
+      "015.input-admission.resource-limit-policy-verification-input.malformed-input",
+      "015.input-admission.resource-limit-policy-verification-input.duplicate-member",
+      "015.input-admission.resource-limit-policy-verification-input.unknown-member",
+      "015.input-admission.resource-limit-policy-verification-input.secret-bearing-input",
+      "015.input-admission.resource-limit-policy-verification-input.ambient-authority",
+      "015.input-admission.resource-limit-policy-verification-input.verification-identity-mismatch",
+      "015.input-admission.resource-limit-policy-verification-input.verification-revision-mismatch",
+      "015.input-admission.resource-limit-policy-verification-input.verification-digest-mismatch"
+    ],
+    "checkIds": []
+  }
+}

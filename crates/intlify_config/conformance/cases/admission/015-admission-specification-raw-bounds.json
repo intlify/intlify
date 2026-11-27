@@ -1,0 +1,35 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-specification-raw-bounds",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "profile-resolution-specification-input",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-specification-raw-bounds.json",
+    "digest": "sha256:34b7fe20185e3f571bc00e0b297dd0abe24db7ae695ed6ea798763b98bb5a25a"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failureReason": "over-bound-member",
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-087",
+      "015-165"
+    ],
+    "ruleIds": [
+      "015.input-admission.profile-resolution-specification-input.over-bound-member"
+    ],
+    "checkIds": []
+  }
+}

@@ -4,7 +4,7 @@
 //! 015's admission of one Resolver Invocation Input Set: the Resolver
 //! Construction Identity reference, the Common Invocation Input Set, and
 //! exactly one file or programmatic Entry Admission Input Set (D15:202,
-//! 1106).
+//! 1107).
 //!
 //! The three are admitted in stages of their own: the reference at its
 //! boundary, the common set in its step, and the entry in the step of its
@@ -32,6 +32,7 @@ use super::entry::{
     self, FileEntryInputs, ProgrammaticEntryInputs, SubmittedFileEntry, SubmittedProgrammaticEntry,
 };
 use super::step::InputFailure;
+use super::text::TextInput;
 use super::verification::VerificationAssertion;
 
 /// The one Entry Admission Input Set an invocation submits.
@@ -43,7 +44,7 @@ pub(crate) enum SubmittedEntry<'a> {
 /// A Resolver Invocation Input Set as submitted. The reference is the
 /// identity's text, `None` when absent.
 pub(crate) struct SubmittedInvocation<'a, R> {
-    pub(crate) construction_identity: Option<&'a str>,
+    pub(crate) construction_identity: Option<TextInput<'a>>,
     pub(crate) common: common::Submitted<'a, R>,
     pub(crate) entry: SubmittedEntry<'a>,
 }
@@ -197,7 +198,7 @@ mod tests {
         let mut common = inputs.submitted(read as Data);
         edit(&mut common);
         let submitted = SubmittedInvocation {
-            construction_identity: reference,
+            construction_identity: reference.map(TextInput::from),
             common,
             entry,
         };
@@ -380,7 +381,7 @@ mod tests {
             refused(
                 &inputs,
                 Some(&reference),
-                |common| common.capability.origin = Some("configuration-file"),
+                |common| common.capability.origin = Some("configuration-file".into()),
                 SubmittedEntry::Programmatic(entry),
             ),
             failures(
@@ -411,7 +412,7 @@ mod tests {
         )];
         let mut entry = file_entry(&revision, "app");
         entry.file.value.identity = None;
-        entry.selector.origin = Some(" Profile-Selector-CLI");
+        entry.selector.origin = Some(" Profile-Selector-CLI".into());
         assert_eq!(
             refused(
                 &inputs,

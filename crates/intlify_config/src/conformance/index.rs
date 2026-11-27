@@ -24,9 +24,10 @@
 //! writes it to, with the file digest of the bytes it writes there. It pins
 //! the Case Schema ([`super::case`]) the same way, and lists each manifest by
 //! its ID, path, and file digest in the array of its kind, in ascending
-//! unsigned byte order of the IDs. The construction cases are written
-//! ([`super::construction_cases`]); the other arrays stay empty until their
-//! cases are.
+//! unsigned byte order of the IDs. The construction cases
+//! ([`super::construction_cases`]) and the input admission cases of the
+//! boundary kinds ([`super::admission_cases`]) are written; the other arrays
+//! stay empty until their cases are.
 
 use serde_json::{json, Map, Value};
 
@@ -41,7 +42,7 @@ use crate::construction::root::{self, RootRole};
 use crate::model::CONFIGURATION_SCHEMA_VERSION;
 
 use super::case::{self, ManifestKind, CASE_ID_PATTERN, OBLIGATION_ID_PATTERN};
-use super::construction_cases;
+use super::{admission_cases, construction_cases};
 
 /// The Suite Index Schema's identity.
 pub(crate) const SCHEMA_IDENTITY: &str = "intlify-project-profile-conformance-suite-index";
@@ -273,8 +274,14 @@ impl From<Artifact> for SuiteFile {
 pub fn artifacts() -> Result<Vec<SuiteFile>, serde_json::Error> {
     let schema = generate::write(&schema())?;
     let case_schema = case::artifact()?;
-    let cases = construction_cases::cases()?;
-    let index = generate::write(&index(&schema, &case_schema, &cases.listing)?)?;
+    let construction = construction_cases::cases()?;
+    let admission = admission_cases::cases()?;
+    let index = generate::write(&index(
+        &schema,
+        &case_schema,
+        &construction.listing,
+        &admission.listing,
+    )?)?;
     let mut files = vec![
         SuiteFile {
             path: SCHEMA_PATH.to_owned(),
@@ -286,7 +293,8 @@ pub fn artifacts() -> Result<Vec<SuiteFile>, serde_json::Error> {
             bytes: index,
         },
     ];
-    files.extend(cases.files);
+    files.extend(construction.files);
+    files.extend(admission.files);
     Ok(files)
 }
 
@@ -302,11 +310,13 @@ fn entry(identity: &str, revision: Option<&String>, artifact: &Artifact) -> Valu
 
 /// The index of the artifacts this crate writes, under the identities and
 /// revisions the Root Package admits, of the schema written as `schema`, of
-/// the Case Schema, and of the construction cases `construction` lists.
+/// the Case Schema, and of the construction and input admission cases
+/// `construction` and `input_admission` list.
 fn index(
     schema: &[u8],
     case_schema: &Artifact,
     construction: &[Value],
+    input_admission: &[Value],
 ) -> Result<Value, serde_json::Error> {
     let admission = ConstructionAdmission::revision_zero();
     let components = &admission.components;
@@ -434,10 +444,10 @@ fn index(
                 case_schema,
             ),
             Member::ResolverConstructionCases => Value::Array(construction.to_vec()),
-            Member::ResolverInputAdmissionCases
-            | Member::ResolverCases
-            | Member::HandoffVectors
-            | Member::ConditionalObligations => json!([]),
+            Member::ResolverInputAdmissionCases => Value::Array(input_admission.to_vec()),
+            Member::ResolverCases | Member::HandoffVectors | Member::ConditionalObligations => {
+                json!([])
+            }
         };
         index.insert(member.name().to_owned(), value);
     }
@@ -486,7 +496,8 @@ mod tests {
     #[test]
     fn the_committed_schema_and_index_are_the_ones_this_crate_writes() {
         let artifacts = artifacts().unwrap();
-        let cases = construction_cases::cases().unwrap().files;
+        let mut cases = construction_cases::cases().unwrap().files;
+        cases.extend(admission_cases::cases().unwrap().files);
         assert_eq!(artifacts.len(), COMMITTED.len() + cases.len());
         assert_eq!(artifacts[COMMITTED.len()..], cases);
         for (artifact, (path, bytes)) in artifacts.iter().zip(COMMITTED) {
@@ -565,7 +576,7 @@ mod tests {
             .chain(manifests)
             .map(|file| (file.path, file_digest(&file.bytes).as_str().to_owned()))
             .collect::<BTreeMap<_, _>>();
-        assert_eq!(named.len(), 20 + 44);
+        assert_eq!(named.len(), 20 + 44 + 105);
         assert_eq!(
             named,
             artifacts

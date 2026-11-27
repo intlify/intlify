@@ -350,11 +350,11 @@ pub(crate) mod tests {
                     revision: Some(revision),
                     locator: Some(locator(LOCATOR)),
                 },
-                origin: Some(Kind::ConfigurationFile.id()),
+                origin: Some(Kind::ConfigurationFile.id().into()),
             },
             selector: Component {
                 value: SelectorReport::String(selector),
-                origin: Some(Kind::ProfileSelectorCli.id()),
+                origin: Some(Kind::ProfileSelectorCli.id().into()),
             },
         }
     }
@@ -429,7 +429,7 @@ pub(crate) mod tests {
         entry.file.value.identity = None;
         entry.selector = Component {
             value: SelectorReport::Unsafe,
-            origin: Some("profile-selector-programmatic"),
+            origin: Some("profile-selector-programmatic".into()),
         };
         assert_eq!(
             refused(entry, Some(&roomy())),
@@ -463,7 +463,7 @@ pub(crate) mod tests {
         entry.selector.value = SelectorReport::Unsafe;
         assert_eq!(refused(entry, None), []);
         let mut entry = submitted("not a revision", "app");
-        entry.selector.origin = Some(" Profile-Selector-CLI");
+        entry.selector.origin = Some(" Profile-Selector-CLI".into());
         assert_eq!(
             refused(entry, None),
             [failure(
@@ -481,9 +481,9 @@ pub(crate) mod tests {
         for slot in [Kind::ConfigurationFile, Kind::ProfileSelectorCli] {
             let mut entry = submitted(&revision, "app");
             if slot == Kind::ConfigurationFile {
-                entry.file.origin = Some("configuration-programmatic");
+                entry.file.origin = Some("configuration-programmatic".into());
             } else {
-                entry.selector.origin = Some("configuration-file");
+                entry.selector.origin = Some("configuration-file".into());
             }
             assert_eq!(
                 refused(entry, Some(&capability)),
@@ -620,11 +620,11 @@ pub(crate) mod tests {
                         locator: Some(safe_label(ENTRY_LABEL)),
                         call_site: Some(self.call_site()),
                     },
-                    origin: Some(Kind::ConfigurationProgrammatic.id()),
+                    origin: Some(Kind::ConfigurationProgrammatic.id().into()),
                 },
                 selector: Component {
                     value: SelectorReport::String(selector),
-                    origin: Some(Kind::ProfileSelectorProgrammatic.id()),
+                    origin: Some(Kind::ProfileSelectorProgrammatic.id().into()),
                 },
             }
         }
@@ -784,7 +784,7 @@ pub(crate) mod tests {
             entry.programmatic.value.call_site = Some(CallSiteReport::Unsafe);
             entry.selector = Component {
                 value: SelectorReport::Unsafe,
-                origin: Some("profile-selector-cli"),
+                origin: Some("profile-selector-cli".into()),
             };
             entry
         };
@@ -807,7 +807,7 @@ pub(crate) mod tests {
         expected.extend(selector);
         assert_eq!(refused_programmatic(entry, Some(&capability)), expected);
         let mut entry = failing(&|value| value.snapshot = Some(&SnapshotReport::Unsafe));
-        entry.programmatic.origin = Some(" configuration-programmatic");
+        entry.programmatic.origin = Some(" configuration-programmatic".into());
         let mut expected = vec![
             failure(
                 Kind::ConfigurationProgrammatic,
@@ -889,7 +889,7 @@ pub(crate) mod tests {
         entry.selector.value = SelectorReport::Unsafe;
         assert_eq!(refused_programmatic(entry, None), []);
         let mut entry = programmatic.entry("app");
-        entry.programmatic.origin = Some("configuration-file");
+        entry.programmatic.origin = Some("configuration-file".into());
         entry.selector.origin = None;
         assert_eq!(
             refused_programmatic(entry, None),
@@ -917,9 +917,9 @@ pub(crate) mod tests {
         ] {
             let mut entry = programmatic.entry("app");
             if slot == Kind::ConfigurationProgrammatic {
-                entry.programmatic.origin = Some("configuration-file");
+                entry.programmatic.origin = Some("configuration-file".into());
             } else {
-                entry.selector.origin = Some("profile-selector-cli");
+                entry.selector.origin = Some("profile-selector-cli".into());
             }
             assert_eq!(
                 refused_programmatic(entry, Some(&capability)),

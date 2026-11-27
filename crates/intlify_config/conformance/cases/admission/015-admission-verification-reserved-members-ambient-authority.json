@@ -1,0 +1,35 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-verification-reserved-members-ambient-authority",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "resource-limit-policy-verification-input",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-verification-reserved-members-ambient-authority.json",
+    "digest": "sha256:61c80f2d6a24086859863e2215c006a4c390f0e493e802350fa8b8eac506d729"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failureReason": "ambient-authority",
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-120",
+      "015-121"
+    ],
+    "ruleIds": [
+      "015.input-admission.resource-limit-policy-verification-input.ambient-authority"
+    ],
+    "checkIds": []
+  }
+}

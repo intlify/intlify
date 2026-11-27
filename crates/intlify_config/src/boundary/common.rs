@@ -213,7 +213,7 @@ where
 
 /// The vocabulary's limits: the capability's `inputBoundary` bounds on it
 /// (D15:1806, 1808-1811).
-const fn vocabulary_limits(bounds: &InputBoundaryLimits) -> VocabularyLimits {
+pub(crate) const fn vocabulary_limits(bounds: &InputBoundaryLimits) -> VocabularyLimits {
     VocabularyLimits {
         artifact_bytes: bounds.max_vocabulary_bytes.get(),
         depth: bounds.max_depth.get(),
@@ -225,7 +225,7 @@ const fn vocabulary_limits(bounds: &InputBoundaryLimits) -> VocabularyLimits {
 
 /// The collection's limits: the capability's `inputBoundary` bounds on its
 /// raw bytes (D15:1806, 1813-1814).
-const fn collection_limits(bounds: &InputBoundaryLimits) -> CollectionLimits {
+pub(crate) const fn collection_limits(bounds: &InputBoundaryLimits) -> CollectionLimits {
     CollectionLimits {
         member_bytes: bounds.max_collection_member_bytes.get(),
         total_bytes: bounds.max_collection_total_bytes.get(),
@@ -248,6 +248,7 @@ pub(crate) mod tests {
     use crate::boundary::capability::CapabilityRefusal;
     use crate::boundary::origin::OriginRefusal;
     use crate::boundary::specification::SpecificationRefusal;
+    use crate::boundary::text::TextInput;
     use crate::boundary::verification::VerificationRefusal;
     use crate::construction::capability::{
         IDENTITY as CAPABILITY, REVISION as CAPABILITY_REVISION,
@@ -366,7 +367,7 @@ pub(crate) mod tests {
         /// These values with `data` for the envelope, each beside its slot's
         /// own Safe Origin Kind.
         pub(crate) fn submitted<R>(&self, data: R) -> Submitted<'_, R> {
-            let own = |slot: Kind| Some(slot.id());
+            let own = |slot: Kind| Some(TextInput::Text(slot.id()));
             Submitted {
                 specification: Component {
                     value: Some(SPECIFICATION),
@@ -459,15 +460,18 @@ pub(crate) mod tests {
             value: Some(b"{"),
             origin: None,
         };
-        submitted.vocabulary.value = None;
-        submitted.data.origin = Some(" Locale-Canonicalization-Data");
+        submitted.vocabulary = Component {
+            value: None,
+            origin: Some(TextInput::NotText),
+        };
+        submitted.data.origin = Some(" Locale-Canonicalization-Data".into());
         submitted.collection = Component {
             value: Some(CollectionReport::Formal(&NUMBER)),
-            origin: Some("intent-surface-class-vocabulary"),
+            origin: Some("intent-surface-class-vocabulary".into()),
         };
         submitted.verification = Component {
             value: None,
-            origin: Some("verification"),
+            origin: Some("verification".into()),
         };
         submitted.capability.origin = None;
         assert_eq!(
@@ -482,6 +486,10 @@ pub(crate) mod tests {
                     Refusal::Specification(SpecificationRefusal::Malformed(
                         specification::Malformation::Syntax
                     ))
+                ),
+                failure(
+                    Kind::IntentSurfaceClassVocabulary,
+                    Refusal::Origin(OriginRefusal::Unknown)
                 ),
                 failure(
                     Kind::IntentSurfaceClassVocabulary,
@@ -595,7 +603,7 @@ pub(crate) mod tests {
         submitted.vocabulary.value = None;
         submitted.collection.value = None;
         submitted.verification.value = None;
-        submitted.vocabulary.origin = Some("profile-selector-cli");
+        submitted.vocabulary.origin = Some("profile-selector-cli".into());
         submitted.capability.value = None;
         assert_eq!(
             inputs.admit(submitted).unwrap_err(),
@@ -644,7 +652,7 @@ pub(crate) mod tests {
                 Kind::ResourceLimitPolicyVerification => &mut submitted.verification.origin,
                 _ => &mut submitted.capability.origin,
             };
-            *origin = Some("configuration-file");
+            *origin = Some("configuration-file".into());
             assert_eq!(
                 inputs.admit(submitted).unwrap_err(),
                 [failure(

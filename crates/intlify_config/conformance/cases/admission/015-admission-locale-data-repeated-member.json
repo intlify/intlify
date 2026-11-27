@@ -1,0 +1,34 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-locale-data-repeated-member",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "locale-canonicalization-data-artifact",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-locale-data-repeated-member.json",
+    "digest": "sha256:8e2dfd72ee8829842988c8bb250b0a99b90c20aae4845a3a32590e8f9f15194c"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failureReason": "duplicate-member",
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-121"
+    ],
+    "ruleIds": [
+      "015.input-admission.locale-canonicalization-data-artifact.duplicate-member"
+    ],
+    "checkIds": []
+  }
+}

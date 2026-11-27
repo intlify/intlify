@@ -1,0 +1,59 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-collection-admitted",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "submitted-profile-resolution-artifact-collection",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-collection-admitted.json",
+    "digest": "sha256:2759ef9603db742ec0cf51bde98a866731e8457c5a021b981e1b425f33718e9d"
+  },
+  "expected": {
+    "admitted": true,
+    "normalizedInput": {
+      "members": [
+        {
+          "json": {
+            "kind": "approval-policy",
+            "schemaRevision": "0",
+            "specification": {
+              "identity": "intlify-design-021",
+              "revision": "0"
+            },
+            "body": {
+              "identity": "storefront-approval",
+              "revision": "1",
+              "content": {
+                "localizedApproval": "required"
+              }
+            },
+            "integrityDigest": "sha256:de5acf5b1da156c38aaa9a34563663b2b1719af9e831b6bf2ba2ecaa7e86c186"
+          }
+        }
+      ]
+    },
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-040",
+      "015-121"
+    ],
+    "ruleIds": [
+      "015.input-admission.submitted-profile-resolution-artifact-collection.missing-input",
+      "015.input-admission.submitted-profile-resolution-artifact-collection.unsafe-host-inspection",
+      "015.input-admission.submitted-profile-resolution-artifact-collection.malformed-container",
+      "015.input-admission.submitted-profile-resolution-artifact-collection.formal-envelope-over-bound",
+      "015.input-admission.submitted-profile-resolution-artifact-collection.unrepresentable-member"
+    ],
+    "checkIds": []
+  }
+}

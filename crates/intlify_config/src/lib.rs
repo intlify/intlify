@@ -117,8 +117,9 @@ mod artifacts;
 mod construction;
 
 // 015's Conformance Suite: the Suite Index and the runner that opens a suite
-// from it. It reads files, so only tests and the developer examples build it.
-#[cfg(any(test, feature = "conformance"))]
+// from it. It reads files, so only tests and the developer examples build it,
+// and its cases read locale data through the ICU4X provider.
+#[cfg(any(all(test, feature = "icu4x"), feature = "conformance"))]
 mod conformance;
 
 // 015's typed-record framing and the Resolver Construction Identity's text.

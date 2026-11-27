@@ -8,15 +8,18 @@
 //!
 //! The reference is the identity's text, `rci0_` and the unpadded base64url
 //! of its 32 bytes. The boundary's checks run in 015's order: a missing
-//! reference, then a text that is not a canonical identity, which includes a
-//! last character with non-zero unused bits, and last the comparison with the
-//! constructed identity, so a malformed text is never compared (D15:988,
-//! 3155). The boundary reads no capability bound and fixes no Safe Origin
-//! Kind. The admitted reference is the identity every outcome of the
-//! invocation carries; no phase changes it (D15:1151, 2148).
+//! reference, then a reference that is no text or a text that is not a
+//! canonical identity, which includes a last character with non-zero unused
+//! bits, and last the comparison with the constructed identity, so a
+//! malformed text is never compared (D15:988, 3156). The boundary reads no
+//! capability bound and fixes no Safe Origin Kind. The admitted reference is
+//! the identity every outcome of the invocation carries; no phase changes it
+//! (D15:1151, 2148).
 
 use crate::base64url;
 use crate::construction::identity::ConstructionIdentity;
+
+use super::text::TextInput;
 
 /// Why the boundary refuses a reference: one of the three reasons of its row,
 /// in that row's order.
@@ -45,10 +48,12 @@ impl IdentityRefusal {
 /// of the resolver the invocation runs on: that identity, or the boundary's
 /// first failing check.
 pub(crate) fn admit(
-    reference: Option<&str>,
+    reference: Option<TextInput<'_>>,
     constructed: &ConstructionIdentity,
 ) -> Result<ConstructionIdentity, IdentityRefusal> {
-    let text = reference.ok_or(IdentityRefusal::Missing)?;
+    let TextInput::Text(text) = reference.ok_or(IdentityRefusal::Missing)? else {
+        return Err(IdentityRefusal::Malformed);
+    };
     let bytes =
         base64url::parse_construction_identity(text).map_err(|_| IdentityRefusal::Malformed)?;
     if &bytes != constructed.bytes() {
@@ -90,7 +95,7 @@ mod tests {
     fn the_constructed_identity_is_admitted() {
         let constructed = identity();
         assert_eq!(
-            admit(Some(&constructed.text()), &constructed),
+            admit(Some(constructed.text().as_str().into()), &constructed),
             Ok(constructed)
         );
     }
@@ -117,7 +122,7 @@ mod tests {
             with_an_unused_bit(),
         ] {
             assert_eq!(
-                admit(Some(&text), &identity()),
+                admit(Some(text.as_str().into()), &identity()),
                 Err(IdentityRefusal::Malformed),
                 "{text:?}"
             );
@@ -131,7 +136,7 @@ mod tests {
         let text = with_an_unused_bit();
         assert_ne!(text, identity().text());
         assert_eq!(
-            admit(Some(&text), &identity()),
+            admit(Some(text.as_str().into()), &identity()),
             Err(IdentityRefusal::Malformed)
         );
     }
@@ -139,7 +144,7 @@ mod tests {
     #[test]
     fn another_canonical_identity_is_a_mismatch() {
         assert_eq!(
-            admit(Some(&other_identity()), &identity()),
+            admit(Some(other_identity().as_str().into()), &identity()),
             Err(IdentityRefusal::Mismatch)
         );
     }
@@ -156,5 +161,14 @@ mod tests {
         ] {
             assert_eq!(refusal.reason(), reason);
         }
+    }
+
+    /// A reference that is no text is malformed, and is never compared.
+    #[test]
+    fn a_reference_that_is_no_text_is_malformed() {
+        assert_eq!(
+            admit(Some(TextInput::NotText), &identity()),
+            Err(IdentityRefusal::Malformed)
+        );
     }
 }

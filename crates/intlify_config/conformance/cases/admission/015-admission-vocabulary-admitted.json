@@ -1,0 +1,51 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-vocabulary-admitted",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "intent-surface-class-vocabulary-artifact",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-vocabulary-admitted.json",
+    "digest": "sha256:8749388e1b9115e4043b02871d5e647109231b2e0a74dd6ebcb86065f1ba78be"
+  },
+  "expected": {
+    "admitted": true,
+    "normalizedInput": {
+      "json": {
+        "identity": "intlify-test-vocabulary",
+        "integrityDigest": "sha256:ab6e3af789421cb109d49ec02e73733d65ea4e8774a168dd71d64908bc116085",
+        "kind": "intent-surface-class-vocabulary",
+        "members": [
+          "checkout",
+          "internal-tool",
+          "nav"
+        ],
+        "revision": "0",
+        "schemaRevision": "0"
+      }
+    },
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-099",
+      "015-138"
+    ],
+    "ruleIds": [
+      "015.input-admission.intent-surface-class-vocabulary-artifact.missing-input",
+      "015.input-admission.intent-surface-class-vocabulary-artifact.over-bound-envelope",
+      "015.input-admission.intent-surface-class-vocabulary-artifact.malformed-envelope",
+      "015.input-admission.intent-surface-class-vocabulary-artifact.duplicate-member",
+      "015.input-admission.intent-surface-class-vocabulary-artifact.unknown-member"
+    ],
+    "checkIds": []
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-file-source-missing-input-missing-source-identity",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "file-source-identity-revision",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-file-source-missing-input-missing-source-identity.json",
+    "digest": "sha256:85f7e1592a706f7b870f6bc528dbce7344767e628dd4d8c1dce0dbfc5c7b044e"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failureReason": "missing-source-identity",
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-080",
+      "015-149"
+    ],
+    "ruleIds": [
+      "015.input-admission.file-source-identity-revision.missing-source-identity"
+    ],
+    "checkIds": []
+  }
+}

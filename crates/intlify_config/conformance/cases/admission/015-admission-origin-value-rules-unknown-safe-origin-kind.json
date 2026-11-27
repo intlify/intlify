@@ -1,0 +1,35 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver-input-admission",
+  "id": "015-admission-origin-value-rules-unknown-safe-origin-kind",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "boundaryKind": "safe-origin-kind",
+  "inputFixture": {
+    "path": "fixtures/admission/015-admission-origin-value-rules-unknown-safe-origin-kind.json",
+    "digest": "sha256:dd04daab7326700eb1d4cea0965dbf678daa6817980c9fa2f14fb736067ba1ba"
+  },
+  "expected": {
+    "admitted": false,
+    "normalizedInput": null,
+    "failureReason": "unknown-safe-origin-kind",
+    "resolverInvoked": false
+  },
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-096",
+      "015-112",
+      "015-122",
+      "015-144",
+      "015-084",
+      "015-166"
+    ],
+    "ruleIds": [
+      "015.input-admission.safe-origin-kind.unknown-safe-origin-kind"
+    ],
+    "checkIds": []
+  }
+}
