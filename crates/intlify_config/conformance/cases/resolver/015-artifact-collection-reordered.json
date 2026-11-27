@@ -1,0 +1,64 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver",
+  "id": "015-artifact-collection-reordered",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "commonInvocationInputFixture": {
+    "path": "fixtures/resolver/015-artifact-collection-reordered.common.json",
+    "digest": "sha256:4ae7f2e4eb5af8bf062512d6f0cea67f6aeef95b2497a9732aba69ec87ee6ce3"
+  },
+  "entries": {
+    "file": {
+      "entryAdmissionInputFixture": {
+        "path": "fixtures/resolver/015-artifact-collection-reordered.file-input.json",
+        "digest": "sha256:021f174825738e88b686cdc66d18d4983d9c1097eaa5bdb9818b0f66c711df5e"
+      },
+      "expectedOutcomeFixture": {
+        "path": "fixtures/resolver/015-artifact-collection-reordered.file-expected.json",
+        "digest": "sha256:b667343ecdc257896901fbfd05c15ff397936bb15142f4abbac3fff5928d0f1d"
+      }
+    },
+    "programmatic": {
+      "entryAdmissionInputFixture": {
+        "path": "fixtures/resolver/015-artifact-collection-reordered.programmatic-input.json",
+        "digest": "sha256:dcf1803ebbb19971b6cb9a70176ddec31b9eea6fd454487f57048f4dee9fce2c"
+      },
+      "expectedOutcomeFixture": {
+        "path": "fixtures/resolver/015-artifact-collection-reordered.programmatic-expected.json",
+        "digest": "sha256:f03386d41cdb280c5209150cb0b883418eadade86a1d08a811aa1923ef048990"
+      }
+    }
+  },
+  "traceability": {
+    "decisionIds": [
+      "015-036",
+      "015-088",
+      "015-129"
+    ],
+    "ruleIds": [],
+    "checkIds": []
+  },
+  "relations": [
+    {
+      "role": "equivalence",
+      "kind": "profile-equal",
+      "case": "015-storefront-checked",
+      "class": "015-COV-028"
+    },
+    {
+      "role": "equivalence",
+      "kind": "invocation-not-stale",
+      "case": "015-storefront-checked",
+      "class": "015-COV-028"
+    },
+    {
+      "role": "equivalence",
+      "kind": "materialized-input-equal",
+      "case": "015-storefront-checked",
+      "class": "015-COV-028"
+    }
+  ]
+}

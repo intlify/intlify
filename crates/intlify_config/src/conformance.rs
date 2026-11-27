@@ -43,6 +43,6 @@ pub(crate) mod runner;
 #[cfg(feature = "conformance")]
 pub mod support {
     pub use super::case::schema_digest as case_schema_digest;
-    pub use super::index::{artifacts, schema_digest, Member, SuiteFile};
+    pub use super::index::{artifacts, schema_digest, Member, SuiteFile, WRITTEN_DIRECTORIES};
     pub use super::runner::{open, HarnessFailure, Opened, Outcome};
 }

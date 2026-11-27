@@ -940,29 +940,39 @@
   ],
   "resolverCases": [
     {
+      "id": "015-artifact-collection-reordered",
+      "path": "cases/resolver/015-artifact-collection-reordered.json",
+      "digest": "sha256:fb85eae36f90ccd7fb79a532f581f5535befc7e2aba8d364135d6ca0e5e4ac9c"
+    },
+    {
       "id": "015-entry-json-invalid",
       "path": "cases/resolver/015-entry-json-invalid.json",
-      "digest": "sha256:6ec6cbfa1dac5def044d41742d0a5182b6c97da0621cfaeea1a93df944b97feb"
+      "digest": "sha256:aacd0e254e283b14635b02ab067080de0a56e7405b2dcc79a6e2fcbbebf314bc"
     },
     {
       "id": "015-locale-default-not-in-project",
       "path": "cases/resolver/015-locale-default-not-in-project.json",
-      "digest": "sha256:dab576b70ca527ac734e6b46b2408653b2ccc8f2b8cbe7d88bdcd44bcf7d10e6"
+      "digest": "sha256:f681709a6c2933026bdc38bf2703931b191defa4753e5a897855a88083692391"
+    },
+    {
+      "id": "015-locale-requested-added",
+      "path": "cases/resolver/015-locale-requested-added.json",
+      "digest": "sha256:afe97e8fac0ec55f7d97139bd795a22d529cb1917b74d49b3ea595d63db24a0e"
     },
     {
       "id": "015-reporting-entry-limit-exceeded",
       "path": "cases/resolver/015-reporting-entry-limit-exceeded.json",
-      "digest": "sha256:8bc09c66de5270fdd16b041a1729901e6e7ec4d59fb5f9b99e5860282ac3ec9e"
+      "digest": "sha256:6c23cb8b07b435e300f3da80181924e12a89d71994c36a8b343c005309542ce4"
     },
     {
       "id": "015-reporting-shared-limit-exceeded",
       "path": "cases/resolver/015-reporting-shared-limit-exceeded.json",
-      "digest": "sha256:772656a22ec7d64f38188fd834557d0da92251fc17a7974c7ca008b011416d30"
+      "digest": "sha256:6ea46448dfe719fc6c074ad10529d1914c3c4d55d70b00426bf67b0f3d4bc2be"
     },
     {
       "id": "015-storefront-checked",
       "path": "cases/resolver/015-storefront-checked.json",
-      "digest": "sha256:c2a6a676e4733177cf97830196b2cf02582e0f38efb9d0ac53ded6b46627717f"
+      "digest": "sha256:642a0ae743301d84aa593c261b3f46be5cd33acef9bc26b589e80fcf9c43cd28"
     }
   ],
   "handoffVectors": [],

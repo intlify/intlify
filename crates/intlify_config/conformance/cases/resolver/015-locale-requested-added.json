@@ -1,0 +1,63 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver",
+  "id": "015-locale-requested-added",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "commonInvocationInputFixture": {
+    "path": "fixtures/resolver/015-locale-requested-added.common.json",
+    "digest": "sha256:5ba6906a13f39748140b9d3176f3266c916fd0acd0f76e1dcfdb3209008e8f57"
+  },
+  "entries": {
+    "file": {
+      "entryAdmissionInputFixture": {
+        "path": "fixtures/resolver/015-locale-requested-added.file-input.json",
+        "digest": "sha256:b4e544244c963ad08904595f8ec8e8b0cf27863bcda159540b7861ac2352416d"
+      },
+      "expectedOutcomeFixture": {
+        "path": "fixtures/resolver/015-locale-requested-added.file-expected.json",
+        "digest": "sha256:a2bf1be2b6a3254b30f0fe28d043f67ad008eff1c15465bc9c64061153a8f3a5"
+      }
+    },
+    "programmatic": {
+      "entryAdmissionInputFixture": {
+        "path": "fixtures/resolver/015-locale-requested-added.programmatic-input.json",
+        "digest": "sha256:caab58e25ee39d18b0c1fdca54d1bee4b489c968181c18ee50a470d0a5342bdf"
+      },
+      "expectedOutcomeFixture": {
+        "path": "fixtures/resolver/015-locale-requested-added.programmatic-expected.json",
+        "digest": "sha256:bf6a53d7e0cb79224bcdde9d1fcb6c3481be07b59d6daad99368fec8cc710fb9"
+      }
+    }
+  },
+  "traceability": {
+    "decisionIds": [
+      "015-036",
+      "015-129"
+    ],
+    "ruleIds": [],
+    "checkIds": []
+  },
+  "relations": [
+    {
+      "role": "mutation",
+      "kind": "profile-changed",
+      "case": "015-storefront-checked",
+      "class": "projectLocales"
+    },
+    {
+      "role": "mutation",
+      "kind": "invocation-stale",
+      "case": "015-storefront-checked",
+      "class": "projectLocales"
+    },
+    {
+      "role": "mutation",
+      "kind": "materialized-input-changed",
+      "case": "015-storefront-checked",
+      "class": "projectLocales"
+    }
+  ]
+}
