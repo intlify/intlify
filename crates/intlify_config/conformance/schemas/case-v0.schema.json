@@ -9715,6 +9715,60 @@
         }
       }
     },
+    "terminalFindingView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "severity",
+        "blocking",
+        "details"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/definitions/findingKey:project-profile-reporting-limit-exceeded"
+        },
+        "severity": {
+          "const": "error"
+        },
+        "blocking": {
+          "const": true
+        },
+        "details": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reason",
+            "bound"
+          ],
+          "properties": {
+            "reason": {
+              "type": "string",
+              "enum": [
+                "entry",
+                "shared"
+              ]
+            },
+            "bound": {
+              "type": "string",
+              "pattern": "^[a-z][A-Za-z0-9]*(?:\\.[a-z][A-Za-z0-9]*)*$"
+            }
+          }
+        }
+      }
+    },
+    "reserveCauseView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cause"
+      ],
+      "properties": {
+        "cause": {
+          "$ref": "#/definitions/findingKey:project-profile-reporting-limit-exceeded"
+        }
+      }
+    },
     "sharedProjection": {
       "type": "object",
       "additionalProperties": false,
@@ -9729,27 +9783,40 @@
         "findings": {
           "type": "array",
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "owner",
-              "record"
-            ],
-            "properties": {
-              "owner": {
-                "oneOf": [
-                  {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "owner",
+                  "record"
+                ],
+                "properties": {
+                  "owner": {
                     "$ref": "#/definitions/unitView"
                   },
-                  {
-                    "type": "null"
+                  "record": {
+                    "$ref": "#/definitions/findingView"
                   }
-                ]
+                }
               },
-              "record": {
-                "$ref": "#/definitions/findingView"
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "owner",
+                  "record"
+                ],
+                "properties": {
+                  "owner": {
+                    "type": "null"
+                  },
+                  "record": {
+                    "$ref": "#/definitions/terminalFindingView"
+                  }
+                }
               }
-            }
+            ]
           }
         },
         "evaluationStatus": {
@@ -9846,27 +9913,40 @@
         "findings": {
           "type": "array",
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "owner",
-              "record"
-            ],
-            "properties": {
-              "owner": {
-                "oneOf": [
-                  {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "owner",
+                  "record"
+                ],
+                "properties": {
+                  "owner": {
                     "$ref": "#/definitions/unitView"
                   },
-                  {
-                    "type": "null"
+                  "record": {
+                    "$ref": "#/definitions/findingView"
                   }
-                ]
+                }
               },
-              "record": {
-                "$ref": "#/definitions/findingView"
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "owner",
+                  "record"
+                ],
+                "properties": {
+                  "owner": {
+                    "type": "null"
+                  },
+                  "record": {
+                    "$ref": "#/definitions/terminalFindingView"
+                  }
+                }
               }
-            }
+            ]
           }
         },
         "evaluationStatus": {
@@ -9967,27 +10047,40 @@
         "sharedUnavailabilityCauses": {
           "type": "array",
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "owner",
-              "record"
-            ],
-            "properties": {
-              "owner": {
-                "oneOf": [
-                  {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "owner",
+                  "record"
+                ],
+                "properties": {
+                  "owner": {
                     "$ref": "#/definitions/unitView"
                   },
-                  {
-                    "type": "null"
+                  "record": {
+                    "$ref": "#/definitions/sharedUnavailabilityCauseView"
                   }
-                ]
+                }
               },
-              "record": {
-                "$ref": "#/definitions/sharedUnavailabilityCauseView"
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "owner",
+                  "record"
+                ],
+                "properties": {
+                  "owner": {
+                    "type": "null"
+                  },
+                  "record": {
+                    "$ref": "#/definitions/reserveCauseView"
+                  }
+                }
               }
-            }
+            ]
           }
         }
       }

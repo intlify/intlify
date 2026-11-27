@@ -584,24 +584,38 @@ fn decimals(section: &Value) -> Value {
 /// profile and bindings, or a blocked one with neither, and the Resolution
 /// Evidence of both projections, whose Shared projection is absent after an
 /// entry failure before materialization. Only a reserved record, the
-/// terminal Finding or the Entry reserve's cause, has no owner.
+/// terminal Finding or the Entry reserve's cause, has no owner: a row
+/// without one holds the terminal reporting-limit Finding, or a cause that
+/// names its key (D15:3303).
 fn fixture(definitions: &mut Map<String, Value>) {
-    let owned = |record: &str| {
-        array(closed(&[
+    let row = |record: &str| {
+        closed(&[
             ("owner", definition("unitView")),
             ("record", definition(record)),
-        ]))
+        ])
     };
-    let reserved = |record: &str| {
-        array(closed(&[
-            ("owner", nullable(definition("unitView"))),
-            ("record", definition(record)),
-        ]))
+    let owned = |record: &str| array(row(record));
+    let terminal = Code::ReportingLimitExceeded;
+    definitions.insert("terminalFindingView".into(), finding(terminal));
+    definitions.insert(
+        "reserveCauseView".into(),
+        closed(&[("cause", definition(&key_definition(terminal)))]),
+    );
+    let reserved = |record: &str, reserve: &str| {
+        array(json!({
+            "oneOf": [
+                row(record),
+                closed(&[
+                    ("owner", json!({ "type": "null" })),
+                    ("record", definition(reserve)),
+                ]),
+            ]
+        }))
     };
     definitions.insert(
         "sharedProjection".into(),
         closed(&[
-            ("findings", reserved("findingView")),
+            ("findings", reserved("findingView", "terminalFindingView")),
             ("evaluationStatus", owned("evaluationStatusView")),
             ("coverageDecisionBases", owned("coverageDecisionBasisView")),
             ("semanticDependencies", owned("semanticDependencyView")),
@@ -614,7 +628,7 @@ fn fixture(definitions: &mut Map<String, Value>) {
     definitions.insert(
         "entryProjection".into(),
         closed(&[
-            ("findings", reserved("findingView")),
+            ("findings", reserved("findingView", "terminalFindingView")),
             ("evaluationStatus", owned("evaluationStatusView")),
             ("occurrences", owned("findingOccurrenceView")),
             (
@@ -625,7 +639,7 @@ fn fixture(definitions: &mut Map<String, Value>) {
             ("entryDependencies", owned("entryDependencyView")),
             (
                 "sharedUnavailabilityCauses",
-                reserved("sharedUnavailabilityCauseView"),
+                reserved("sharedUnavailabilityCauseView", "reserveCauseView"),
             ),
         ]),
     );
@@ -945,5 +959,61 @@ mod tests {
         ownerless["resolutionEvidence"]["entry"]["evaluationStatus"] =
             json!([{ "owner": null, "record": status }]);
         assert!(!form.admits(&ownerless));
+        // Only the terminal Finding, and a cause naming its key, may have no
+        // owner.
+        let key = |check: &str, code: &str, reason: Option<&str>| {
+            let mut key = json!({
+                "specification": { "identity": "intlify-project-profile", "revision": "0" },
+                "phase": "reporting-finalization",
+                "check": check,
+                "code": code,
+                "subject": { "token": format!("sha256:{}", "5".repeat(64)) },
+            });
+            if let Some(reason) = reason {
+                key["reason"] = json!(reason);
+            }
+            key
+        };
+        let terminal = key(
+            "reporting.diagnostic-domain.complete",
+            "project-profile-reporting-limit-exceeded",
+            Some("entry"),
+        );
+        let finding = json!({
+            "key": terminal,
+            "severity": "error",
+            "blocking": true,
+            "details": { "reason": "entry", "bound": "maxRecords" },
+        });
+        let mut reserved = blocked.clone();
+        reserved["resolutionEvidence"]["complete"] = json!(false);
+        reserved["resolutionEvidence"]["entry"]["findings"] =
+            json!([{ "owner": null, "record": finding }]);
+        reserved["resolutionEvidence"]["entry"]["sharedUnavailabilityCauses"] =
+            json!([{ "owner": null, "record": { "cause": terminal } }]);
+        assert!(form.admits(&reserved));
+        // A committed ordinary Finding is in its row's form with its owner,
+        // and is not without it; nor is a cause naming its key.
+        let ordinary = vectors["accountingViews"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|view| view["recordKind"] == "entry-finding")
+            .unwrap()["accounting"]
+            .clone();
+        let record = &ordinary["record"]["entry-finding"];
+        let with = |findings: Value, causes: Value| {
+            let mut outcome = reserved.clone();
+            outcome["resolutionEvidence"]["entry"]["findings"] = findings;
+            outcome["resolutionEvidence"]["entry"]["sharedUnavailabilityCauses"] = causes;
+            form.admits(&outcome)
+        };
+        let reserve = json!([{ "owner": null, "record": { "cause": terminal } }]);
+        let owned = json!([{ "owner": ordinary["owner"], "record": record }]);
+        let unowned = json!([{ "owner": null, "record": record }]);
+        assert!(with(owned.clone(), reserve.clone()));
+        assert!(!with(unowned, reserve));
+        let cause = json!([{ "owner": null, "record": { "cause": record["key"] } }]);
+        assert!(!with(owned, cause));
     }
 }

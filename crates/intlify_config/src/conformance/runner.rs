@@ -72,6 +72,7 @@ use crate::construction::root::{self, RootPackage, RootRole};
 use crate::construction::validator::schema::Schema;
 use crate::construction::{authority_set, capability, profile};
 use crate::model::CONFIGURATION_SCHEMA_VERSION;
+use crate::resolver::origin::SafeOriginKind;
 
 use super::admission;
 use super::case::{self, input_fixture, ManifestKind};
@@ -730,11 +731,12 @@ impl Closure<'_> {
     }
 
     /// List a Resolver Case with its fixtures, once the construction case it
-    /// names builds a resolver, each expected outcome names the identity the
+    /// names builds a resolver, each side's entry fixture submits through
+    /// that side's own adapter, each expected outcome names the identity the
     /// case states, and the boundaries admit each paired entry's inputs as its
     /// fixtures give them, which they refuse under an identity other than the
     /// constructed one; a case that does not meet them cannot run (D15:3219,
-    /// 3252).
+    /// 3233, 3252).
     fn resolver_case(&mut self, manifest: &Value) -> Result<(), HarnessFailure> {
         let id = text(&manifest["id"]).to_owned();
         let invalid = || HarnessFailure::InvalidCase(id.clone());
@@ -746,7 +748,11 @@ impl Closure<'_> {
             "commonInvocationInputFixture",
         )?;
         let mut entries = Vec::new();
-        for side in ["file", "programmatic"] {
+        let sides = [
+            ("file", SafeOriginKind::ConfigurationFile),
+            ("programmatic", SafeOriginKind::ConfigurationProgrammatic),
+        ];
+        for (side, source) in sides {
             let entry = &manifest["entries"][side];
             if entry.get("unpaired").is_some() {
                 continue;
@@ -755,6 +761,9 @@ impl Closure<'_> {
                 &entry["entryAdmissionInputFixture"],
                 "entryAdmissionInputFixture",
             )?;
+            if fixture.get(source.id()).is_none() {
+                return Err(invalid());
+            }
             let expected =
                 self.fixture(&entry["expectedOutcomeFixture"], "expectedOutcomeFixture")?;
             if expected["resolverConstructionIdentity"] != reference.as_str() {
@@ -1863,6 +1872,21 @@ mod tests {
         let outcomes = outcomes_of(&suite, STOREFRONT);
         assert_eq!(outcomes.len(), 5);
         assert!(outcomes.iter().all(Outcome::passed), "{outcomes:?}");
+    }
+
+    /// Each side of a Resolver Case submits through its own adapter: a file
+    /// entry fixture on the programmatic side, or a programmatic one on the
+    /// file side, cannot run, so no adapter stands in for the other
+    /// (D15:3233).
+    #[test]
+    fn each_side_submits_through_its_own_adapter() {
+        let invalid = Err(HarnessFailure::InvalidCase(STOREFRONT.to_owned()));
+        for (from, to) in [("file", "programmatic"), ("programmatic", "file")] {
+            let suite = resolver_suite(STOREFRONT, |_, manifest| {
+                manifest["entries"][to] = manifest["entries"][from].clone();
+            });
+            assert_eq!(suite.open(), invalid, "{from} on the {to} side");
+        }
     }
 
     /// A Resolver Case's entry runs only on inputs its boundaries admit as

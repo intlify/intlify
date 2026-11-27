@@ -30,7 +30,7 @@ use serde_json::{json, Map, Value};
 use crate::boundary::invocation::{EntryInputs, InvocationInputs, SubmittedInvocation};
 use crate::boundary::locator::Locator;
 use crate::boundary::text::TextInput;
-use crate::construction::registry::check::{CheckRegistry, RecordKind};
+use crate::construction::registry::check::{kind_id, CheckRegistry, CheckRow, RecordKind};
 use crate::construction::resolver::ConstructedResolver;
 use crate::construction::root::ConstructionRoot;
 use crate::locale::icu4x::Icu4xData;
@@ -303,16 +303,21 @@ fn projection(projection: &Projection<'_>, arrays: &[(&str, RecordKind)]) -> Val
 pub(crate) fn duties(outcome: &Value) -> Vec<String> {
     let mut violations = Vec::new();
     let registry = CheckRegistry::revision_zero();
-    let permitted: BTreeMap<&str, &[RecordKind]> = registry
+    let rows: BTreeMap<&str, &CheckRow> = registry
         .rows
         .iter()
-        .map(|row| {
-            (
-                row.check_id.as_str(),
-                row.possible_evidence_record_kinds.as_slice(),
-            )
-        })
+        .map(|row| (row.check_id.as_str(), row))
         .collect();
+    // The owner is a unit of its check's row: the row's phase and subject
+    // kind, and a row that may own the record's kind.
+    let permitted = |owner: &Value, kind: RecordKind| {
+        rows.get(owner["check"].as_str().unwrap_or_default())
+            .is_some_and(|row| {
+                owner["phase"] == row.phase_id.id()
+                    && owner["subjectKind"] == kind_id(row.subject_kind)
+                    && row.possible_evidence_record_kinds.contains(&kind)
+            })
+    };
     let evidence = &outcome["resolutionEvidence"];
     for (domain, arrays) in [("shared", &SHARED[..]), ("entry", &ENTRY[..])] {
         let Some(projection) = evidence[domain].as_object() else {
@@ -321,11 +326,8 @@ pub(crate) fn duties(outcome: &Value) -> Vec<String> {
         for (name, kind) in arrays {
             let rows = projection[*name].as_array().into_iter().flatten();
             for row in rows.filter(|row| !row["owner"].is_null()) {
-                let check = row["owner"]["check"].as_str().unwrap_or_default();
-                if !permitted
-                    .get(check)
-                    .is_some_and(|kinds| kinds.contains(kind))
-                {
+                if !permitted(&row["owner"], *kind) {
+                    let check = row["owner"]["check"].as_str().unwrap_or_default();
                     violations.push(format!("{domain}.{name}: {check} owns no {}", kind.id()));
                 }
             }
@@ -425,10 +427,6 @@ mod tests {
 
     use super::*;
 
-    fn unit(check: &str) -> Value {
-        json!({ "phase": "p", "subjectKind": "k", "subject": { "token": "t" }, "check": check })
-    }
-
     fn empty() -> Value {
         json!({
             "resolutionEvidence": {
@@ -460,34 +458,46 @@ mod tests {
     #[test]
     fn an_owner_its_check_does_not_permit_is_a_violation() {
         let registry = CheckRegistry::revision_zero();
-        let owning = |kind: RecordKind| {
-            registry
-                .rows
-                .iter()
-                .find(|row| row.possible_evidence_record_kinds.contains(&kind))
-                .unwrap()
-                .check_id
-                .clone()
-        };
-        let other = |kind: RecordKind| {
-            registry
-                .rows
-                .iter()
-                .find(|row| !row.possible_evidence_record_kinds.contains(&kind))
-                .unwrap()
-                .check_id
-                .clone()
-        };
-        let mut outcome = empty();
         let status = RecordKind::SharedEvaluationStatus;
-        outcome["resolutionEvidence"]["shared"]["evaluationStatus"] =
-            json!([{ "owner": unit(&owning(status)), "record": {} }]);
-        outcome["resolutionEvidence"]["shared"]["findings"] =
-            json!([{ "owner": null, "record": { "key": 1 } }]);
-        assert!(duties(&outcome).is_empty());
-        outcome["resolutionEvidence"]["shared"]["evaluationStatus"] =
-            json!([{ "owner": unit(&other(status)), "record": {} }]);
-        assert_eq!(duties(&outcome).len(), 1);
+        let owning = registry
+            .rows
+            .iter()
+            .find(|row| row.possible_evidence_record_kinds.contains(&status))
+            .unwrap();
+        let other = registry
+            .rows
+            .iter()
+            .find(|row| {
+                !row.possible_evidence_record_kinds.contains(&status)
+                    && row.phase_id != owning.phase_id
+                    && row.subject_kind != owning.subject_kind
+            })
+            .unwrap();
+        let owner = json!({
+            "phase": owning.phase_id.id(),
+            "subjectKind": kind_id(owning.subject_kind),
+            "subject": { "token": "t" },
+            "check": owning.check_id,
+        });
+        let with = |owner: &Value| {
+            let mut outcome = empty();
+            outcome["resolutionEvidence"]["shared"]["evaluationStatus"] =
+                json!([{ "owner": owner, "record": {} }]);
+            outcome["resolutionEvidence"]["shared"]["findings"] =
+                json!([{ "owner": null, "record": { "key": 1 } }]);
+            duties(&outcome)
+        };
+        assert!(with(&owner).is_empty());
+        let changed = [
+            ("check", json!(other.check_id)),
+            ("phase", json!(other.phase_id.id())),
+            ("subjectKind", json!(kind_id(other.subject_kind))),
+        ];
+        for (member, value) in changed {
+            let mut wrong = owner.clone();
+            wrong[member] = value;
+            assert_eq!(with(&wrong).len(), 1, "{member}");
+        }
     }
 
     /// A projection lists each Finding Key once.

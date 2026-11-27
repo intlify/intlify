@@ -1157,8 +1157,14 @@ if (
   !isDeepStrictEqual(evidence.properties.complete, { type: 'boolean' }) ||
   !isDeepStrictEqual(orNull(evidence.properties.shared), ref('sharedProjection')) ||
   !isDeepStrictEqual(evidence.properties.entry, ref('entryProjection')) ||
-  !isDeepStrictEqual(evidence.properties.terminalStates?.items, ref('terminalStateView')) ||
-  !isDeepStrictEqual(evidence.properties.sharedUnavailableCauseKeys?.items, ref('findingKeyView'))
+  !isDeepStrictEqual(evidence.properties.terminalStates, {
+    type: 'array',
+    items: ref('terminalStateView')
+  }) ||
+  !isDeepStrictEqual(evidence.properties.sharedUnavailableCauseKeys, {
+    type: 'array',
+    items: ref('findingKeyView')
+  })
 ) {
   fail('resolutionEvidence: not the bundle of both projections')
 }
@@ -1166,23 +1172,23 @@ const PROJECTIONS = [
   [
     'sharedProjection',
     [
-      ['findings', 'findingView', true],
-      ['evaluationStatus', 'evaluationStatusView', false],
-      ['coverageDecisionBases', 'coverageDecisionBasisView', false],
-      ['semanticDependencies', 'semanticDependencyView', false],
-      ['materializedDependencies', 'materializedDependencyView', false]
+      ['findings', 'findingView', 'terminalFindingView'],
+      ['evaluationStatus', 'evaluationStatusView'],
+      ['coverageDecisionBases', 'coverageDecisionBasisView'],
+      ['semanticDependencies', 'semanticDependencyView'],
+      ['materializedDependencies', 'materializedDependencyView']
     ]
   ],
   [
     'entryProjection',
     [
-      ['findings', 'findingView', true],
-      ['evaluationStatus', 'evaluationStatusView', false],
-      ['occurrences', 'findingOccurrenceView', false],
-      ['coverageDecisionEvidence', 'coverageDecisionEvidenceView', false],
-      ['evidenceIndex', 'evidenceView', false],
-      ['entryDependencies', 'entryDependencyView', false],
-      ['sharedUnavailabilityCauses', 'sharedUnavailabilityCauseView', true]
+      ['findings', 'findingView', 'terminalFindingView'],
+      ['evaluationStatus', 'evaluationStatusView'],
+      ['occurrences', 'findingOccurrenceView'],
+      ['coverageDecisionEvidence', 'coverageDecisionEvidenceView'],
+      ['evidenceIndex', 'evidenceView'],
+      ['entryDependencies', 'entryDependencyView'],
+      ['sharedUnavailabilityCauses', 'sharedUnavailabilityCauseView', 'reserveCauseView']
     ]
   ]
 ]
@@ -1197,17 +1203,27 @@ for (const [name, arrays] of PROJECTIONS) {
     fail(`${String(name)}: not its arrays`)
     continue
   }
-  for (const [member, view, reserved] of arrays) {
+  for (const [member, view, reserve] of arrays) {
     const rows = node.properties[member]
-    const owner = rows?.items?.properties?.owner
+    // An owned row, or, in the two arrays a reserved record ends, a row
+    // without an owner that holds that record.
+    const owned = row =>
+      closedOf(row, ['owner', 'record']) &&
+      isDeepStrictEqual(row.properties.owner, ref('unitView')) &&
+      isDeepStrictEqual(row.properties.record, ref(view))
+    const unowned = row =>
+      closedOf(row, ['owner', 'record']) &&
+      isDeepStrictEqual(row.properties.owner, { type: 'null' }) &&
+      isDeepStrictEqual(row.properties.record, ref(reserve))
+    const branches = rows?.items?.oneOf
     if (
       rows?.type !== 'array' ||
-      !closedOf(rows.items, ['owner', 'record']) ||
-      !isDeepStrictEqual(reserved ? orNull(owner) : owner, ref('unitView')) ||
-      !isDeepStrictEqual(rows.items.properties.record, ref(view))
+      (reserve === undefined
+        ? !owned(rows.items)
+        : !(branches?.length === 2 && owned(branches[0]) && unowned(branches[1])))
     ) {
       fail(
-        `${String(name)}.${String(member)}: not rows of an owner${reserved ? ' or none' : ''} and a ${String(view)}`
+        `${String(name)}.${String(member)}: not rows of an owner${reserve === undefined ? '' : ' or the reserved record'} and a ${String(view)}`
       )
     }
   }
@@ -1263,14 +1279,41 @@ for (const [index, row] of findingRows.entries()) {
     ...(members.length > 0 ? ['details'] : []),
     ...(row.suggestionKind === 'none' ? [] : ['suggestion'])
   ]
+  // A suggestion is the closed replacement its kind names, a nonempty
+  // string (D15:2309).
+  const suggested =
+    row.suggestionKind === 'none' ||
+    isDeepStrictEqual(finding?.properties?.suggestion, {
+      type: 'object',
+      additionalProperties: false,
+      required: [row.suggestionKind],
+      properties: { [row.suggestionKind]: { type: 'string', minLength: 1 } }
+    })
   if (
     !closedOf(finding, names) ||
     finding.properties.severity.const !== row.severity ||
     finding.properties.blocking.const !== row.blocking ||
-    (members.length > 0 && !closedOf(finding.properties.details, members))
+    (members.length > 0 && !closedOf(finding.properties.details, members)) ||
+    !suggested
   ) {
     fail(`findingView ${row.code}: not its severity, blocking flag, details, or suggestion`)
   }
+}
+
+// The reserved records (D15:3303): the terminal Finding is the
+// reporting-limit code's own Finding, and the reserve's cause names its key.
+const TERMINAL_CODE = 'project-profile-reporting-limit-exceeded'
+const terminalBranch = findings[findingRows.findIndex(row => row.code === TERMINAL_CODE)]
+if (
+  terminalBranch === undefined ||
+  !isDeepStrictEqual(definitions.terminalFindingView, terminalBranch) ||
+  !closedOf(definitions.reserveCauseView, ['cause']) ||
+  !isDeepStrictEqual(
+    definitions.reserveCauseView.properties.cause,
+    ref(`findingKey:${TERMINAL_CODE}`)
+  )
+) {
+  fail('terminalFindingView, reserveCauseView: not the reporting-limit Finding and its key')
 }
 
 // Each evidence kind's Evidence: its members, and the origins whose row
@@ -1327,7 +1370,7 @@ function section(node, path) {
     for (const name of names) {
       section(node.properties[name], path ? `${path}.${name}` : name)
     }
-  } else if (node?.pattern === '^(0|[1-9][0-9]*)$') {
+  } else if (node?.type === 'string' && node?.pattern === '^(0|[1-9][0-9]*)$') {
     bounds.push(path)
   } else {
     fail(`profileView: ${path} is not a count`)

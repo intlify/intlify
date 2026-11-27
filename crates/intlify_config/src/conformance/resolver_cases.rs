@@ -902,9 +902,10 @@ mod tests {
         }
     }
 
-    /// The storefront resolves to a checked profile with a binding for each
-    /// member of its collection, in ascending unsigned byte order of the
-    /// keys' canonical bytes (D15:3303).
+    /// The storefront resolves to a checked profile whose bindings are the
+    /// exact reference each sealed member of its collection declares, one
+    /// row each, in ascending unsigned byte order of the keys' canonical
+    /// bytes (D15:3303).
     #[test]
     fn the_storefront_resolves_to_a_checked_profile_with_each_binding() {
         let cases = all(committed());
@@ -912,20 +913,27 @@ mod tests {
             .iter()
             .find(|case| case.id == "015-storefront-checked")
             .unwrap();
+        let encode = |key: &Value| intlify_shared_json::encoding::encode(key).unwrap();
+        let mut declared = Storefront::new()
+            .members
+            .iter()
+            .map(|member| reference_value(&tuple_of(member)))
+            .collect::<Vec<_>>();
+        declared.sort_by_key(|key| encode(key));
         for (_, done) in run(case) {
             let outcome = &done.outcome;
             assert_eq!(outcome["outcome"], "checked");
             assert_eq!(outcome["resolutionEvidence"]["complete"], true);
             assert!(findings(outcome).is_empty());
-            let bindings = outcome["resolvedProfileArtifactBindings"]
+            let keys = outcome["resolvedProfileArtifactBindings"]
                 .as_array()
-                .unwrap();
-            assert_eq!(bindings.len(), Storefront::new().members.len());
-            let keys = bindings
+                .unwrap()
                 .iter()
-                .map(|row| intlify_shared_json::encoding::encode(&row["key"]).unwrap())
+                .map(|row| row["key"].clone())
                 .collect::<Vec<_>>();
-            assert!(keys.windows(2).all(|pair| pair[0] < pair[1]));
+            assert_eq!(keys, declared);
+            let bytes = keys.iter().map(encode).collect::<Vec<_>>();
+            assert!(bytes.windows(2).all(|pair| pair[0] < pair[1]));
         }
     }
 

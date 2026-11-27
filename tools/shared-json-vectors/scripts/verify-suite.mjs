@@ -1392,6 +1392,64 @@ for (const form of Object.keys(STEP_FORMS)) {
 const checkRegistry = named(registryMembers['check-registry'])
 const ruleOfCheck = new Map((checkRegistry?.rows ?? []).map(row => [row.checkId, row.ruleId]))
 const icu4xData = resolve(crate, '../intlify_locale_icu4x/data')
+const dataAddresses = (
+  readJson(resolve(icu4xData, 'manifest.json'), 'manifest.json').value?.payloads ?? []
+)
+  .map(payload => payload.address)
+  .toSorted(byBytes)
+// Each side's own adapter, by the slot its entry fixture submits through.
+const SOURCES = { file: 'configuration-file', programmatic: 'configuration-programmatic' }
+const SELECTORS = { file: 'profile-selector-cli', programmatic: 'profile-selector-programmatic' }
+
+/**
+ * The value a Snapshot node in the Case Schema's notation spells, or
+ * undefined for a refused node.
+ *
+ * @param node - The node.
+ * @returns The value.
+ */
+function snapshotValue(node) {
+  const [[kind, value]] = Object.entries(node ?? { refused: null })
+  switch (kind) {
+    case 'null':
+      return null
+    case 'boolean':
+    case 'string':
+      return value
+    case 'number':
+      return Number(value)
+    case 'array':
+      return value.map(snapshotValue)
+    case 'object':
+      return Object.fromEntries(value.map(([name, member]) => [name, snapshotValue(member)]))
+    default:
+      return undefined
+  }
+}
+
+/**
+ * The value an entry fixture submits, and its selector: the file's bytes read
+ * as JSON, or the programmatic entry's Snapshot.
+ *
+ * @param input - The entry fixture.
+ * @param side - Its side.
+ * @returns The value and the selector, the value undefined when the bytes
+ *   are no JSON.
+ */
+function submitted(input, side) {
+  const source = input?.[SOURCES[side]]?.input
+  let value
+  if (side === 'file') {
+    try {
+      value = JSON.parse(utf8(rawBytes(source?.bytes)) ?? '')
+    } catch {
+      value = undefined
+    }
+  } else {
+    value = snapshotValue(source?.snapshot?.snapshot)
+  }
+  return { value, selector: input?.[SELECTORS[side]]?.input }
+}
 const DOMAINS = ['entry', 'shared']
 const SIDES = ['file', 'programmatic']
 let resolverCases = 0
@@ -1435,6 +1493,9 @@ function outcomeWrong(outcome) {
   }
   if (evidence.complete !== (states.length === 0)) {
     return 'is complete with a terminal state, or incomplete without one'
+  }
+  if (exhausted.some(domain => evidence[domain] === null || typeof evidence[domain] !== 'object')) {
+    return 'has a terminal state for a domain without its projection'
   }
   const blocking = findingRows(outcome).some(row => row.record?.blocking === true)
   if (outcome.outcome === 'checked') {
@@ -1502,22 +1563,23 @@ for (const entry of index.value.resolverCases ?? []) {
   for (const body of references(commonFixture ?? {})) {
     referenced(body, common.path)
   }
+  // The manifest and a payload at each address the committed manifest
+  // names, each the committed artifact's bytes for that address.
   const data = commonFixture?.['locale-canonicalization-data']?.input ?? {}
-  for (const reference of [data.manifest, ...Object.values(data.payloads ?? {})]) {
-    const name = String(reference?.path).split('/').at(-1)
-    const committed = resolve(icu4xData, name)
+  const supplied = data.payloads ?? {}
+  const sameBytes = (reference, name) => {
     const copy = resolve(root, String(reference?.path))
-    if (
-      !existsSync(committed) ||
-      !existsSync(copy) ||
-      !readFileSync(committed).equals(readFileSync(copy))
-    ) {
-      fail(
-        `${entry.path}: submits ${String(reference?.path)}, which is not the committed artifact's`
-      )
-    }
+    return existsSync(copy) && readFileSync(resolve(icu4xData, name)).equals(readFileSync(copy))
+  }
+  if (
+    !isDeepStrictEqual(Object.keys(supplied).toSorted(byBytes), dataAddresses) ||
+    !sameBytes(data.manifest, 'manifest.json') ||
+    dataAddresses.some(address => !sameBytes(supplied[address], address))
+  ) {
+    fail(`${entry.path}: does not submit the committed locale data at each of its addresses`)
   }
   const outcomes = {}
+  const values = {}
   for (const side of SIDES) {
     const own = manifest.entries?.[side]
     if (own?.unpaired !== undefined) {
@@ -1528,6 +1590,10 @@ for (const entry of index.value.resolverCases ?? []) {
     for (const body of references(input ?? {})) {
       referenced(body, own.entryAdmissionInputFixture.path)
     }
+    if (input?.[SOURCES[side]] === undefined) {
+      fail(`${entry.path}: its ${side} side does not submit through its own adapter`)
+    }
+    values[side] = submitted(input, side)
     referenced(own?.expectedOutcomeFixture, entry.path)
     const expected = named(own?.expectedOutcomeFixture)
     if (expected === undefined) {
@@ -1566,18 +1632,25 @@ for (const entry of index.value.resolverCases ?? []) {
   if (file === undefined || programmatic === undefined) {
     continue
   }
-  const shared = outcome => outcome.resolutionEvidence?.shared ?? null
+  // Two entries that spell one value under one selector, beside the one
+  // common input, reach one Materialized Resolution Input Set.
+  const oneSet =
+    values.file?.value !== undefined &&
+    isDeepStrictEqual(values.file.value, values.programmatic?.value) &&
+    isDeepStrictEqual(values.file.selector, values.programmatic?.selector)
   const sharedStates = outcome =>
     (outcome.resolutionEvidence?.terminalStates ?? []).filter(state => state.domain === 'shared')
-  const bothShared = shared(file) !== null && shared(programmatic) !== null
   const bothComplete =
     file.resolutionEvidence?.complete === true && programmatic.resolutionEvidence?.complete === true
   if (
     file.resolverConstructionIdentity !== programmatic.resolverConstructionIdentity ||
-    (bothShared &&
-      (!isDeepStrictEqual(shared(file), shared(programmatic)) ||
+    (oneSet &&
+      (!isDeepStrictEqual(
+        file.resolutionEvidence?.shared,
+        programmatic.resolutionEvidence?.shared
+      ) ||
         !isDeepStrictEqual(sharedStates(file), sharedStates(programmatic)))) ||
-    (bothShared &&
+    (oneSet &&
       bothComplete &&
       ['outcome', 'profile', 'resolvedProfileArtifactBindings'].some(
         member => !isDeepStrictEqual(file[member], programmatic[member])

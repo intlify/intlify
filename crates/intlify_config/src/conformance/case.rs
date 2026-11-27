@@ -66,7 +66,7 @@ pub(crate) const PATH: &str = "schemas/case-v0.schema.json";
 
 /// The Case Schema's file digest, which the runner pins.
 pub(crate) const DIGEST: &str =
-    "sha256:fe8f8dfeb8acb4450f95987122332f0995bc310e9742c02e2893393757cb1973";
+    "sha256:299f44f2863285b029649c7053532a38f108ca5fe38059622de999af41652cbc";
 
 /// A case or Handoff Vector ID: `015-` and lowercase kebab-case.
 pub(crate) const CASE_ID_PATTERN: &str = "^015-[a-z0-9]+(?:-[a-z0-9]+)*$";

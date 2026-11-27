@@ -146,8 +146,13 @@ impl<Id> SupportedSpecifications<Id> {
 }
 
 /// Each other slot's supported value, which the benchmark's input context
-/// binds beside the assertions.
-#[cfg(any(feature = "benchmark", feature = "conformance"))]
+/// binds beside the assertions, and the conformance suite's Resolver Cases
+/// assert, under the gate of the conformance module.
+#[cfg(any(
+    feature = "benchmark",
+    feature = "conformance",
+    all(test, feature = "icu4x")
+))]
 impl<Id> SupportedSpecifications<Id> {
     pub(crate) const fn locale_canonicalization(&self) -> &Supported<Id> {
         &self.locale_canonicalization
