@@ -1,0 +1,125 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "handoff-vector",
+  "id": "015-handoff-group-selection-two-groups-omitted",
+  "producerCaseId": "015-storefront-two-groups",
+  "producerProfileFacts": {
+    "deploymentGroups": {
+      "jobs": {
+        "members": [
+          "worker"
+        ],
+        "hydrationRelations": []
+      },
+      "web": {
+        "members": [
+          "browser",
+          "server"
+        ],
+        "hydrationRelations": [
+          {
+            "server": "server",
+            "client": "browser"
+          }
+        ]
+      }
+    },
+    "targets": {
+      "browser": {
+        "profile": {
+          "kind": "target-profile",
+          "identity": "storefront-browser",
+          "revision": "1",
+          "specificationRevision": "0",
+          "semanticDigest": "sha256:772fc476dd8a937e76f44fedf8294a1823a0794096ebd4e068368ec02fdf985d"
+        },
+        "requestedLocales": [
+          "en",
+          "ja"
+        ],
+        "defaultRequestedLocale": "en",
+        "effectiveDefaultRequestedLocale": "en"
+      },
+      "server": {
+        "profile": {
+          "kind": "target-profile",
+          "identity": "storefront-server",
+          "revision": "1",
+          "specificationRevision": "0",
+          "semanticDigest": "sha256:22dad492f9200328b031d37368bba9002ce10523355980fce0c866acc6cb9727"
+        },
+        "requestedLocales": [
+          "en",
+          "ja"
+        ],
+        "defaultRequestedLocale": null,
+        "effectiveDefaultRequestedLocale": "en"
+      },
+      "worker": {
+        "profile": {
+          "kind": "target-profile",
+          "identity": "storefront-worker",
+          "revision": "1",
+          "specificationRevision": "0",
+          "semanticDigest": "sha256:e86a606f3b0a3bcd08106fb1654a2452e093ebb7b307be86a5c5b44f52d2e431"
+        },
+        "requestedLocales": [
+          "ja"
+        ],
+        "defaultRequestedLocale": "ja",
+        "effectiveDefaultRequestedLocale": "ja"
+      }
+    }
+  },
+  "producerArtifactBindings": [
+    {
+      "key": {
+        "kind": "target-profile",
+        "identity": "storefront-server",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:22dad492f9200328b031d37368bba9002ce10523355980fce0c866acc6cb9727"
+      }
+    },
+    {
+      "key": {
+        "kind": "target-profile",
+        "identity": "storefront-worker",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:e86a606f3b0a3bcd08106fb1654a2452e093ebb7b307be86a5c5b44f52d2e431"
+      }
+    },
+    {
+      "key": {
+        "kind": "target-profile",
+        "identity": "storefront-browser",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:772fc476dd8a937e76f44fedf8294a1823a0794096ebd4e068368ec02fdf985d"
+      }
+    }
+  ],
+  "consumerInputs": {
+    "json": {
+      "groupIdSelectors": [],
+      "targetIdSelectors": null
+    }
+  },
+  "expectedRelationship": {
+    "json": {
+      "outcome": "rejected",
+      "rule": "selector-required"
+    }
+  },
+  "verificationOwner": "020",
+  "traceability": {
+    "decisionIds": [
+      "015-034",
+      "015-044",
+      "015-049"
+    ],
+    "ruleIds": [],
+    "checkIds": []
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "conditional-obligation",
+  "id": "015-XV-001",
+  "activation": "second-configuration-schema-revision",
+  "activationState": "inactive",
+  "notApplicableReason": "no-second-admitted-configuration-schema-revision",
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-051"
+    ],
+    "ruleIds": [],
+    "checkIds": []
+  }
+}

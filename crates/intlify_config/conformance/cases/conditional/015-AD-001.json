@@ -1,0 +1,16 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "conditional-obligation",
+  "id": "015-AD-001",
+  "activation": "trusted-local-editor-navigation-adapter",
+  "activationState": "inactive",
+  "notApplicableReason": "no-trusted-local-editor-navigation-adapter",
+  "verificationOwner": "product-integration",
+  "traceability": {
+    "decisionIds": [
+      "015-206"
+    ],
+    "ruleIds": [],
+    "checkIds": []
+  }
+}

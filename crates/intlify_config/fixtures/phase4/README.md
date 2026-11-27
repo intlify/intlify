@@ -22,7 +22,7 @@ vp run bench:config:smoke
 
 | File | Contents | Read by |
 | --- | --- | --- |
-| [`fixtures/handoff/group-selection.json`](../handoff/group-selection.json) | Twelve Handoff Vectors for 020: the six selector forms over a profile with one group and over one with two | The `resolver::handoff` tests |
+| [`conformance/cases/handoff/`](../../conformance/cases/handoff/) | Twelve Handoff Vectors for 020, one manifest each since Implementation Phase 6: the six selector forms over a profile with one group and over one with two | The conformance runner and the `conformance::handoff_vectors` tests |
 | [`src/benchmark/cases/expectations-v0.json`](../../src/benchmark/cases/expectations-v0.json) | The fixed input context, result, and work of every measured case, Phase 4's two operations included | The measurement tests and `bench:config:smoke` |
 
 ## Completion conditions
@@ -34,7 +34,7 @@ Plan 017 lists five exit criteria for Phase 4.
 | Each Target ID belongs to exactly one group | `targets_partitioned_exactly_once_form_their_groups`, `one_target_in_one_group_is_a_partition`, `a_target_in_no_group_or_in_two_is_no_partition`, `a_target_in_no_group_leaves_only_the_groups_unresolved` |
 | The authoring order of members and relations does not change semantic equality | `reordering_targets_and_their_locales_changes_nothing_phase_11_records`, `reordering_groups_and_members_changes_nothing_phase_12_records`, `reordering_relations_changes_nothing_phase_13_records`, `reordering_sets_objects_and_the_collection_changes_no_semantic_state`. Equality is by value; profile equality and the digest are Phase 5's |
 | A hydration mismatch is a deterministic blocking result | `equal_endpoints_and_a_repeated_pair_are_invalid_relations`, `an_endpoint_naming_no_target_or_another_groups_member_is_invalid`, `a_target_serving_and_hydrating_in_one_group_takes_two_roles`, `endpoints_with_other_locales_or_defaults_are_incompatible_with_nothing_intersected`, `a_statically_known_incompatibility_blocks_the_relation`, `the_roles_come_from_each_target_profiles_body`. The Finding itself is Phase 5's |
-| Requirement planning and linking are not implemented on 015's side | `every_vector_has_015s_fields_and_020_verifies_it`, `no_selector_changes_what_the_profile_hands_over`: the vectors leave every relationship to 020, and the resolver admits no selector |
+| Requirement planning and linking are not implemented on 015's side | `each_relationship_is_what_015_s_selection_rules_conclude`, `the_two_profiles_hand_over_their_groups_in_canonical_order`: the vectors leave every relationship to 020, and the resolver admits no selector |
 | The target and group measurement keeps its Target, Group, membership, and relation work and a deterministic checksum in the common projection, with accounting, diagnostics, and order kept as 026 adopts them | `every_declared_case_is_admitted_against_fixed_input_result_and_work_expectations`, `the_work_counts_the_bounds_units_and_what_resolved`, `the_work_counts_relations_roles_units_and_what_was_checked`, `the_profile_declares_exactly_the_execution_states_its_cases_run_in`, and `vp run bench:config:smoke`. Neither operation reuses an index or scratch, so every case runs fresh (plan 023 decision #15) |
 
 Design 024 defines the hydration roles a Target Profile declares in its body, `ssr-renderer` and `browser-hydration-client`, and the closed static compatibility of two Target Profiles: equal `mf2Specification`, `execution`, and `locale.services`, never their physical dimensions (plan 024). Phase 13 reads both from the Target Profiles Phase 9 resolved, and Phase 11 checks that each target's Target Profile has a direction for each locale it requests, so Phase 4 is complete.
@@ -56,8 +56,8 @@ Plan 023 fixes thirteen examples.
 | One server hydrating two clients, and two servers hydrating one client | Both valid | `fan_out_and_fan_in_are_valid` |
 | The target map, the group map, members, and relations reordered | An equal state, compared by value | `reordering_targets_and_their_locales_changes_nothing_phase_11_records`, `reordering_groups_and_members_changes_nothing_phase_12_records`, `reordering_relations_changes_nothing_phase_13_records` |
 | Each `targetGrouping` bound, and each member's and endpoint's bytes, at their exact value and one more | The exact value holds; one more is a blocking `project-profile-resource-limit-exceeded`, with nothing truncated | `the_map_holds_at_its_bound_and_one_target_more_leaves_every_target_unchecked`, `each_target_id_holds_at_its_bound_and_one_byte_more_blocks_only_that_target`, `the_group_map_holds_at_its_bound_and_one_group_more_leaves_each_group_unchecked`, `every_member_occurrence_counts_toward_the_total_and_one_more_leaves_members_unchecked`, `each_group_id_and_member_count_holds_at_its_bound_and_one_more_blocks_that_group`, `a_member_holds_at_the_target_id_bound_and_one_byte_more_leaves_its_other_checks`, `the_relations_hold_at_their_bound_and_one_occurrence_more_leaves_every_relation_unchecked`, `each_endpoint_holds_at_the_target_id_bound_on_its_own_and_one_byte_more_blocks_its_relation` |
-| One group, with the selector omitted or naming it | Vectors in which 020 selects that group | `the_committed_vectors_are_the_resolvers`, `no_selector_changes_what_the_profile_hands_over` |
-| Several groups, with the selector omitted, unknown, repeated, a Target ID, or part of a group | Vectors in which 020 rejects the selection; 020 verifies them | `the_committed_vectors_are_the_resolvers`, `every_vector_has_015s_fields_and_020_verifies_it` |
+| One group, with the selector omitted or naming it | Vectors in which 020 selects that group | `each_vector_hands_over_its_producer_s_groups_and_their_bindings`, `the_two_profiles_hand_over_their_groups_in_canonical_order` |
+| Several groups, with the selector omitted, unknown, repeated, a Target ID, or part of a group | Vectors in which 020 rejects the selection; 020 verifies them | `each_vector_hands_over_its_producer_s_groups_and_their_bindings`, `each_relationship_is_what_015_s_selection_rules_conclude` |
 
 Plan 024 adds six examples of 024's roles and compatibility and of 017's directions.
 
@@ -130,10 +130,10 @@ The rows come from design 015's [Coverage inventory](../../../../design/015-intl
 
 | Requirement | Checked by |
 | --- | --- |
-| Omitted and exact selection are equivalent for a one-group profile | `the_committed_vectors_are_the_resolvers`, `no_selector_changes_what_the_profile_hands_over` |
-| With several groups, omission, an unknown Group ID, several selectors, and part of a group fail 020's admission without invalidating the profile | `the_committed_vectors_are_the_resolvers`, `every_vector_has_015s_fields_and_020_verifies_it` |
+| Omitted and exact selection are equivalent for a one-group profile | `each_vector_hands_over_its_producer_s_groups_and_their_bindings`, `the_two_profiles_hand_over_their_groups_in_canonical_order` |
+| With several groups, omission, an unknown Group ID, several selectors, and part of a group fail 020's admission without invalidating the profile | `each_vector_hands_over_its_producer_s_groups_and_their_bindings`, `each_relationship_is_what_015_s_selection_rules_conclude` |
 | The producer fields come from the resolver: every group's members with their locale facts, and the bindings planning one group consumes | `each_group_hands_over_its_members_checked_locale_facts`, `planning_a_group_consumes_its_members_target_profiles_and_the_resource_limits`, `a_profile_whose_targets_do_not_all_resolve_hands_over_no_group`, `a_profile_whose_groups_do_not_partition_its_targets_hands_over_no_group`, `reordering_the_profile_changes_nothing_it_hands_over` |
-| Membership and relations are semantic, while the selected Group ID stays compiler-transaction input | `no_selector_changes_what_the_profile_hands_over`. The profile equality that includes them is Phase 5's |
+| Membership and relations are semantic, while the selected Group ID stays compiler-transaction input | `the_two_profiles_hand_over_their_groups_in_canonical_order`. The profile equality that includes them is Phase 5's |
 
 ### Measurement
 

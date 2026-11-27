@@ -8,15 +8,15 @@
 //! `manifestKind` names it: a Resolver Construction Case (D15:3035-3060), a
 //! Resolver Input Admission Case (D15:3109-3168), a Resolver Case
 //! (D15:3174-3237), a Handoff Vector (D15:3309-3348), and a Conditional
-//! Obligation (D15:3352-3382). The schema closes what those sections fix: the
+//! Obligation (D15:3352-3393). The schema closes what those sections fix: the
 //! ID grammars, the `traceability` member and its rule-ID grammars, the 38
 //! construction failure reasons, each boundary kind's failure reasons and the
 //! form of its admitted input (D15:3142-3156, 3256-3265), the slots of the two
 //! admission steps' failures, the closed reasons of an unpaired entry, the
-//! relations, the verification owners, and the eight rows of the obligation
-//! table. Each vocabulary is written from this crate's own: the construction
-//! reasons and bounds, the Safe Origin Kinds, the semantic groups, the
-//! artifact kinds, and the Snapshot marker reasons.
+//! relations, the verification owners, and the nineteen rows of the
+//! obligation table. Each vocabulary is written from this crate's own: the
+//! construction reasons and bounds, the Safe Origin Kinds, the semantic
+//! groups, the artifact kinds, and the Snapshot marker reasons.
 //!
 //! Beside the forms, the schema pins the failure precedence as its top-level
 //! `failurePrecedence` (D15:3269): each boundary kind's ordered
@@ -66,7 +66,7 @@ pub(crate) const PATH: &str = "schemas/case-v0.schema.json";
 
 /// The Case Schema's file digest, which the runner pins.
 pub(crate) const DIGEST: &str =
-    "sha256:299f44f2863285b029649c7053532a38f108ca5fe38059622de999af41652cbc";
+    "sha256:d9401b8e436a76fa12453f39fa653f5a239de9bee542b549e889882550d636e7";
 
 /// A case or Handoff Vector ID: `015-` and lowercase kebab-case.
 pub(crate) const CASE_ID_PATTERN: &str = "^015-[a-z0-9]+(?:-[a-z0-9]+)*$";
@@ -619,8 +619,9 @@ impl RelationKind {
 
 /// The conditional obligations of revision `"0"`: the ID, the activation,
 /// the not-applicable reason, and the verification owner of each row
-/// (D15:3373-3382).
-pub(crate) const OBLIGATIONS: [(&str, &str, &str, &str); 8] = [
+/// (D15:3373-3393). Rows `015-HV-003` to `015-HV-013` wait, one for each
+/// Handoff Vector owner, until that owner defines the form of its vectors.
+pub(crate) const OBLIGATIONS: [(&str, &str, &str, &str); 19] = [
     (
         "015-XV-001",
         "second-configuration-schema-revision",
@@ -668,6 +669,72 @@ pub(crate) const OBLIGATIONS: [(&str, &str, &str, &str); 8] = [
         "expanded-fallback-probes",
         "no-expanded-fallback-probes",
         "020",
+    ),
+    (
+        "015-HV-003",
+        "016-handoff-consumer-form",
+        "no-016-handoff-consumer-form",
+        "016",
+    ),
+    (
+        "015-HV-004",
+        "019-handoff-consumer-form",
+        "no-019-handoff-consumer-form",
+        "019",
+    ),
+    (
+        "015-HV-005",
+        "020-handoff-consumer-form",
+        "no-020-handoff-consumer-form",
+        "020",
+    ),
+    (
+        "015-HV-006",
+        "021-handoff-consumer-form",
+        "no-021-handoff-consumer-form",
+        "021",
+    ),
+    (
+        "015-HV-007",
+        "022-handoff-consumer-form",
+        "no-022-handoff-consumer-form",
+        "022",
+    ),
+    (
+        "015-HV-008",
+        "023-handoff-consumer-form",
+        "no-023-handoff-consumer-form",
+        "023",
+    ),
+    (
+        "015-HV-009",
+        "024-handoff-consumer-form",
+        "no-024-handoff-consumer-form",
+        "024",
+    ),
+    (
+        "015-HV-010",
+        "025-handoff-consumer-form",
+        "no-025-handoff-consumer-form",
+        "025",
+    ),
+    (
+        "015-HV-011",
+        "026-handoff-consumer-form",
+        "no-026-handoff-consumer-form",
+        "026",
+    ),
+    (
+        "015-HV-012",
+        "027-handoff-consumer-form",
+        "no-027-handoff-consumer-form",
+        "027",
+    ),
+    (
+        "015-HV-013",
+        "030-handoff-consumer-form",
+        "no-030-handoff-consumer-form",
+        "030",
     ),
 ];
 
@@ -1518,7 +1585,7 @@ fn handoff(definitions: &mut Map<String, Value>) {
 }
 
 /// A Conditional Obligation: one row of the obligation table, inactive with
-/// its not-applicable reason or active without one (D15:3352-3382).
+/// its not-applicable reason or active without one (D15:3352-3393).
 fn obligation(definitions: &mut Map<String, Value>) {
     let kind = ManifestKind::ConditionalObligation;
     let rows = OBLIGATIONS
@@ -2758,7 +2825,7 @@ mod tests {
         assert!(HANDOFF_OWNERS
             .iter()
             .all(|owner| VERIFICATION_OWNERS.contains(owner)));
-        assert_eq!(OBLIGATIONS.len(), 8);
+        assert_eq!(OBLIGATIONS.len(), 19);
         let classes = OBLIGATIONS
             .iter()
             .map(|(id, ..)| &id[4..6])

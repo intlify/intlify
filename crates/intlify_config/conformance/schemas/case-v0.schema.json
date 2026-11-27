@@ -10940,6 +10940,842 @@
               "$ref": "#/definitions/traceability"
             }
           }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "notApplicableReason",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-003"
+            },
+            "activation": {
+              "const": "016-handoff-consumer-form"
+            },
+            "activationState": {
+              "const": "inactive"
+            },
+            "notApplicableReason": {
+              "const": "no-016-handoff-consumer-form"
+            },
+            "verificationOwner": {
+              "const": "016"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-003"
+            },
+            "activation": {
+              "const": "016-handoff-consumer-form"
+            },
+            "activationState": {
+              "const": "active"
+            },
+            "verificationOwner": {
+              "const": "016"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "notApplicableReason",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-004"
+            },
+            "activation": {
+              "const": "019-handoff-consumer-form"
+            },
+            "activationState": {
+              "const": "inactive"
+            },
+            "notApplicableReason": {
+              "const": "no-019-handoff-consumer-form"
+            },
+            "verificationOwner": {
+              "const": "019"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-004"
+            },
+            "activation": {
+              "const": "019-handoff-consumer-form"
+            },
+            "activationState": {
+              "const": "active"
+            },
+            "verificationOwner": {
+              "const": "019"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "notApplicableReason",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-005"
+            },
+            "activation": {
+              "const": "020-handoff-consumer-form"
+            },
+            "activationState": {
+              "const": "inactive"
+            },
+            "notApplicableReason": {
+              "const": "no-020-handoff-consumer-form"
+            },
+            "verificationOwner": {
+              "const": "020"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-005"
+            },
+            "activation": {
+              "const": "020-handoff-consumer-form"
+            },
+            "activationState": {
+              "const": "active"
+            },
+            "verificationOwner": {
+              "const": "020"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "notApplicableReason",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-006"
+            },
+            "activation": {
+              "const": "021-handoff-consumer-form"
+            },
+            "activationState": {
+              "const": "inactive"
+            },
+            "notApplicableReason": {
+              "const": "no-021-handoff-consumer-form"
+            },
+            "verificationOwner": {
+              "const": "021"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-006"
+            },
+            "activation": {
+              "const": "021-handoff-consumer-form"
+            },
+            "activationState": {
+              "const": "active"
+            },
+            "verificationOwner": {
+              "const": "021"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "notApplicableReason",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-007"
+            },
+            "activation": {
+              "const": "022-handoff-consumer-form"
+            },
+            "activationState": {
+              "const": "inactive"
+            },
+            "notApplicableReason": {
+              "const": "no-022-handoff-consumer-form"
+            },
+            "verificationOwner": {
+              "const": "022"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-007"
+            },
+            "activation": {
+              "const": "022-handoff-consumer-form"
+            },
+            "activationState": {
+              "const": "active"
+            },
+            "verificationOwner": {
+              "const": "022"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "notApplicableReason",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-008"
+            },
+            "activation": {
+              "const": "023-handoff-consumer-form"
+            },
+            "activationState": {
+              "const": "inactive"
+            },
+            "notApplicableReason": {
+              "const": "no-023-handoff-consumer-form"
+            },
+            "verificationOwner": {
+              "const": "023"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-008"
+            },
+            "activation": {
+              "const": "023-handoff-consumer-form"
+            },
+            "activationState": {
+              "const": "active"
+            },
+            "verificationOwner": {
+              "const": "023"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "notApplicableReason",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-009"
+            },
+            "activation": {
+              "const": "024-handoff-consumer-form"
+            },
+            "activationState": {
+              "const": "inactive"
+            },
+            "notApplicableReason": {
+              "const": "no-024-handoff-consumer-form"
+            },
+            "verificationOwner": {
+              "const": "024"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-009"
+            },
+            "activation": {
+              "const": "024-handoff-consumer-form"
+            },
+            "activationState": {
+              "const": "active"
+            },
+            "verificationOwner": {
+              "const": "024"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "notApplicableReason",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-010"
+            },
+            "activation": {
+              "const": "025-handoff-consumer-form"
+            },
+            "activationState": {
+              "const": "inactive"
+            },
+            "notApplicableReason": {
+              "const": "no-025-handoff-consumer-form"
+            },
+            "verificationOwner": {
+              "const": "025"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-010"
+            },
+            "activation": {
+              "const": "025-handoff-consumer-form"
+            },
+            "activationState": {
+              "const": "active"
+            },
+            "verificationOwner": {
+              "const": "025"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "notApplicableReason",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-011"
+            },
+            "activation": {
+              "const": "026-handoff-consumer-form"
+            },
+            "activationState": {
+              "const": "inactive"
+            },
+            "notApplicableReason": {
+              "const": "no-026-handoff-consumer-form"
+            },
+            "verificationOwner": {
+              "const": "026"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-011"
+            },
+            "activation": {
+              "const": "026-handoff-consumer-form"
+            },
+            "activationState": {
+              "const": "active"
+            },
+            "verificationOwner": {
+              "const": "026"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "notApplicableReason",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-012"
+            },
+            "activation": {
+              "const": "027-handoff-consumer-form"
+            },
+            "activationState": {
+              "const": "inactive"
+            },
+            "notApplicableReason": {
+              "const": "no-027-handoff-consumer-form"
+            },
+            "verificationOwner": {
+              "const": "027"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-012"
+            },
+            "activation": {
+              "const": "027-handoff-consumer-form"
+            },
+            "activationState": {
+              "const": "active"
+            },
+            "verificationOwner": {
+              "const": "027"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "notApplicableReason",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-013"
+            },
+            "activation": {
+              "const": "030-handoff-consumer-form"
+            },
+            "activationState": {
+              "const": "inactive"
+            },
+            "notApplicableReason": {
+              "const": "no-030-handoff-consumer-form"
+            },
+            "verificationOwner": {
+              "const": "030"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "suiteRevision",
+            "manifestKind",
+            "id",
+            "activation",
+            "activationState",
+            "verificationOwner",
+            "traceability"
+          ],
+          "properties": {
+            "suiteRevision": {
+              "const": "0"
+            },
+            "manifestKind": {
+              "const": "conditional-obligation"
+            },
+            "id": {
+              "const": "015-HV-013"
+            },
+            "activation": {
+              "const": "030-handoff-consumer-form"
+            },
+            "activationState": {
+              "const": "active"
+            },
+            "verificationOwner": {
+              "const": "030"
+            },
+            "traceability": {
+              "$ref": "#/definitions/traceability"
+            }
+          }
         }
       ]
     }

@@ -57,7 +57,10 @@ const FIXTURES: &str = "fixtures/resolver";
 
 /// The storefront, whose bodies the other cases share and with which every
 /// relation compares a case.
-const STOREFRONT: &str = "015-storefront-checked";
+pub(crate) const STOREFRONT: &str = "015-storefront-checked";
+
+/// The storefront with a second group.
+pub(crate) const TWO_GROUPS: &str = "015-storefront-two-groups";
 
 /// Where the suite holds the committed canonicalization data, below its
 /// root.
@@ -122,6 +125,10 @@ const TARGETS: [(&str, &str, &str); 2] = [
     ("browser", "storefront-browser", "browser-hydration-client"),
     ("server", "storefront-server", "ssr-renderer"),
 ];
+
+/// The second group a storefront may have: its Group ID, and its one
+/// member's Target ID and Target Profile identity.
+const JOBS: (&str, &str, &str) = ("jobs", "worker", "storefront-worker");
 
 /// The Verification Input trusted setup supplies, by identity and revision.
 const VERIFICATION: (&str, &str) = ("intlify-conformance-verification-input", "0");
@@ -300,6 +307,26 @@ impl Storefront {
             assertion,
             capability,
         }
+    }
+
+    /// The storefront with a second group, `jobs`, whose one member `worker`
+    /// requests `ja` alone, by default, under a Target Profile without a
+    /// hydration role.
+    fn two_groups() -> Self {
+        let (group, target, identity) = JOBS;
+        let mut storefront = Self::new();
+        let mut content = sample(ArtifactKind::TargetProfile);
+        content["hydration"]["roles"] = json!([]);
+        let member = envelope_of(ArtifactKind::TargetProfile, identity, "1", content);
+        let app = &mut storefront.config["profiles"][SELECTED];
+        app["targetProfiles"][target] = json!({
+            "profile": reference_value(&tuple_of(&member)),
+            "requestedLocales": ["ja"],
+            "defaultRequestedLocale": "ja",
+        });
+        app["deploymentGroups"][group] = json!({ "members": [target], "hydrationRelations": [] });
+        storefront.members.push(member);
+        storefront
     }
 
     /// The common input fixture on the resolver `constructed`: each slot's
@@ -562,8 +589,9 @@ impl Case {
 /// requested locales, blocked with Shared evidence; a requested locale
 /// added, a mutation; its bytes unclosed, a file-only case without Shared
 /// evidence; and each diagnostic domain exhausting, Entry before any Shared
-/// evidence and Shared beside a complete Entry. Each relation compares its
-/// case with the storefront (D15:3305).
+/// evidence and Shared beside a complete Entry; and the storefront with a
+/// second group, checked. Each relation compares its case with the
+/// storefront (D15:3305).
 fn all(constructed: &ConstructedResolver) -> Vec<Case> {
     use RelationKind as Kind;
     let storefront = Storefront::new();
@@ -577,6 +605,7 @@ fn all(constructed: &ConstructedResolver) -> Vec<Case> {
         .as_array_mut()
         .expect("the collection lists its members")
         .reverse();
+    let two = Storefront::two_groups();
     let mut added = Storefront::new();
     added.config["profiles"][SELECTED]["requestedLocales"] = json!(["ja", "en", "fr"]);
     let changed = [Kind::InvocationStale, Kind::MaterializedInputChanged];
@@ -661,6 +690,15 @@ fn all(constructed: &ConstructedResolver) -> Vec<Case> {
             checks: &[],
             relations: Vec::new(),
         },
+        Case {
+            id: TWO_GROUPS,
+            common: two.common(constructed),
+            file: Side::Paired(two.file()),
+            programmatic: Side::Paired(two.programmatic()),
+            decisions: &["015-034", "015-044", "015-049"],
+            checks: &[],
+            relations: Vec::new(),
+        },
     ]
 }
 
@@ -730,7 +768,7 @@ pub(crate) fn cases() -> Result<Cases, serde_json::Error> {
                     let input = generate::write(&input)?;
                     let expected = expected_bytes(&outcome)?;
                     let input_path = format!("{FIXTURES}/{}.{side}-input.json", case.id);
-                    let expected_path = format!("{FIXTURES}/{}.{side}-expected.json", case.id);
+                    let expected_path = expected_path(case.id, side);
                     let value = json!({
                         "entryAdmissionInputFixture": reference(&input_path, &input),
                         "expectedOutcomeFixture": reference(&expected_path, &expected),
@@ -800,6 +838,12 @@ pub(crate) fn cases() -> Result<Cases, serde_json::Error> {
     }
     listing.sort_by(|a, b| a["id"].as_str().cmp(&b["id"].as_str()));
     Ok(Cases { files, listing })
+}
+
+/// Where the suite holds the outcome the `side` entry of the case `id`
+/// expects.
+pub(crate) fn expected_path(id: &str, side: &str) -> String {
+    format!("{FIXTURES}/{id}.{side}-expected.json")
 }
 
 /// The bytes of an expected outcome: two-space indentation, as the suite's

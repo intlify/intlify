@@ -78,7 +78,7 @@
     "identity": "intlify-project-profile-conformance-case",
     "revision": "0",
     "path": "schemas/case-v0.schema.json",
-    "digest": "sha256:299f44f2863285b029649c7053532a38f108ca5fe38059622de999af41652cbc"
+    "digest": "sha256:d9401b8e436a76fa12453f39fa653f5a239de9bee542b549e889882550d636e7"
   },
   "registryPackage": {
     "identity": "intlify-project-profile-resolver-registry-package",
@@ -973,8 +973,170 @@
       "id": "015-storefront-checked",
       "path": "cases/resolver/015-storefront-checked.json",
       "digest": "sha256:642a0ae743301d84aa593c261b3f46be5cd33acef9bc26b589e80fcf9c43cd28"
+    },
+    {
+      "id": "015-storefront-two-groups",
+      "path": "cases/resolver/015-storefront-two-groups.json",
+      "digest": "sha256:f8eb0c6cf6877f2b86b78006470581da3318ff8ab46c25dd3e79302774a5944a"
     }
   ],
-  "handoffVectors": [],
-  "conditionalObligations": []
+  "handoffVectors": [
+    {
+      "id": "015-handoff-group-selection-one-group-group-id",
+      "path": "cases/handoff/015-handoff-group-selection-one-group-group-id.json",
+      "digest": "sha256:35ccbbbedc88ead5d0b8c626420081506acba2e26678aa3be111af0755243bc8"
+    },
+    {
+      "id": "015-handoff-group-selection-one-group-group-subset",
+      "path": "cases/handoff/015-handoff-group-selection-one-group-group-subset.json",
+      "digest": "sha256:0b1957dc0520bed982f3c6c4d746fd246c7a737ee5de18a1759f50016944f063"
+    },
+    {
+      "id": "015-handoff-group-selection-one-group-omitted",
+      "path": "cases/handoff/015-handoff-group-selection-one-group-omitted.json",
+      "digest": "sha256:fb69d2dfcba09cdc179fc7faaf02abb87724a302bb5b3b2c68239a02d532e8e6"
+    },
+    {
+      "id": "015-handoff-group-selection-one-group-repeated-group-id",
+      "path": "cases/handoff/015-handoff-group-selection-one-group-repeated-group-id.json",
+      "digest": "sha256:53bcb22529494fce04dcd98484b0fa8573e888969534299d09a2a44f4e0f3c42"
+    },
+    {
+      "id": "015-handoff-group-selection-one-group-target-id",
+      "path": "cases/handoff/015-handoff-group-selection-one-group-target-id.json",
+      "digest": "sha256:49b97c0cd195665a465b5af5f7469f3df03e9d53b6f4f107ce673fbd38172822"
+    },
+    {
+      "id": "015-handoff-group-selection-one-group-unknown-group-id",
+      "path": "cases/handoff/015-handoff-group-selection-one-group-unknown-group-id.json",
+      "digest": "sha256:69e98944c6ff7bfcf4aa3a09ccc17d30a5cb18b5cec1bc306c4865f25f3ffba2"
+    },
+    {
+      "id": "015-handoff-group-selection-two-groups-group-id",
+      "path": "cases/handoff/015-handoff-group-selection-two-groups-group-id.json",
+      "digest": "sha256:65db8304653dec11c31f0cd1d5fd9810f9712f15147029790240146e6d1c5ca1"
+    },
+    {
+      "id": "015-handoff-group-selection-two-groups-group-subset",
+      "path": "cases/handoff/015-handoff-group-selection-two-groups-group-subset.json",
+      "digest": "sha256:1a5ac2817e0f3917b27451e5d00f29e5c2614df7412e64280ee0642faa7ad4c8"
+    },
+    {
+      "id": "015-handoff-group-selection-two-groups-omitted",
+      "path": "cases/handoff/015-handoff-group-selection-two-groups-omitted.json",
+      "digest": "sha256:a5bed8693b39bf5ecbb77085924c35d09f3443f991a113cca0b5e259bb5a1816"
+    },
+    {
+      "id": "015-handoff-group-selection-two-groups-target-id",
+      "path": "cases/handoff/015-handoff-group-selection-two-groups-target-id.json",
+      "digest": "sha256:110107b8b4f3bd783f4814d9764932335b5851010ac3f9c8544a5b52bfe02486"
+    },
+    {
+      "id": "015-handoff-group-selection-two-groups-two-group-ids",
+      "path": "cases/handoff/015-handoff-group-selection-two-groups-two-group-ids.json",
+      "digest": "sha256:d8e710d9ac190c7bbc75c9a1531d3312749a7cca3b7b4764331e6836c4674dc5"
+    },
+    {
+      "id": "015-handoff-group-selection-two-groups-unknown-group-id",
+      "path": "cases/handoff/015-handoff-group-selection-two-groups-unknown-group-id.json",
+      "digest": "sha256:254ae4f7ef67a60b8ee4ff5a3a642bccf922f76e8701e35ecc1a2945b46b277e"
+    }
+  ],
+  "conditionalObligations": [
+    {
+      "id": "015-AD-001",
+      "path": "cases/conditional/015-AD-001.json",
+      "digest": "sha256:d09f4acc33134359587832ae7b9f7827de683c6fe4cc427541d3d4b681b6fa38"
+    },
+    {
+      "id": "015-AD-002",
+      "path": "cases/conditional/015-AD-002.json",
+      "digest": "sha256:6bc3b08e412bf1b8e662aba6249f5b69fff489d0ac26cb483233788e1f918d74"
+    },
+    {
+      "id": "015-AD-003",
+      "path": "cases/conditional/015-AD-003.json",
+      "digest": "sha256:443cbd79d7171da79188c821e6a7b7fa4daa27f26e54262b49a85c08361f5cb6"
+    },
+    {
+      "id": "015-AD-004",
+      "path": "cases/conditional/015-AD-004.json",
+      "digest": "sha256:87b349890be4170901a5b26dd5b9ff65f4859bcde0c61c3e4c037e01a64f7c04"
+    },
+    {
+      "id": "015-HV-001",
+      "path": "cases/conditional/015-HV-001.json",
+      "digest": "sha256:73733662fea918dbb7714d043e5837242514762ef99b6e26dbdc3ed362f1899d"
+    },
+    {
+      "id": "015-HV-002",
+      "path": "cases/conditional/015-HV-002.json",
+      "digest": "sha256:f1452c1d67f3c988305eb18f862c74431785e8c4c674720a857edcbdda5137bb"
+    },
+    {
+      "id": "015-HV-003",
+      "path": "cases/conditional/015-HV-003.json",
+      "digest": "sha256:1dd5be454fd00c80407b7a2327f08ed19e966eb058f03982365b8e481f90314c"
+    },
+    {
+      "id": "015-HV-004",
+      "path": "cases/conditional/015-HV-004.json",
+      "digest": "sha256:cb454acc27a4004bd735348b128584e74c52d6569d182921d1d75f441b341ae0"
+    },
+    {
+      "id": "015-HV-005",
+      "path": "cases/conditional/015-HV-005.json",
+      "digest": "sha256:a6887a3860774107ea4a67b5308f6b7f35915e3774c6d0464fc6a569d20edc86"
+    },
+    {
+      "id": "015-HV-006",
+      "path": "cases/conditional/015-HV-006.json",
+      "digest": "sha256:ba6fb31ed9846305a66459284d7c9269a811e5890cd71512192755f255de4f66"
+    },
+    {
+      "id": "015-HV-007",
+      "path": "cases/conditional/015-HV-007.json",
+      "digest": "sha256:be4489ece215a210d8de4dff8136b1a779b8f34cc90abf031b039c81670c91f1"
+    },
+    {
+      "id": "015-HV-008",
+      "path": "cases/conditional/015-HV-008.json",
+      "digest": "sha256:9fbec5398153883312455581097662536fbe7db03c1bf01bcbb069184fc0a7d1"
+    },
+    {
+      "id": "015-HV-009",
+      "path": "cases/conditional/015-HV-009.json",
+      "digest": "sha256:f198c941a5f7cc2d86e1edaf5d4252e6ad76ad4f3ee9c19dc50654a52519e516"
+    },
+    {
+      "id": "015-HV-010",
+      "path": "cases/conditional/015-HV-010.json",
+      "digest": "sha256:e6c9854df9d8ec31a4ebd7d88cc8f5e3274869f94b1f620b13779d831637d933"
+    },
+    {
+      "id": "015-HV-011",
+      "path": "cases/conditional/015-HV-011.json",
+      "digest": "sha256:d6733780f3de0e538048320f9c121b14e19578bc6cf37954cdcbcf2ddbf714c4"
+    },
+    {
+      "id": "015-HV-012",
+      "path": "cases/conditional/015-HV-012.json",
+      "digest": "sha256:9d88ff5e1661d6bb8836e8229f6bfd7363d4ed9241222ae4d0a7ea7761839105"
+    },
+    {
+      "id": "015-HV-013",
+      "path": "cases/conditional/015-HV-013.json",
+      "digest": "sha256:3bba08c0d4286c42536159036804b1a5c45fa817129be371c3cc88040fba63e3"
+    },
+    {
+      "id": "015-XV-001",
+      "path": "cases/conditional/015-XV-001.json",
+      "digest": "sha256:5abcda80e4aa7c4071fee78bca95bb2d1cd84d280ae3f2ba246ea392a4471184"
+    },
+    {
+      "id": "015-XV-002",
+      "path": "cases/conditional/015-XV-002.json",
+      "digest": "sha256:04107c70741f370e63074d1a2ab5bb5320a69eb839b09175c49348cd55e1f709"
+    }
+  ]
 }

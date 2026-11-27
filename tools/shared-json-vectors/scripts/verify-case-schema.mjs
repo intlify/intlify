@@ -302,7 +302,14 @@ const OBLIGATIONS = [
     'no-negotiation-adapter-resource-section',
     '027'
   ],
-  ['015-HV-002', 'expanded-fallback-probes', 'no-expanded-fallback-probes', '020']
+  ['015-HV-002', 'expanded-fallback-probes', 'no-expanded-fallback-probes', '020'],
+  // Each Handoff Vector owner's form, until the owner defines it.
+  ...HANDOFF_OWNERS.map((owner, at) => [
+    `015-HV-${String(at + 3).padStart(3, '0')}`,
+    `${owner}-handoff-consumer-form`,
+    `no-${owner}-handoff-consumer-form`,
+    owner
+  ])
 ]
 
 /** The kinds of artifact an exact reference names. */
@@ -666,7 +673,7 @@ const table = OBLIGATIONS.flatMap(([id, activation, reason, owner]) => [
   [id, activation, 'active', null, owner]
 ])
 if (!isDeepStrictEqual(states, table)) {
-  fail("schema: the conditional obligations are not design 015's eight rows")
+  fail("schema: the conditional obligations are not design 015's nineteen rows")
 }
 
 // An admitted Snapshot's markers.

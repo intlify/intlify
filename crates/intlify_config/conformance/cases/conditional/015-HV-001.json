@@ -1,0 +1,16 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "conditional-obligation",
+  "id": "015-HV-001",
+  "activation": "negotiation-adapter-resource-section",
+  "activationState": "inactive",
+  "notApplicableReason": "no-negotiation-adapter-resource-section",
+  "verificationOwner": "027",
+  "traceability": {
+    "decisionIds": [
+      "015-212"
+    ],
+    "ruleIds": [],
+    "checkIds": []
+  }
+}
