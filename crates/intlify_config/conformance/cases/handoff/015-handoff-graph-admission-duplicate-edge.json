@@ -1,0 +1,105 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "handoff-vector",
+  "id": "015-handoff-graph-admission-duplicate-edge",
+  "producerCaseId": "015-storefront-checked",
+  "producerProfileFacts": {
+    "delivery": {
+      "graph": {
+        "identity": "intlify-delivery-graph",
+        "revision": "0"
+      },
+      "placement": {
+        "identity": "intlify-delivery-placement",
+        "revision": "0"
+      },
+      "mode": "duplicate"
+    },
+    "deploymentGroups": {
+      "web": {
+        "members": [
+          "browser",
+          "server"
+        ],
+        "hydrationRelations": [
+          {
+            "server": "server",
+            "client": "browser"
+          }
+        ]
+      }
+    }
+  },
+  "producerArtifactBindings": [],
+  "consumerInputs": {
+    "json": {
+      "selectedGroupId": "web",
+      "graphs": [
+        {
+          "identity": "storefront-web",
+          "targets": [
+            "browser",
+            "server"
+          ],
+          "units": [
+            {
+              "id": [
+                "app"
+              ]
+            },
+            {
+              "id": [
+                "app",
+                "checkout"
+              ]
+            }
+          ],
+          "edges": [
+            {
+              "from": 0,
+              "to": 1
+            },
+            {
+              "from": 0,
+              "to": 1
+            }
+          ],
+          "bindings": [
+            {
+              "reference": "cart-title",
+              "unit": 0
+            },
+            {
+              "reference": "checkout-title",
+              "unit": 1
+            }
+          ]
+        }
+      ],
+      "references": {
+        "browser": [
+          "cart-title",
+          "checkout-title"
+        ],
+        "server": [
+          "checkout-title"
+        ]
+      }
+    }
+  },
+  "expectedRelationship": {
+    "json": {
+      "outcome": "rejected",
+      "rule": "duplicate-edge"
+    }
+  },
+  "verificationOwner": "020",
+  "traceability": {
+    "decisionIds": [
+      "015-033",
+      "015-034"
+    ],
+    "ruleIds": [],
+    "checkIds": []
+  }
+}

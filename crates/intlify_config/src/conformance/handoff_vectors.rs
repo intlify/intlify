@@ -32,9 +32,11 @@
 //! profile and expect what the portable lookup concludes ([`negotiation`]);
 //! the seven source-locale vectors for 016 and the five fallback vectors for
 //! 020 ([`sources`]); the twelve coverage vectors for 020 ([`coverage`]);
-//! and the thirteen binding-subset vectors, which hand each consumer of
-//! 015's table the minimum projection of the bindings it receives
-//! ([`bindings`]).
+//! the thirteen binding-subset vectors, which hand each consumer of 015's
+//! table the minimum projection of the bindings it receives ([`bindings`]);
+//! and the eighteen graph-admission vectors for 020, which hand over the
+//! delivery specifications and the groups and expect whether a selected
+//! group's Delivery Unit Graphs are admitted ([`graphs`]).
 
 use serde_json::{json, Map, Value};
 
@@ -49,6 +51,7 @@ use super::resolver_cases::{expected_path, FALLBACK, NEGOTIATION, STOREFRONT, TW
 
 mod bindings;
 mod coverage;
+mod graphs;
 mod negotiation;
 mod sources;
 
@@ -98,6 +101,11 @@ const BINDING_GROUPS: [SemanticGroup; 4] = [
     SemanticGroup::RequiredPolicies,
     SemanticGroup::Targets,
 ];
+
+/// The semantic groups a graph-admission vector hands over: the Delivery
+/// Graph Specification and placement policy, and the groups whose selected
+/// members the graphs partition (D15:2029-2055).
+const GRAPH_GROUPS: [SemanticGroup; 2] = [SemanticGroup::Delivery, SemanticGroup::DeploymentGroups];
 
 /// The decisions every Group ID selection vector rests on: one complete
 /// group per transaction, 015's selection vectors beside 020's selector
@@ -286,7 +294,8 @@ struct Written {
 /// names among the cases `resolver` writes: the Group ID selection vectors
 /// for 020, the negotiation vectors for 027, the source-locale vectors for
 /// 016, the fallback vectors for 020, the coverage vectors for 020, and the
-/// binding-subset vectors for each consumer of 015's table.
+/// binding-subset vectors for each consumer of 015's table, and the
+/// graph-admission vectors for 020.
 ///
 /// # Errors
 ///
@@ -422,6 +431,28 @@ pub(crate) fn cases(resolver: &Cases) -> Result<Cases, serde_json::Error> {
             relationship,
             owner: vector.consumer.owner(),
             decisions: &bindings::DECISIONS,
+        });
+    }
+    let groups = GRAPH_GROUPS.map(SemanticGroup::id);
+    let on_storefront =
+        produced(&storefront, groups).expect("the storefront is checked with every group");
+    let on_two_groups =
+        produced(&two, groups).expect("the two-group storefront is checked with every group");
+    for vector in &graphs::VECTORS {
+        let (producer, (facts, bindings)) = if vector.two_groups {
+            (TWO_GROUPS, &on_two_groups)
+        } else {
+            (STOREFRONT, &on_storefront)
+        };
+        let (inputs, relationship) = graphs::relationship(vector, facts);
+        written.push(Written {
+            id: format!("015-handoff-graph-admission-{}", vector.name),
+            producer,
+            produced: (facts.clone(), bindings.clone()),
+            inputs,
+            relationship,
+            owner: "020",
+            decisions: &graphs::DECISIONS,
         });
     }
     let mut files = Vec::new();
@@ -773,6 +804,7 @@ mod tests {
                 + sources::FALLBACK_VECTORS.len()
                 + coverage::VECTORS.len()
                 + bindings::VECTORS.len()
+                + graphs::VECTORS.len()
         );
         let paths = vectors
             .files
@@ -790,6 +822,7 @@ mod tests {
                     "015-handoff-fallback-",
                     "015-handoff-coverage-",
                     "015-handoff-binding-subset-",
+                    "015-handoff-graph-admission-",
                 ]
                 .iter()
                 .any(|family| id.starts_with(family)),

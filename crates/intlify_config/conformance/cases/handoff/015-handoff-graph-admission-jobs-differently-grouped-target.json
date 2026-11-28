@@ -1,0 +1,92 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "handoff-vector",
+  "id": "015-handoff-graph-admission-jobs-differently-grouped-target",
+  "producerCaseId": "015-storefront-two-groups",
+  "producerProfileFacts": {
+    "delivery": {
+      "graph": {
+        "identity": "intlify-delivery-graph",
+        "revision": "0"
+      },
+      "placement": {
+        "identity": "intlify-delivery-placement",
+        "revision": "0"
+      },
+      "mode": "duplicate"
+    },
+    "deploymentGroups": {
+      "jobs": {
+        "members": [
+          "worker"
+        ],
+        "hydrationRelations": []
+      },
+      "web": {
+        "members": [
+          "browser",
+          "server"
+        ],
+        "hydrationRelations": [
+          {
+            "server": "server",
+            "client": "browser"
+          }
+        ]
+      }
+    }
+  },
+  "producerArtifactBindings": [],
+  "consumerInputs": {
+    "json": {
+      "selectedGroupId": "jobs",
+      "graphs": [
+        {
+          "identity": "storefront-jobs",
+          "targets": [
+            "browser",
+            "worker"
+          ],
+          "units": [
+            {
+              "id": [
+                "main"
+              ]
+            }
+          ],
+          "edges": [],
+          "bindings": [
+            {
+              "reference": "cart-title",
+              "unit": 0
+            },
+            {
+              "reference": "digest-subject",
+              "unit": 0
+            }
+          ]
+        }
+      ],
+      "references": {
+        "worker": [
+          "digest-subject"
+        ]
+      }
+    }
+  },
+  "expectedRelationship": {
+    "json": {
+      "outcome": "rejected",
+      "rule": "target-outside-group"
+    }
+  },
+  "verificationOwner": "020",
+  "traceability": {
+    "decisionIds": [
+      "015-033",
+      "015-034"
+    ],
+    "ruleIds": [],
+    "checkIds": []
+  }
+}
