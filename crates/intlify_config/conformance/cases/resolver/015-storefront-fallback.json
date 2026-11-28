@@ -1,0 +1,43 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver",
+  "id": "015-storefront-fallback",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "commonInvocationInputFixture": {
+    "path": "fixtures/resolver/015-storefront-fallback.common.json",
+    "digest": "sha256:5ba6906a13f39748140b9d3176f3266c916fd0acd0f76e1dcfdb3209008e8f57"
+  },
+  "entries": {
+    "file": {
+      "entryAdmissionInputFixture": {
+        "path": "fixtures/resolver/015-storefront-fallback.file-input.json",
+        "digest": "sha256:d5085e8508ab45f02a44966a0fcc469101063df7f1b7e277709bd1ac0a180556"
+      },
+      "expectedOutcomeFixture": {
+        "path": "fixtures/resolver/015-storefront-fallback.file-expected.json",
+        "digest": "sha256:cbc73c5432d090be0bc99cf483611a52332eb0bcdc04c23e3405e5d4c69c5e29"
+      }
+    },
+    "programmatic": {
+      "entryAdmissionInputFixture": {
+        "path": "fixtures/resolver/015-storefront-fallback.programmatic-input.json",
+        "digest": "sha256:29770806802a4b6f52d1efd6abc378c0dff888f2b7675892d45585a40d157c9b"
+      },
+      "expectedOutcomeFixture": {
+        "path": "fixtures/resolver/015-storefront-fallback.programmatic-expected.json",
+        "digest": "sha256:c6bb7f3d875974da64020fed6d41f1ce0a651d40933c08fc734ab0255ce92eaa"
+      }
+    }
+  },
+  "traceability": {
+    "decisionIds": [
+      "015-026",
+      "015-030"
+    ],
+    "ruleIds": [],
+    "checkIds": []
+  }
+}

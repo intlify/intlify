@@ -414,13 +414,9 @@ fn conclusion(relationship: &Value) -> Concluded {
 
 #[cfg(test)]
 mod tests {
-    use intlify_locale_icu4x::{ConformanceLimits, ReadLimits};
-
+    use super::super::tests::canonicalizer;
     use super::*;
-    use crate::conformance::resolver_cases::{data_files, NEGOTIATION};
-    use crate::input_limits::Bound;
-    use crate::locale::icu4x::Icu4xProvider;
-    use crate::locale::{Canonicalizer, VersionedIdentity};
+    use crate::conformance::resolver_cases::NEGOTIATION;
 
     /// The written negotiation vectors.
     fn manifests() -> Vec<Value> {
@@ -552,42 +548,6 @@ mod tests {
                 manifest["id"]
             );
         }
-    }
-
-    /// The canonicalizer the committed construction admits, over the
-    /// committed ICU4X data.
-    fn canonicalizer() -> Canonicalizer<Icu4xProvider> {
-        const LIMITS: ReadLimits = ReadLimits {
-            manifest_bytes: 16_384,
-            manifest_depth: 8,
-            payloads: 2,
-            payload_bytes: 1 << 20,
-            marker_bytes: 1 << 20,
-            conformance: ConformanceLimits {
-                validity_groups: 64,
-                codes: 1 << 15,
-                extension_keys: 64,
-                types: 2_048,
-                corrections: 128,
-                work: 1 << 16,
-            },
-        };
-        let files = data_files();
-        let acquire = |address: &str| {
-            files
-                .iter()
-                .find(|(path, _)| path.ends_with(&format!("/{address}")))
-                .map(|(_, bytes)| bytes.to_vec())
-        };
-        let provider = Icu4xProvider::admit(files[0].1, acquire, &LIMITS).unwrap();
-        let supported = crate::construction::resolver::committed().locale_canonicalization();
-        let expected = supported
-            .expected(&VersionedIdentity {
-                identity: "intlify-locale-canonicalization".into(),
-                revision: "0".into(),
-            })
-            .unwrap();
-        Canonicalizer::bind(expected, Some(provider), Bound::new(1024).unwrap()).unwrap()
     }
 
     /// Each preference and direct selection is a canonical spelling, so its

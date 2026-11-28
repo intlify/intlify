@@ -29,7 +29,9 @@
 //!
 //! It also writes the twenty negotiation vectors for 027, which hand over a
 //! target's supported subset and effective default with the negotiation
-//! profile and expect what the portable lookup concludes ([`negotiation`]).
+//! profile and expect what the portable lookup concludes ([`negotiation`]);
+//! the seven source-locale vectors for 016 and the five fallback vectors for
+//! 020 ([`sources`]).
 
 use serde_json::{json, Map, Value};
 
@@ -40,9 +42,10 @@ use crate::resolver::dependency::SemanticGroup;
 use super::case::{ManifestKind, REVISION};
 use super::construction_cases::Cases;
 use super::index::SuiteFile;
-use super::resolver_cases::{expected_path, NEGOTIATION, STOREFRONT, TWO_GROUPS};
+use super::resolver_cases::{expected_path, FALLBACK, NEGOTIATION, STOREFRONT, TWO_GROUPS};
 
 mod negotiation;
+mod sources;
 
 /// Where the suite holds the vectors' manifests.
 const CASES: &str = "cases/handoff";
@@ -58,6 +61,17 @@ const NEGOTIATION_GROUPS: [SemanticGroup; 3] = [
     SemanticGroup::LocaleCanonicalization,
     SemanticGroup::LocaleNegotiation,
     SemanticGroup::Targets,
+];
+
+/// The semantic group a source-locale vector hands over: the project's
+/// locales, its source default among them (D15:1369-1375).
+const SOURCE_GROUPS: [SemanticGroup; 1] = [SemanticGroup::ProjectLocales];
+
+/// The semantic groups a fallback vector hands over: the fallback policy and
+/// the project's locales, whose requested locales key it (D15:1494).
+const FALLBACK_GROUPS: [SemanticGroup; 2] = [
+    SemanticGroup::MessageFallback,
+    SemanticGroup::ProjectLocales,
 ];
 
 /// The decisions every Group ID selection vector rests on: one complete
@@ -245,7 +259,8 @@ struct Written {
 /// The suite's Handoff Vectors, in ascending unsigned byte order of their
 /// IDs, each produced from the expected outcome of the Resolver Case it
 /// names among the cases `resolver` writes: the Group ID selection vectors
-/// for 020 and the negotiation vectors for 027.
+/// for 020, the negotiation vectors for 027, the source-locale vectors for
+/// 016, and the fallback vectors for 020.
 ///
 /// # Errors
 ///
@@ -301,6 +316,44 @@ pub(crate) fn cases(resolver: &Cases) -> Result<Cases, serde_json::Error> {
             decisions: &negotiation::DECISIONS,
         });
     }
+    let storefront = expected(resolver, STOREFRONT);
+    let fallback = expected(resolver, FALLBACK);
+    let groups = SOURCE_GROUPS.map(SemanticGroup::id);
+    for vector in &sources::SOURCE_VECTORS {
+        let (producer, outcome) = if vector.with_default {
+            (STOREFRONT, &storefront)
+        } else {
+            (FALLBACK, &fallback)
+        };
+        let (facts, bindings) =
+            produced(outcome, groups).expect("a producer case is checked with every group");
+        let (inputs, relationship) = sources::source_relationship(vector, &facts["projectLocales"]);
+        written.push(Written {
+            id: format!("015-handoff-source-locale-{}", vector.name),
+            producer,
+            produced: (facts, bindings),
+            inputs,
+            relationship,
+            owner: "016",
+            decisions: &sources::SOURCE_DECISIONS,
+        });
+    }
+    let groups = FALLBACK_GROUPS.map(SemanticGroup::id);
+    let (facts, bindings) =
+        produced(&fallback, groups).expect("the fallback case is checked with every group");
+    for vector in &sources::FALLBACK_VECTORS {
+        let (inputs, relationship) =
+            sources::fallback_relationship(vector, &facts["messageFallback"]);
+        written.push(Written {
+            id: format!("015-handoff-fallback-{}", vector.name),
+            producer: FALLBACK,
+            produced: (facts.clone(), bindings.clone()),
+            inputs,
+            relationship,
+            owner: "020",
+            decisions: &sources::FALLBACK_DECISIONS,
+        });
+    }
     let mut files = Vec::new();
     let mut listing = Vec::new();
     for vector in written {
@@ -337,8 +390,49 @@ mod tests {
     use std::collections::BTreeSet;
     use std::sync::OnceLock;
 
+    use intlify_locale_icu4x::{ConformanceLimits, ReadLimits};
+
     use super::*;
-    use crate::conformance::resolver_cases;
+    use crate::conformance::resolver_cases::{self, data_files};
+    use crate::input_limits::Bound;
+    use crate::locale::icu4x::Icu4xProvider;
+    use crate::locale::{Canonicalizer, VersionedIdentity};
+
+    /// The canonicalizer the committed construction admits, over the
+    /// committed ICU4X data.
+    pub(super) fn canonicalizer() -> Canonicalizer<Icu4xProvider> {
+        const LIMITS: ReadLimits = ReadLimits {
+            manifest_bytes: 16_384,
+            manifest_depth: 8,
+            payloads: 2,
+            payload_bytes: 1 << 20,
+            marker_bytes: 1 << 20,
+            conformance: ConformanceLimits {
+                validity_groups: 64,
+                codes: 1 << 15,
+                extension_keys: 64,
+                types: 2_048,
+                corrections: 128,
+                work: 1 << 16,
+            },
+        };
+        let files = data_files();
+        let acquire = |address: &str| {
+            files
+                .iter()
+                .find(|(path, _)| path.ends_with(&format!("/{address}")))
+                .map(|(_, bytes)| bytes.to_vec())
+        };
+        let provider = Icu4xProvider::admit(files[0].1, acquire, &LIMITS).unwrap();
+        let supported = crate::construction::resolver::committed().locale_canonicalization();
+        let expected = supported
+            .expected(&VersionedIdentity {
+                identity: "intlify-locale-canonicalization".into(),
+                revision: "0".into(),
+            })
+            .unwrap();
+        Canonicalizer::bind(expected, Some(provider), Bound::new(1024).unwrap()).unwrap()
+    }
 
     /// The Resolver Cases and the vectors this crate writes, written once.
     pub(super) fn written() -> &'static (Cases, Cases) {
@@ -601,7 +695,13 @@ mod tests {
         sorted.sort_unstable();
         sorted.dedup();
         assert_eq!(ids, sorted);
-        assert_eq!(ids.len(), VECTORS.len() + negotiation::VECTORS.len());
+        assert_eq!(
+            ids.len(),
+            VECTORS.len()
+                + negotiation::VECTORS.len()
+                + sources::SOURCE_VECTORS.len()
+                + sources::FALLBACK_VECTORS.len()
+        );
         let paths = vectors
             .files
             .iter()
@@ -611,8 +711,15 @@ mod tests {
         for entry in &vectors.listing {
             let id = entry["id"].as_str().unwrap();
             assert!(
-                id.starts_with("015-handoff-group-selection-")
-                    || id.starts_with("015-handoff-negotiation-")
+                [
+                    "015-handoff-group-selection-",
+                    "015-handoff-negotiation-",
+                    "015-handoff-source-locale-",
+                    "015-handoff-fallback-",
+                ]
+                .iter()
+                .any(|family| id.starts_with(family)),
+                "{id}"
             );
             assert_eq!(entry["path"], format!("{CASES}/{id}.json"));
             assert!(paths.contains(entry["path"].as_str().unwrap()));
