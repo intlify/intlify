@@ -975,6 +975,11 @@
       "digest": "sha256:642a0ae743301d84aa593c261b3f46be5cd33acef9bc26b589e80fcf9c43cd28"
     },
     {
+      "id": "015-storefront-fallback",
+      "path": "cases/resolver/015-storefront-fallback.json",
+      "digest": "sha256:5d8cd8f4933941a30aa2befad8cff5f304274f3dc599c39716fb879c9f1253e4"
+    },
+    {
       "id": "015-storefront-negotiation",
       "path": "cases/resolver/015-storefront-negotiation.json",
       "digest": "sha256:d354539be10b9702cc2433c944adbd4f8816a5cdb06185570c3c2446274fcd87"
@@ -986,6 +991,31 @@
     }
   ],
   "handoffVectors": [
+    {
+      "id": "015-handoff-fallback-english-source",
+      "path": "cases/handoff/015-handoff-fallback-english-source.json",
+      "digest": "sha256:7699eadaebbffb4028f63f3a5cf5203a983af72e108d5b9ccc47bc1619fb27cf"
+    },
+    {
+      "id": "015-handoff-fallback-french-source",
+      "path": "cases/handoff/015-handoff-fallback-french-source.json",
+      "digest": "sha256:d6b8462302dfe2e29b4068687dc1b5328ce5b8fe2ca1ec271c1d6bf950dfbf54"
+    },
+    {
+      "id": "015-handoff-fallback-german-library-source",
+      "path": "cases/handoff/015-handoff-fallback-german-library-source.json",
+      "digest": "sha256:2f10ee13822e90151b76b8a0b86e73b4b21c4158154a6085636c89ade516847f"
+    },
+    {
+      "id": "015-handoff-fallback-independent-sequence",
+      "path": "cases/handoff/015-handoff-fallback-independent-sequence.json",
+      "digest": "sha256:a9ba641d1709b79fcdc2d2801181b7806acd34e3160c2f74e55aa118b14e51e0"
+    },
+    {
+      "id": "015-handoff-fallback-no-recursion",
+      "path": "cases/handoff/015-handoff-fallback-no-recursion.json",
+      "digest": "sha256:e127992c2b65255c81bececd1513cc3bd3d327da234900892fb6e3af4975e24d"
+    },
     {
       "id": "015-handoff-group-selection-one-group-group-id",
       "path": "cases/handoff/015-handoff-group-selection-one-group-group-id.json",
@@ -1145,6 +1175,41 @@
       "id": "015-handoff-negotiation-worker-whole-extension",
       "path": "cases/handoff/015-handoff-negotiation-worker-whole-extension.json",
       "digest": "sha256:25383d8ba81ac5e30580a87125e0f8e1453daff6fedf286c304005a00fa169d3"
+    },
+    {
+      "id": "015-handoff-source-locale-default-inherited",
+      "path": "cases/handoff/015-handoff-source-locale-default-inherited.json",
+      "digest": "sha256:fe4052e05ebf63657ddee9c558b5b562211432ddbe54c258a7383d14d18c7427"
+    },
+    {
+      "id": "015-handoff-source-locale-explicit-over-default",
+      "path": "cases/handoff/015-handoff-source-locale-explicit-over-default.json",
+      "digest": "sha256:97d5834ba7b8bb575ffd47161ccce639fc1f70c102a0addc776423e4e8b72e4f"
+    },
+    {
+      "id": "015-handoff-source-locale-library-keeps-its-published-source",
+      "path": "cases/handoff/015-handoff-source-locale-library-keeps-its-published-source.json",
+      "digest": "sha256:6a3e9c61f642b9deedab6c68ca2d8f33e64f702679670cf29fdea00e53955b83"
+    },
+    {
+      "id": "015-handoff-source-locale-library-without-a-published-source",
+      "path": "cases/handoff/015-handoff-source-locale-library-without-a-published-source.json",
+      "digest": "sha256:aaa552734e383b9a8895e5f4717202d96091d8057c5e440472dbd71c3042ce7c"
+    },
+    {
+      "id": "015-handoff-source-locale-no-default-explicit",
+      "path": "cases/handoff/015-handoff-source-locale-no-default-explicit.json",
+      "digest": "sha256:e4a0d54f4807be42c7fe5bed2b9da597713e1ff81957b548e9d69b6553d4187a"
+    },
+    {
+      "id": "015-handoff-source-locale-no-default-library",
+      "path": "cases/handoff/015-handoff-source-locale-no-default-library.json",
+      "digest": "sha256:ab94b99fa623a85977fc937cf717b51db940edac214253b1b16be68d28d2bd71"
+    },
+    {
+      "id": "015-handoff-source-locale-no-default-omitted",
+      "path": "cases/handoff/015-handoff-source-locale-no-default-omitted.json",
+      "digest": "sha256:3fb3b124113a318aeb2142221e393e6164e5a1fee2a0ccc3a4f37bd6c70f3aa8"
     }
   ],
   "conditionalObligations": [

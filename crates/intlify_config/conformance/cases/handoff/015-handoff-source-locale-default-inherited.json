@@ -1,0 +1,39 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "handoff-vector",
+  "id": "015-handoff-source-locale-default-inherited",
+  "producerCaseId": "015-storefront-checked",
+  "producerProfileFacts": {
+    "projectLocales": {
+      "requestedLocales": [
+        "en",
+        "ja"
+      ],
+      "defaultRequestedLocale": "en",
+      "defaultSourceLocale": "en"
+    }
+  },
+  "producerArtifactBindings": [],
+  "consumerInputs": {
+    "json": {
+      "intent": {
+        "owner": "application"
+      }
+    }
+  },
+  "expectedRelationship": {
+    "json": {
+      "outcome": "resolved",
+      "sourceLocale": "en",
+      "origin": "inherited"
+    }
+  },
+  "verificationOwner": "016",
+  "traceability": {
+    "decisionIds": [
+      "015-026"
+    ],
+    "ruleIds": [],
+    "checkIds": []
+  }
+}

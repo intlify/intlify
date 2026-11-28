@@ -65,6 +65,10 @@ pub(crate) const TWO_GROUPS: &str = "015-storefront-two-groups";
 /// The storefront whose targets negotiate among more locales.
 pub(crate) const NEGOTIATION: &str = "015-storefront-negotiation";
 
+/// The storefront without a project source default, with three fallback
+/// sequences.
+pub(crate) const FALLBACK: &str = "015-storefront-fallback";
+
 /// Where the suite holds the committed canonicalization data, below its
 /// root.
 pub(crate) const DATA: &str = "fixtures/resolver/locale-data";
@@ -386,6 +390,26 @@ impl Storefront {
         storefront
     }
 
+    /// The storefront that omits `defaultSourceLocale`, which leaves the
+    /// project without a source default (D15:1373), and requests `ja-JP`
+    /// beside its two locales, in no target's subset, under three complete
+    /// fallback sequences: `ja-JP` to `ja` and the Intent source-locale
+    /// candidate, `ja` to `en`, and `en` to `fr` (D15:1505-1518).
+    fn fallback() -> Self {
+        let mut storefront = Self::new();
+        let app = &mut storefront.config["profiles"][SELECTED];
+        app.as_object_mut()
+            .expect("a profile is an object")
+            .remove("defaultSourceLocale");
+        app["requestedLocales"] = json!(["ja", "en", "ja-JP"]);
+        app["messageFallback"] = json!({
+            "ja-JP": ["ja", { "kind": "intent-source-locale" }],
+            "ja": ["en"],
+            "en": ["fr"],
+        });
+        storefront
+    }
+
     /// The common input fixture on the resolver `constructed`: each slot's
     /// candidate its own ID and its input one its boundary admits, the
     /// specification asserting what the resolver supports and the
@@ -646,7 +670,9 @@ impl Case {
 /// requested locales, blocked with Shared evidence; a requested locale
 /// added, a mutation; its bytes unclosed, a file-only case without Shared
 /// evidence; and each diagnostic domain exhausting, Entry before any Shared
-/// evidence and Shared beside a complete Entry; the storefront negotiating
+/// evidence and Shared beside a complete Entry; the storefront without a
+/// source default and with three fallback sequences, checked; the storefront
+/// negotiating
 /// among six locales, with aliases and a second group, checked; and the
 /// storefront with a second group, checked. Each relation compares its case with the
 /// storefront (D15:3305).
@@ -665,6 +691,7 @@ fn all(constructed: &ConstructedResolver) -> Vec<Case> {
         .reverse();
     let two = Storefront::two_groups();
     let negotiation = Storefront::negotiation();
+    let fallback = Storefront::fallback();
     let mut added = Storefront::new();
     added.config["profiles"][SELECTED]["requestedLocales"] = json!(["ja", "en", "fr"]);
     let changed = [Kind::InvocationStale, Kind::MaterializedInputChanged];
@@ -746,6 +773,15 @@ fn all(constructed: &ConstructedResolver) -> Vec<Case> {
             file: Side::Paired(storefront.file()),
             programmatic: Side::Paired(storefront.programmatic()),
             decisions: &["015-037", "015-060", "015-064", "015-066"],
+            checks: &[],
+            relations: Vec::new(),
+        },
+        Case {
+            id: FALLBACK,
+            common: fallback.common(constructed),
+            file: Side::Paired(fallback.file()),
+            programmatic: Side::Paired(fallback.programmatic()),
+            decisions: &["015-026", "015-030"],
             checks: &[],
             relations: Vec::new(),
         },

@@ -652,9 +652,9 @@ mod tests {
             .map(|file| (file.path, file_digest(&file.bytes).as_str().to_owned()))
             .collect::<BTreeMap<_, _>>();
         // The 20 bodies, then the 44 construction cases, the 118 input
-        // admission cases, the 9 Resolver Cases, the 32 Handoff Vectors, and
-        // the 19 conditional obligations.
-        assert_eq!(named.len(), 20 + 44 + 118 + 9 + 32 + 19);
+        // admission cases, the 10 Resolver Cases, the 44 Handoff Vectors,
+        // and the 19 conditional obligations.
+        assert_eq!(named.len(), 20 + 44 + 118 + 10 + 44 + 19);
         assert_eq!(
             named,
             artifacts

@@ -34,8 +34,10 @@
  * makes them agree. Each Handoff Vector names a listed Resolver Case whose
  * every expected outcome is checked and gives the vector's facts and
  * bindings, each Group ID selection vector concludes what 015's selection
- * rules conclude from its selectors, and each negotiation vector what 015's
- * portable lookup concludes from its preferences. Each row of the obligation table is one
+ * rules conclude from its selectors, each negotiation vector what 015's
+ * portable lookup concludes from its preferences, each source-locale vector
+ * the source locale 015's rules give its Intent, and each fallback vector
+ * the complete fallback order. Each row of the obligation table is one
  * inactive manifest, and nothing activates an evaluated row. It does not read
  * the design document.
  */
@@ -1883,6 +1885,57 @@ function negotiate(facts, inputs) {
   return { outcome: 'default', locale: target?.effectiveDefaultRequestedLocale, trace }
 }
 
+/**
+ * What 016 resolves an Intent's source locale to under 015's rules: a
+ * library Intent keeps its published source locale, an application Intent
+ * its explicit one, else the project default, and without either it blocks.
+ *
+ * @param locales - The vector's `projectLocales` fact.
+ * @param inputs - Its consumer inputs.
+ * @returns The relationship.
+ */
+function sourceLocale(locales, inputs) {
+  const intent = inputs?.intent ?? {}
+  const blocked = reason => ({ outcome: 'blocked', reason })
+  const resolved = (locale, origin) => ({ outcome: 'resolved', sourceLocale: locale, origin })
+  if (intent.owner === 'library') {
+    return typeof intent.publishedSourceLocale === 'string'
+      ? resolved(intent.publishedSourceLocale, 'published')
+      : blocked('library-source-locale-missing')
+  }
+  if (typeof intent.sourceLocale === 'string') {
+    return resolved(intent.sourceLocale, 'explicit')
+  }
+  return typeof locales?.defaultSourceLocale === 'string'
+    ? resolved(locales.defaultSourceLocale, 'inherited')
+    : blocked('application-source-locale-missing')
+}
+
+/**
+ * The complete fallback order 020 considers for a requested locale and an
+ * Intent's source locale: the requested locale, then its configured
+ * sequence alone, a literal as it is and the Intent source-locale candidate
+ * as the Intent's source locale.
+ *
+ * @param fallback - The vector's `messageFallback` fact.
+ * @param inputs - Its consumer inputs.
+ * @returns The relationship.
+ */
+function fallbackOrder(fallback, inputs) {
+  const requested = inputs?.requestedLocale
+  const configured = fallback?.mappings?.[requested] ?? []
+  return {
+    candidates: [
+      { locale: requested, kind: 'requested' },
+      ...configured.map(candidate =>
+        typeof candidate === 'string'
+          ? { locale: candidate, kind: 'literal' }
+          : { locale: inputs?.intentSourceLocale, kind: 'intent-source-locale' }
+      )
+    ]
+  }
+}
+
 // Each Handoff Vector names a listed Resolver Case whose every expected
 // outcome is checked, holds whole semantic groups of each such outcome's
 // profile as its facts, and as its bindings exactly the outcome's rows whose
@@ -1891,10 +1944,16 @@ function negotiate(facts, inputs) {
 // 015's selection rules conclude from its selectors (D15:2085). A
 // negotiation vector hands over the canonicalization specification, the
 // negotiation profile, and the targets, and expects what 015's portable
-// lookup or direct selection concludes from its inputs (D15:1416-1484).
+// lookup or direct selection concludes from its inputs (D15:1416-1484). A
+// source-locale vector hands over the project's locales and expects the
+// source locale 016 resolves the Intent to, or the block (D15:1369-1375); a
+// fallback vector hands over the fallback policy and the project's locales
+// and expects the complete, non-recursive candidate order (D15:1503-1522).
 let vectors = 0
 const SELECTION = '015-handoff-group-selection-'
 const NEGOTIATION = '015-handoff-negotiation-'
+const SOURCE_LOCALE = '015-handoff-source-locale-'
+const FALLBACK = '015-handoff-fallback-'
 for (const entry of index.value.handoffVectors ?? []) {
   const vector = named(entry)
   if (vector === undefined) {
@@ -1947,6 +2006,28 @@ for (const entry of index.value.handoffVectors ?? []) {
       ))
   ) {
     fail(`${entry.path}: does not expect what 015's portable lookup concludes`)
+  }
+  if (
+    entry.id.startsWith(SOURCE_LOCALE) &&
+    (!isDeepStrictEqual(Object.keys(facts), ['projectLocales']) ||
+      vector.verificationOwner !== '016' ||
+      !isDeepStrictEqual(
+        vector.expectedRelationship?.json,
+        sourceLocale(facts.projectLocales, vector.consumerInputs?.json)
+      ))
+  ) {
+    fail(`${entry.path}: does not expect the source locale 015's rules give the Intent`)
+  }
+  if (
+    entry.id.startsWith(FALLBACK) &&
+    (!isDeepStrictEqual(Object.keys(facts), ['messageFallback', 'projectLocales']) ||
+      vector.verificationOwner !== '020' ||
+      !isDeepStrictEqual(
+        vector.expectedRelationship?.json,
+        fallbackOrder(facts.messageFallback, vector.consumerInputs?.json)
+      ))
+  ) {
+    fail(`${entry.path}: does not expect the complete fallback order 015's rules give`)
   }
 }
 

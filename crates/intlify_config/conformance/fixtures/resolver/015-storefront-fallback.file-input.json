@@ -1,0 +1,26 @@
+{
+  "configuration-file": {
+    "candidate": "configuration-file",
+    "input": {
+      "bytes": {
+        "path": "fixtures/resolver/015-storefront-fallback/configuration-file.input.bytes.json",
+        "digest": "sha256:61702a1d5aa9b27f57824e07d9e70d6a2709d2898e1a8cc924dd4dd12e69b118"
+      },
+      "identity": "intlify-file-source.v0:storefront/intlify.config.json",
+      "nonSecret": true,
+      "revision": "sha256:8e2c45bdb70810f587466126baed3c746c7c07ce1725e85cefa69fb2d44cb87e",
+      "locator": {
+        "variant": "relative-path",
+        "payload": "intlify.config.json",
+        "nonSecret": true
+      }
+    }
+  },
+  "profile-selector-cli": {
+    "candidate": "profile-selector-cli",
+    "input": {
+      "report": "string",
+      "value": "app"
+    }
+  }
+}

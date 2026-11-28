@@ -1,0 +1,38 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "handoff-vector",
+  "id": "015-handoff-source-locale-library-without-a-published-source",
+  "producerCaseId": "015-storefront-checked",
+  "producerProfileFacts": {
+    "projectLocales": {
+      "requestedLocales": [
+        "en",
+        "ja"
+      ],
+      "defaultRequestedLocale": "en",
+      "defaultSourceLocale": "en"
+    }
+  },
+  "producerArtifactBindings": [],
+  "consumerInputs": {
+    "json": {
+      "intent": {
+        "owner": "library"
+      }
+    }
+  },
+  "expectedRelationship": {
+    "json": {
+      "outcome": "blocked",
+      "reason": "library-source-locale-missing"
+    }
+  },
+  "verificationOwner": "016",
+  "traceability": {
+    "decisionIds": [
+      "015-026"
+    ],
+    "ruleIds": [],
+    "checkIds": []
+  }
+}

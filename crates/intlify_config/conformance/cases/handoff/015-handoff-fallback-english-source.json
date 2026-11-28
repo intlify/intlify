@@ -1,0 +1,70 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "handoff-vector",
+  "id": "015-handoff-fallback-english-source",
+  "producerCaseId": "015-storefront-fallback",
+  "producerProfileFacts": {
+    "messageFallback": {
+      "specification": {
+        "identity": "intlify-message-locale-fallback",
+        "revision": "0"
+      },
+      "mappings": {
+        "en": [
+          "fr"
+        ],
+        "ja": [
+          "en"
+        ],
+        "ja-JP": [
+          "ja",
+          {
+            "kind": "intent-source-locale"
+          }
+        ]
+      }
+    },
+    "projectLocales": {
+      "requestedLocales": [
+        "en",
+        "ja",
+        "ja-JP"
+      ],
+      "defaultRequestedLocale": "en",
+      "defaultSourceLocale": null
+    }
+  },
+  "producerArtifactBindings": [],
+  "consumerInputs": {
+    "json": {
+      "requestedLocale": "ja-JP",
+      "intentSourceLocale": "en"
+    }
+  },
+  "expectedRelationship": {
+    "json": {
+      "candidates": [
+        {
+          "locale": "ja-JP",
+          "kind": "requested"
+        },
+        {
+          "locale": "ja",
+          "kind": "literal"
+        },
+        {
+          "locale": "en",
+          "kind": "intent-source-locale"
+        }
+      ]
+    }
+  },
+  "verificationOwner": "020",
+  "traceability": {
+    "decisionIds": [
+      "015-030"
+    ],
+    "ruleIds": [],
+    "checkIds": []
+  }
+}
