@@ -992,6 +992,66 @@
   ],
   "handoffVectors": [
     {
+      "id": "015-handoff-coverage-direct-required-direct",
+      "path": "cases/handoff/015-handoff-coverage-direct-required-direct.json",
+      "digest": "sha256:6f49fa5976d28794b916269befe293310fe806f95554d63189dd9f1f30c2c59c"
+    },
+    {
+      "id": "015-handoff-coverage-direct-required-invalid",
+      "path": "cases/handoff/015-handoff-coverage-direct-required-invalid.json",
+      "digest": "sha256:59112bcd0df6ee25270454a15b90abd1a1a22da141f19ecad5223e964131a5aa"
+    },
+    {
+      "id": "015-handoff-coverage-direct-required-missing-despite-a-fallback",
+      "path": "cases/handoff/015-handoff-coverage-direct-required-missing-despite-a-fallback.json",
+      "digest": "sha256:248d97d1eb93bd743e3265a3805e50532672e7082c579ccc16b6bb87cc41dcc0"
+    },
+    {
+      "id": "015-handoff-coverage-direct-required-source-equal",
+      "path": "cases/handoff/015-handoff-coverage-direct-required-source-equal.json",
+      "digest": "sha256:8ad30bd109c4cad89926ce939e644c1a8d36c4369e65b1497378994943f2585b"
+    },
+    {
+      "id": "015-handoff-coverage-direct-required-stale",
+      "path": "cases/handoff/015-handoff-coverage-direct-required-stale.json",
+      "digest": "sha256:592c95a79623015078c3fb0c74e95f4c28681da1a3af74a56cc47324624d81c1"
+    },
+    {
+      "id": "015-handoff-coverage-direct-required-unapproved",
+      "path": "cases/handoff/015-handoff-coverage-direct-required-unapproved.json",
+      "digest": "sha256:c3f76b59b55122231925cca85e316ca4fafde6ab0c8919756b99a41542327178"
+    },
+    {
+      "id": "015-handoff-coverage-excluded-locale",
+      "path": "cases/handoff/015-handoff-coverage-excluded-locale.json",
+      "digest": "sha256:260bf2562fb1a8d7a5397aed728b48424eec75a7304921d658a741f09daedecf"
+    },
+    {
+      "id": "015-handoff-coverage-fallback-allowed-direct",
+      "path": "cases/handoff/015-handoff-coverage-fallback-allowed-direct.json",
+      "digest": "sha256:bf15f93bf06c84bc0d23d14e5b8bee4175d58403594d11a491e95919c2af615b"
+    },
+    {
+      "id": "015-handoff-coverage-fallback-allowed-first-candidate",
+      "path": "cases/handoff/015-handoff-coverage-fallback-allowed-first-candidate.json",
+      "digest": "sha256:64c9072e32e07858d4508de2cbc8cf8ed950e4573028274446063c8ef1e1d203"
+    },
+    {
+      "id": "015-handoff-coverage-fallback-allowed-later-candidate",
+      "path": "cases/handoff/015-handoff-coverage-fallback-allowed-later-candidate.json",
+      "digest": "sha256:35ff9ec2d31a4286d09aedc350c03e7b6ba88b0bd4e7b7c79e21254943e5b008"
+    },
+    {
+      "id": "015-handoff-coverage-fallback-allowed-no-eligible-candidate",
+      "path": "cases/handoff/015-handoff-coverage-fallback-allowed-no-eligible-candidate.json",
+      "digest": "sha256:45a484d23391dbcdae947454caec13b6f50af9bccd55acbc9529bdfb0a196d19"
+    },
+    {
+      "id": "015-handoff-coverage-fallback-allowed-source-equal",
+      "path": "cases/handoff/015-handoff-coverage-fallback-allowed-source-equal.json",
+      "digest": "sha256:b9fe1d1fcdabe36eb7c00b011b5b41421338249fcec34a0c88baa18a13d0da81"
+    },
+    {
       "id": "015-handoff-fallback-english-source",
       "path": "cases/handoff/015-handoff-fallback-english-source.json",
       "digest": "sha256:7699eadaebbffb4028f63f3a5cf5203a983af72e108d5b9ccc47bc1619fb27cf"

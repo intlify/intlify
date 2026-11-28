@@ -1,0 +1,149 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "handoff-vector",
+  "id": "015-handoff-coverage-direct-required-invalid",
+  "producerCaseId": "015-storefront-fallback",
+  "producerProfileFacts": {
+    "coverage": {
+      "specification": {
+        "identity": "intlify-localization-coverage",
+        "revision": "0"
+      },
+      "vocabulary": {
+        "identity": "intlify-test-vocabulary",
+        "revision": "0",
+        "semanticDigest": "sha256:ca5f503b95aad972565514d3b68b3e8be4a811bb2fc983be16163b88c1fffbb2"
+      },
+      "defaultMode": "direct-required",
+      "decisions": {
+        "en": {
+          "checkout": "direct-required",
+          "internal-tool": "direct-required",
+          "nav": "direct-required"
+        },
+        "ja": {
+          "checkout": "fallback-allowed",
+          "internal-tool": "fallback-allowed",
+          "nav": "fallback-allowed"
+        },
+        "ja-JP": {
+          "checkout": "direct-required",
+          "internal-tool": "direct-required",
+          "nav": "direct-required"
+        }
+      }
+    },
+    "messageFallback": {
+      "specification": {
+        "identity": "intlify-message-locale-fallback",
+        "revision": "0"
+      },
+      "mappings": {
+        "en": [
+          "fr"
+        ],
+        "ja": [
+          "en"
+        ],
+        "ja-JP": [
+          "ja",
+          {
+            "kind": "intent-source-locale"
+          }
+        ]
+      }
+    },
+    "projectLocales": {
+      "requestedLocales": [
+        "en",
+        "ja",
+        "ja-JP"
+      ],
+      "defaultRequestedLocale": "en",
+      "defaultSourceLocale": null
+    },
+    "targets": {
+      "browser": {
+        "profile": {
+          "kind": "target-profile",
+          "identity": "storefront-browser",
+          "revision": "1",
+          "specificationRevision": "0",
+          "semanticDigest": "sha256:772fc476dd8a937e76f44fedf8294a1823a0794096ebd4e068368ec02fdf985d"
+        },
+        "requestedLocales": [
+          "en",
+          "ja"
+        ],
+        "defaultRequestedLocale": "en",
+        "effectiveDefaultRequestedLocale": "en"
+      },
+      "server": {
+        "profile": {
+          "kind": "target-profile",
+          "identity": "storefront-server",
+          "revision": "1",
+          "specificationRevision": "0",
+          "semanticDigest": "sha256:22dad492f9200328b031d37368bba9002ce10523355980fce0c866acc6cb9727"
+        },
+        "requestedLocales": [
+          "en",
+          "ja"
+        ],
+        "defaultRequestedLocale": null,
+        "effectiveDefaultRequestedLocale": "en"
+      }
+    }
+  },
+  "producerArtifactBindings": [
+    {
+      "key": {
+        "kind": "target-profile",
+        "identity": "storefront-server",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:22dad492f9200328b031d37368bba9002ce10523355980fce0c866acc6cb9727"
+      }
+    },
+    {
+      "key": {
+        "kind": "target-profile",
+        "identity": "storefront-browser",
+        "revision": "1",
+        "specificationRevision": "0",
+        "semanticDigest": "sha256:772fc476dd8a937e76f44fedf8294a1823a0794096ebd4e068368ec02fdf985d"
+      }
+    }
+  ],
+  "consumerInputs": {
+    "json": {
+      "targetId": "browser",
+      "requestedLocale": "en",
+      "intentSurfaceClass": "nav",
+      "intentSourceLocale": "ja",
+      "direct": "invalid",
+      "fallbackDefinitions": {
+        "fr": "eligible"
+      }
+    }
+  },
+  "expectedRelationship": {
+    "json": {
+      "requirement": "present",
+      "mode": "direct-required",
+      "sourceEqual": false,
+      "providerDemand": true,
+      "outcome": "blocked",
+      "blockingCause": "invalid"
+    }
+  },
+  "verificationOwner": "020",
+  "traceability": {
+    "decisionIds": [
+      "015-030",
+      "015-031"
+    ],
+    "ruleIds": [],
+    "checkIds": []
+  }
+}

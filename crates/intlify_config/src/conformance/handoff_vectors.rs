@@ -31,7 +31,8 @@
 //! target's supported subset and effective default with the negotiation
 //! profile and expect what the portable lookup concludes ([`negotiation`]);
 //! the seven source-locale vectors for 016 and the five fallback vectors for
-//! 020 ([`sources`]).
+//! 020 ([`sources`]); and the twelve coverage vectors for 020
+//! ([`coverage`]).
 
 use serde_json::{json, Map, Value};
 
@@ -44,6 +45,7 @@ use super::construction_cases::Cases;
 use super::index::SuiteFile;
 use super::resolver_cases::{expected_path, FALLBACK, NEGOTIATION, STOREFRONT, TWO_GROUPS};
 
+mod coverage;
 mod negotiation;
 mod sources;
 
@@ -72,6 +74,16 @@ const SOURCE_GROUPS: [SemanticGroup; 1] = [SemanticGroup::ProjectLocales];
 const FALLBACK_GROUPS: [SemanticGroup; 2] = [
     SemanticGroup::MessageFallback,
     SemanticGroup::ProjectLocales,
+];
+
+/// The semantic groups a coverage vector hands over: the decision table,
+/// the fallback policy a `fallback-allowed` requirement selects from, the
+/// project's locales, and each target's subset (D15:1552-1629).
+const COVERAGE_GROUPS: [SemanticGroup; 4] = [
+    SemanticGroup::Coverage,
+    SemanticGroup::MessageFallback,
+    SemanticGroup::ProjectLocales,
+    SemanticGroup::Targets,
 ];
 
 /// The decisions every Group ID selection vector rests on: one complete
@@ -260,7 +272,7 @@ struct Written {
 /// IDs, each produced from the expected outcome of the Resolver Case it
 /// names among the cases `resolver` writes: the Group ID selection vectors
 /// for 020, the negotiation vectors for 027, the source-locale vectors for
-/// 016, and the fallback vectors for 020.
+/// 016, the fallback vectors for 020, and the coverage vectors for 020.
 ///
 /// # Errors
 ///
@@ -352,6 +364,28 @@ pub(crate) fn cases(resolver: &Cases) -> Result<Cases, serde_json::Error> {
             relationship,
             owner: "020",
             decisions: &sources::FALLBACK_DECISIONS,
+        });
+    }
+    let groups = COVERAGE_GROUPS.map(SemanticGroup::id);
+    let on_storefront =
+        produced(&storefront, groups).expect("the storefront is checked with every group");
+    let on_fallback =
+        produced(&fallback, groups).expect("the fallback case is checked with every group");
+    for vector in &coverage::VECTORS {
+        let (producer, (facts, bindings)) = if vector.fallback_storefront {
+            (FALLBACK, &on_fallback)
+        } else {
+            (STOREFRONT, &on_storefront)
+        };
+        let (inputs, relationship) = coverage::relationship(vector, facts);
+        written.push(Written {
+            id: format!("015-handoff-coverage-{}", vector.name),
+            producer,
+            produced: (facts.clone(), bindings.clone()),
+            inputs,
+            relationship,
+            owner: "020",
+            decisions: &coverage::DECISIONS,
         });
     }
     let mut files = Vec::new();
@@ -701,6 +735,7 @@ mod tests {
                 + negotiation::VECTORS.len()
                 + sources::SOURCE_VECTORS.len()
                 + sources::FALLBACK_VECTORS.len()
+                + coverage::VECTORS.len()
         );
         let paths = vectors
             .files
@@ -716,6 +751,7 @@ mod tests {
                     "015-handoff-negotiation-",
                     "015-handoff-source-locale-",
                     "015-handoff-fallback-",
+                    "015-handoff-coverage-",
                 ]
                 .iter()
                 .any(|family| id.starts_with(family)),
