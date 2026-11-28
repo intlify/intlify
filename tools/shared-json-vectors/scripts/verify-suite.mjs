@@ -1987,6 +1987,113 @@ function coverageOutcome(facts, inputs) {
 }
 
 /**
+ * Each consumer of 015's table with its owner, the Policy kinds it receives
+ * where the profile references them, and the Target Profiles it receives:
+ * none, every target's, the selected group's members', or the one exported
+ * target's (D15:2718-2726).
+ */
+const CONSUMERS = new Map([
+  [
+    'source-producer',
+    {
+      owner: '016',
+      policies: ['source-admission-policy', 'trust-policy', 'resource-limit-policy'],
+      profiles: 'none'
+    }
+  ],
+  ['project-graph', { owner: '019', policies: 'all', profiles: 'all' }],
+  ['requirement-planner', { owner: '020', policies: ['resource-limit-policy'], profiles: 'group' }],
+  [
+    'synchronization',
+    {
+      owner: '022',
+      policies: [
+        'provider-routing-policy',
+        'glossary-set',
+        'trust-policy',
+        'resource-limit-policy'
+      ],
+      profiles: 'none'
+    }
+  ],
+  [
+    'governance-and-store',
+    {
+      owner: '021',
+      policies: [
+        'approval-policy',
+        'selection-policy',
+        'trust-policy',
+        'source-admission-policy',
+        'resource-limit-policy'
+      ],
+      profiles: 'none'
+    }
+  ],
+  [
+    'message-linker',
+    {
+      owner: '020',
+      policies: [
+        'approval-policy',
+        'selection-policy',
+        'trust-policy',
+        'source-admission-policy',
+        'resource-limit-policy'
+      ],
+      profiles: 'group'
+    }
+  ],
+  ['target-exporter', { owner: '024', policies: ['resource-limit-policy'], profiles: 'target' }],
+  [
+    'release-assembly',
+    {
+      owner: '025',
+      policies: ['approval-policy', 'selection-policy', 'trust-policy', 'resource-limit-policy'],
+      profiles: 'group'
+    }
+  ],
+  ['execution-integration', { owner: '027', policies: [], profiles: 'none' }]
+])
+
+/**
+ * The binding subset 015's consumer table gives a consumer: the keys of the
+ * complete bindings whose Policy kind it receives or whose Target Profile it
+ * receives, in the sidecar's order.
+ *
+ * @param facts - The vector's facts.
+ * @param bindings - Its producer's complete bindings.
+ * @param inputs - Its consumer inputs.
+ * @returns The relationship, or undefined for no consumer of the table.
+ */
+function bindingSubset(facts, bindings, inputs) {
+  const consumer = CONSUMERS.get(inputs?.consumer)
+  if (consumer === undefined) {
+    return undefined
+  }
+  const keys = (Array.isArray(bindings) ? bindings : []).map(row => row?.key)
+  const targets = facts?.targets ?? {}
+  const groups = facts?.deploymentGroups ?? {}
+  const profileOf = id => (Object.hasOwn(targets, id) ? targets[id]?.profile : undefined)
+  const members = Object.hasOwn(groups, inputs.selectedGroupId)
+    ? (groups[inputs.selectedGroupId]?.members ?? [])
+    : []
+  const profiles = {
+    none: [],
+    all: keys.filter(key => key?.kind === 'target-profile'),
+    group: members.map(profileOf),
+    target: [profileOf(inputs.targetId)]
+  }[consumer.profiles]
+  return {
+    bindingKeys: keys.filter(key =>
+      key?.kind === 'target-profile'
+        ? profiles.some(profile => isDeepStrictEqual(profile, key))
+        : consumer.policies === 'all' || consumer.policies.includes(key?.kind)
+    )
+  }
+}
+
+/**
  * Whether a value is a non-empty string.
  *
  * @param value - The value.
@@ -2098,6 +2205,32 @@ function inputsHaveTheirForm(id, inputs, facts) {
       isText(inputs.intentSourceLocale)
     )
   }
+  if (id.startsWith(BINDING_SUBSET)) {
+    const consumer = CONSUMERS.get(inputs?.consumer)
+    const groups = facts?.deploymentGroups
+    const group = () =>
+      isText(inputs.selectedGroupId) &&
+      groups !== null &&
+      typeof groups === 'object' &&
+      !Array.isArray(groups) &&
+      Object.hasOwn(groups, inputs.selectedGroupId)
+    if (consumer === undefined) {
+      return false
+    }
+    if (consumer.profiles === 'group') {
+      return holdsMembers(inputs, ['consumer', 'selectedGroupId']) && group()
+    }
+    if (consumer.profiles === 'target') {
+      return (
+        holdsMembers(inputs, ['consumer', 'selectedGroupId', 'targetId']) &&
+        group() &&
+        namesATarget(facts, inputs.targetId) &&
+        Array.isArray(groups[inputs.selectedGroupId]?.members) &&
+        groups[inputs.selectedGroupId].members.includes(inputs.targetId)
+      )
+    }
+    return holdsMembers(inputs, ['consumer'])
+  }
   if (id.startsWith(COVERAGE)) {
     const required = ['targetId', 'requestedLocale', 'intentSurfaceClass', 'intentSourceLocale']
     const offered = inputs?.fallbackDefinitions
@@ -2133,13 +2266,17 @@ function inputsHaveTheirForm(id, inputs, facts) {
 // and expects the complete, non-recursive candidate order (D15:1503-1522). A
 // coverage vector hands over the decision table, the fallback policy, the
 // project's locales, and the targets, and expects what 015's coverage rules
-// conclude for its requirement (D15:1552-1629).
+// conclude for its requirement (D15:1552-1629). A binding-subset vector
+// hands over the policy references, the targets, and the groups, so its
+// bindings are the complete set, and expects the subset 015's consumer table
+// gives its consumer, owned by that consumer's design (D15:2718-2726).
 let vectors = 0
 const SELECTION = '015-handoff-group-selection-'
 const NEGOTIATION = '015-handoff-negotiation-'
 const SOURCE_LOCALE = '015-handoff-source-locale-'
 const FALLBACK = '015-handoff-fallback-'
 const COVERAGE = '015-handoff-coverage-'
+const BINDING_SUBSET = '015-handoff-binding-subset-'
 for (const entry of index.value.handoffVectors ?? []) {
   const vector = named(entry)
   if (vector === undefined) {
@@ -2236,6 +2373,22 @@ for (const entry of index.value.handoffVectors ?? []) {
       ))
   ) {
     fail(`${entry.path}: does not expect what 015's coverage rules conclude`)
+  }
+  if (
+    entry.id.startsWith(BINDING_SUBSET) &&
+    (!isDeepStrictEqual(Object.keys(facts), [
+      'deploymentGroups',
+      'optionalPolicies',
+      'requiredPolicies',
+      'targets'
+    ]) ||
+      vector.verificationOwner !== CONSUMERS.get(vector.consumerInputs?.json?.consumer)?.owner ||
+      !isDeepStrictEqual(
+        vector.expectedRelationship?.json,
+        bindingSubset(facts, vector.producerArtifactBindings, vector.consumerInputs?.json)
+      ))
+  ) {
+    fail(`${entry.path}: does not expect the binding subset 015's consumer table gives`)
   }
 }
 

@@ -992,6 +992,71 @@
   ],
   "handoffVectors": [
     {
+      "id": "015-handoff-binding-subset-execution-integration",
+      "path": "cases/handoff/015-handoff-binding-subset-execution-integration.json",
+      "digest": "sha256:439680aff7ef4eb1ba8107ab5f874bfa0bea0b463396be7b66a4fa5a798dcc5f"
+    },
+    {
+      "id": "015-handoff-binding-subset-governance-and-store",
+      "path": "cases/handoff/015-handoff-binding-subset-governance-and-store.json",
+      "digest": "sha256:1b8da44b07aaff8370c732402a7449e9bd3991c5c82ccff18e7911e580f6b04a"
+    },
+    {
+      "id": "015-handoff-binding-subset-message-linker-jobs",
+      "path": "cases/handoff/015-handoff-binding-subset-message-linker-jobs.json",
+      "digest": "sha256:301307d67e0e49568cb3fea18e815a05caaa1ed0b350e1ad2cf8bad405d0346a"
+    },
+    {
+      "id": "015-handoff-binding-subset-message-linker-web",
+      "path": "cases/handoff/015-handoff-binding-subset-message-linker-web.json",
+      "digest": "sha256:a934ed76b891f509509e1e97530f993d60c108335567eace13e1e4e0541128bf"
+    },
+    {
+      "id": "015-handoff-binding-subset-project-graph",
+      "path": "cases/handoff/015-handoff-binding-subset-project-graph.json",
+      "digest": "sha256:18ac1d3c3f0e7cc80daa9dc892231fb2c5b34c9e9f56bcd231c1a2c28a9d0973"
+    },
+    {
+      "id": "015-handoff-binding-subset-release-assembly-jobs",
+      "path": "cases/handoff/015-handoff-binding-subset-release-assembly-jobs.json",
+      "digest": "sha256:50543f209e7fd0dd200805815befb24a6d5376d7c840ee4f32a4ae9c7b05b7a8"
+    },
+    {
+      "id": "015-handoff-binding-subset-release-assembly-web",
+      "path": "cases/handoff/015-handoff-binding-subset-release-assembly-web.json",
+      "digest": "sha256:f71eade327d32d851950b07e16ca10c576e6753042c954340d044944806e69dc"
+    },
+    {
+      "id": "015-handoff-binding-subset-requirement-planner-jobs",
+      "path": "cases/handoff/015-handoff-binding-subset-requirement-planner-jobs.json",
+      "digest": "sha256:f05bd20fa01e3f65333f3a097e629a70edbca8e12abaa3d93a79cab8be9a2061"
+    },
+    {
+      "id": "015-handoff-binding-subset-requirement-planner-web",
+      "path": "cases/handoff/015-handoff-binding-subset-requirement-planner-web.json",
+      "digest": "sha256:3e51d548d174d721e50ce2a47b999cdd89af010bc8180177c68086991975947c"
+    },
+    {
+      "id": "015-handoff-binding-subset-source-producer",
+      "path": "cases/handoff/015-handoff-binding-subset-source-producer.json",
+      "digest": "sha256:ec198050824a224b027a431e7406b04e87aac9b04fa086ce386b96bedf1d5274"
+    },
+    {
+      "id": "015-handoff-binding-subset-synchronization",
+      "path": "cases/handoff/015-handoff-binding-subset-synchronization.json",
+      "digest": "sha256:fe39fbf48d7a1343517150b80cd1615b500821655bd891b815ba5c5fd974931c"
+    },
+    {
+      "id": "015-handoff-binding-subset-target-exporter-server",
+      "path": "cases/handoff/015-handoff-binding-subset-target-exporter-server.json",
+      "digest": "sha256:23f1c75378257cd120e223b4473f1b1d1c1f68b32eeeef1ac306b2c1707f3d14"
+    },
+    {
+      "id": "015-handoff-binding-subset-target-exporter-worker",
+      "path": "cases/handoff/015-handoff-binding-subset-target-exporter-worker.json",
+      "digest": "sha256:7527713afc88121ad58ffd2ee6f6f21ffded14002267116bb255c874dc46ffbf"
+    },
+    {
       "id": "015-handoff-coverage-direct-required-direct",
       "path": "cases/handoff/015-handoff-coverage-direct-required-direct.json",
       "digest": "sha256:6f49fa5976d28794b916269befe293310fe806f95554d63189dd9f1f30c2c59c"
