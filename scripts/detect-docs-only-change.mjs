@@ -15,7 +15,11 @@ const defaultRootDir = fileURLToPath(new URL('..', import.meta.url))
  */
 export const testedDesignDocuments = new Set([
   // `changelog_documents_v01` in crates/ox_mf2_parser/tests/snapshot_compat.rs
-  'design/003-ox-mf2-binary-ast-format-changelog.md'
+  'design/003-ox-mf2-binary-ast-format-changelog.md',
+  // the conformance traceability report: crates/intlify_config's
+  // `generate_conformance_suite` example and `conformance::traceability`
+  // tests, and tools/shared-json-vectors' verify-traceability.mjs
+  'design/015-intlify-project-profile-and-locale-policy-design.md'
 ])
 
 /**
