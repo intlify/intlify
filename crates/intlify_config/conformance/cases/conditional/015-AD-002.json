@@ -1,0 +1,16 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "conditional-obligation",
+  "id": "015-AD-002",
+  "activation": "compatibility-conversion-adapter",
+  "activationState": "inactive",
+  "notApplicableReason": "no-compatibility-conversion-adapter",
+  "verificationOwner": "029",
+  "traceability": {
+    "decisionIds": [
+      "015-212"
+    ],
+    "ruleIds": [],
+    "checkIds": []
+  }
+}

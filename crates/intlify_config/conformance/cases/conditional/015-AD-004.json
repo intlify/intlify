@@ -1,0 +1,16 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "conditional-obligation",
+  "id": "015-AD-004",
+  "activation": "cli-adapter",
+  "activationState": "inactive",
+  "notApplicableReason": "no-cli-adapter",
+  "verificationOwner": "product-integration",
+  "traceability": {
+    "decisionIds": [
+      "015-212"
+    ],
+    "ruleIds": [],
+    "checkIds": []
+  }
+}

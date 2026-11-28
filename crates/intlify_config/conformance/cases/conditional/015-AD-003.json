@@ -1,0 +1,16 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "conditional-obligation",
+  "id": "015-AD-003",
+  "activation": "baked-canonicalization-provider",
+  "activationState": "inactive",
+  "notApplicableReason": "no-baked-canonicalization-provider",
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-212"
+    ],
+    "ruleIds": [],
+    "checkIds": []
+  }
+}

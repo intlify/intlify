@@ -24,10 +24,12 @@
 //! writes it to, with the file digest of the bytes it writes there. It pins
 //! the Case Schema ([`super::case`]) the same way, and lists each manifest by
 //! its ID, path, and file digest in the array of its kind, in ascending
-//! unsigned byte order of the IDs. The construction cases
-//! ([`super::construction_cases`]) and the input admission cases of the
-//! boundary kinds ([`super::admission_cases`]) are written; the other arrays
-//! stay empty until their cases are.
+//! unsigned byte order of the IDs: the construction cases
+//! ([`super::construction_cases`]), the input admission cases
+//! ([`super::admission_cases`]), the Resolver Cases
+//! ([`super::resolver_cases`]), the Handoff Vectors
+//! ([`super::handoff_vectors`]), and the conditional obligations
+//! ([`super::obligations`]).
 
 use serde_json::{json, Map, Value};
 
@@ -42,7 +44,7 @@ use crate::construction::root::{self, RootRole};
 use crate::model::CONFIGURATION_SCHEMA_VERSION;
 
 use super::case::{self, ManifestKind, CASE_ID_PATTERN, OBLIGATION_ID_PATTERN};
-use super::{admission_cases, construction_cases, resolver_cases};
+use super::{admission_cases, construction_cases, handoff_vectors, obligations, resolver_cases};
 
 /// The Suite Index Schema's identity.
 pub(crate) const SCHEMA_IDENTITY: &str = "intlify-project-profile-conformance-suite-index";
@@ -282,12 +284,18 @@ pub fn artifacts() -> Result<Vec<SuiteFile>, serde_json::Error> {
     let construction = construction_cases::cases()?;
     let admission = admission_cases::cases()?;
     let resolver = resolver_cases::cases()?;
+    let handoff = handoff_vectors::cases(&resolver)?;
+    let obligations = obligations::cases()?;
     let index = generate::write(&index(
         &schema,
         &case_schema,
-        &construction.listing,
-        &admission.listing,
-        &resolver.listing,
+        [
+            &construction.listing,
+            &admission.listing,
+            &resolver.listing,
+            &handoff.listing,
+            &obligations.listing,
+        ],
     )?)?;
     let mut files = vec![
         SuiteFile {
@@ -303,6 +311,8 @@ pub fn artifacts() -> Result<Vec<SuiteFile>, serde_json::Error> {
     files.extend(construction.files);
     files.extend(admission.files);
     files.extend(resolver.files);
+    files.extend(handoff.files);
+    files.extend(obligations.files);
     Ok(files)
 }
 
@@ -318,15 +328,14 @@ fn entry(identity: &str, revision: Option<&String>, artifact: &Artifact) -> Valu
 
 /// The index of the artifacts this crate writes, under the identities and
 /// revisions the Root Package admits, of the schema written as `schema`, of
-/// the Case Schema, and of the construction and input admission cases
-/// `construction` and `input_admission` list.
+/// the Case Schema, and of the manifests each of the five `listings` lists,
+/// in the order of the index's arrays.
 fn index(
     schema: &[u8],
     case_schema: &Artifact,
-    construction: &[Value],
-    input_admission: &[Value],
-    resolver: &[Value],
+    listings: [&[Value]; 5],
 ) -> Result<Value, serde_json::Error> {
+    let [construction, input_admission, resolver, handoff, obligations] = listings;
     let admission = ConstructionAdmission::revision_zero();
     let components = &admission.components;
     let root_artifacts = generate::artifacts()?;
@@ -455,7 +464,8 @@ fn index(
             Member::ResolverConstructionCases => Value::Array(construction.to_vec()),
             Member::ResolverInputAdmissionCases => Value::Array(input_admission.to_vec()),
             Member::ResolverCases => Value::Array(resolver.to_vec()),
-            Member::HandoffVectors | Member::ConditionalObligations => json!([]),
+            Member::HandoffVectors => Value::Array(handoff.to_vec()),
+            Member::ConditionalObligations => Value::Array(obligations.to_vec()),
         };
         index.insert(member.name().to_owned(), value);
     }
@@ -507,7 +517,11 @@ mod tests {
         let artifacts = artifacts().unwrap();
         let mut cases = construction_cases::cases().unwrap().files;
         cases.extend(admission_cases::cases().unwrap().files);
-        cases.extend(resolver_cases::cases().unwrap().files);
+        let resolver = resolver_cases::cases().unwrap();
+        let handoff = handoff_vectors::cases(&resolver).unwrap().files;
+        cases.extend(resolver.files);
+        cases.extend(handoff);
+        cases.extend(obligations::cases().unwrap().files);
         assert_eq!(artifacts.len(), COMMITTED.len() + cases.len());
         assert_eq!(artifacts[COMMITTED.len()..], cases);
         for (artifact, (path, bytes)) in artifacts.iter().zip(COMMITTED) {
@@ -637,7 +651,10 @@ mod tests {
             .chain(manifests)
             .map(|file| (file.path, file_digest(&file.bytes).as_str().to_owned()))
             .collect::<BTreeMap<_, _>>();
-        assert_eq!(named.len(), 20 + 44 + 118 + 7);
+        // The 20 bodies, then the 44 construction cases, the 118 input
+        // admission cases, the 8 Resolver Cases, the 12 Handoff Vectors, and
+        // the 19 conditional obligations.
+        assert_eq!(named.len(), 20 + 44 + 118 + 8 + 12 + 19);
         assert_eq!(
             named,
             artifacts

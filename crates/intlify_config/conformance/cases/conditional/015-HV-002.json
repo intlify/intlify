@@ -1,0 +1,16 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "conditional-obligation",
+  "id": "015-HV-002",
+  "activation": "expanded-fallback-probes",
+  "activationState": "inactive",
+  "notApplicableReason": "no-expanded-fallback-probes",
+  "verificationOwner": "020",
+  "traceability": {
+    "decisionIds": [
+      "015-212"
+    ],
+    "ruleIds": [],
+    "checkIds": []
+  }
+}

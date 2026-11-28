@@ -31,7 +31,12 @@
  * outcome, its Shared evidence and causes, its rows without an owner, and
  * its bindings' order, that the case traces each check its expected outcomes
  * report under the check's rule, and that its paired entries agree where 015
- * makes them agree. It does not read the design document.
+ * makes them agree. Each Handoff Vector names a listed Resolver Case whose
+ * every expected outcome is checked and gives the vector's facts and
+ * bindings, and each Group ID selection vector concludes what 015's selection
+ * rules conclude from its selectors. Each row of the obligation table is one
+ * inactive manifest, and nothing activates an evaluated row. It does not read
+ * the design document.
  */
 
 import { createHash } from 'node:crypto'
@@ -1722,6 +1727,142 @@ for (const own of resolverListing.values()) {
   }
 }
 
+/**
+ * Whether a value is a key or holds one at any depth.
+ *
+ * @param value - The value.
+ * @param key - The key.
+ * @returns Whether it holds the key.
+ */
+function holds(value, key) {
+  if (isDeepStrictEqual(value, key)) {
+    return true
+  }
+  if (Array.isArray(value)) {
+    return value.some(item => holds(item, key))
+  }
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    Object.values(value).some(member => holds(member, key))
+  )
+}
+
+/**
+ * What 015's Group ID selection rules conclude from the groups and targets a
+ * vector hands over and its selectors: one group permits omission, several
+ * require one exact Group ID, and an unknown Group ID, several selectors, a
+ * Target ID, or a subset of a group is rejected.
+ *
+ * @param facts - The vector's facts.
+ * @param inputs - Its consumer inputs.
+ * @returns The relationship.
+ */
+function selection(facts, inputs) {
+  const groups = facts?.deploymentGroups ?? {}
+  const targets = facts?.targets ?? {}
+  const selectors = Array.isArray(inputs?.groupIdSelectors) ? inputs.groupIdSelectors : []
+  const rejected = rule => ({ outcome: 'rejected', rule })
+  let group
+  if (selectors.length === 0) {
+    if (Object.keys(groups).length !== 1) {
+      return rejected('selector-required')
+    }
+    group = Object.keys(groups)[0]
+  } else if (selectors.length > 1) {
+    return rejected('multiple-selectors')
+  } else if (Object.hasOwn(groups, selectors[0])) {
+    group = selectors[0]
+  } else if (Object.hasOwn(targets, selectors[0])) {
+    return rejected('target-id-selector')
+  } else {
+    return rejected('unknown-group-id')
+  }
+  if (inputs?.targetIdSelectors !== null) {
+    return rejected('group-subset')
+  }
+  return { outcome: 'selected-group', groupId: group, plannedTargetIds: groups[group]?.members }
+}
+
+// Each Handoff Vector names a listed Resolver Case whose every expected
+// outcome is checked, holds whole semantic groups of each such outcome's
+// profile as its facts, and as its bindings exactly the outcome's rows whose
+// key a fact holds, in the outcome's order (D15:3330, 3348). A Group ID
+// selection vector hands over the groups and the targets, and expects what
+// 015's selection rules conclude from its selectors (D15:2085).
+let vectors = 0
+const SELECTION = '015-handoff-group-selection-'
+for (const entry of index.value.handoffVectors ?? []) {
+  const vector = named(entry)
+  if (vector === undefined) {
+    continue
+  }
+  vectors += 1
+  const facts = vector.producerProfileFacts ?? {}
+  const producer = resolverListing.get(vector.producerCaseId)
+  const outcomes = Object.values(producer?.outcomes ?? {})
+  const reproduced =
+    outcomes.length > 0 &&
+    outcomes.every(
+      outcome =>
+        outcome.outcome === 'checked' &&
+        Object.entries(facts).every(([group, value]) =>
+          isDeepStrictEqual(outcome.profile?.[group], value)
+        ) &&
+        isDeepStrictEqual(
+          vector.producerArtifactBindings,
+          (outcome.resolvedProfileArtifactBindings ?? []).filter(row => holds(facts, row.key))
+        )
+    )
+  if (!reproduced) {
+    fail(
+      `${entry.path}: does not hold the groups and bindings its producer's expected outcomes give`
+    )
+  }
+  if (
+    entry.id.startsWith(SELECTION) &&
+    (!isDeepStrictEqual(Object.keys(facts), ['deploymentGroups', 'targets']) ||
+      vector.verificationOwner !== '020' ||
+      !isDeepStrictEqual(
+        vector.expectedRelationship?.json,
+        selection(facts, vector.consumerInputs?.json)
+      ))
+  ) {
+    fail(`${entry.path}: does not expect what 015's Group ID selection rules conclude`)
+  }
+}
+
+// Each row of the obligation table is one manifest, inactive with its
+// not-applicable reason, since an active one would need cases no
+// revision-"0" manifest names; and nothing activates an evaluated row: the
+// Configuration Schema Authority Set maps one configuration schema revision,
+// and the Profile Specification names canonicalization specification
+// revision "0", which admits no extension but u and t (D15:1288, 3371).
+const obligationRows = [
+  ...new Set(
+    (caseSchemaBody?.definitions?.conditionalObligation?.oneOf ?? []).map(
+      row => row?.properties?.id?.const
+    )
+  )
+].toSorted(byBytes)
+const listedObligations = (index.value.conditionalObligations ?? []).map(entry => entry?.id)
+if (obligationRows.length === 0 || !isDeepStrictEqual(listedObligations, obligationRows)) {
+  fail('index: the conditional obligations are not one manifest for each row of the table')
+}
+for (const entry of index.value.conditionalObligations ?? []) {
+  const obligation = named(entry)
+  if (obligation !== undefined && obligation.activationState !== 'inactive') {
+    fail(`${entry.path}: is active, though no case its row names can be listed`)
+  }
+}
+const schemaRevisions = Object.keys(index.value.configurationSchemaAuthoritySet?.members ?? {})
+const canonicalization = named(index.value.profileSpecification)?.specificationSlots?.[
+  'locale-canonicalization'
+]
+if (schemaRevisions.length >= 2 || canonicalization?.revision !== '0') {
+  fail('index: an evaluated activation holds, which no manifest of the suite can follow')
+}
+
 // The containers list the digests the index declares for their members.
 const without = (entry, name) =>
   Object.fromEntries(Object.entries(entry ?? {}).filter(([key]) => key !== name))
@@ -1773,5 +1914,5 @@ for (const [module, name, pointer] of PINS) {
 finish()
 
 console.log(
-  `conformance suite index agrees: ${MEMBERS.length} members, ${bodies} bodies of which ${manifests} manifests, ${fixtures} construction fixtures, ${admissionFixtures} input admission fixtures (${stepCases} of the admission steps), ${resolverCases} Resolver Cases with ${expectedOutcomes} expected outcomes and ${relations} relations, ${objects} closed schema objects, ${PINS.length} pinned digests`
+  `conformance suite index agrees: ${MEMBERS.length} members, ${bodies} bodies of which ${manifests} manifests, ${fixtures} construction fixtures, ${admissionFixtures} input admission fixtures (${stepCases} of the admission steps), ${resolverCases} Resolver Cases with ${expectedOutcomes} expected outcomes and ${relations} relations, ${vectors} Handoff Vectors, ${listedObligations.length} conditional obligations, ${objects} closed schema objects, ${PINS.length} pinned digests`
 )

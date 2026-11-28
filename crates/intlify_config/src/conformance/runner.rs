@@ -39,8 +39,16 @@
 //!    Snapshot (D15:3158, 3162, 3252). An admission step's case has no such
 //!    part: its capability is one of its slots, or bounds its entry, and a
 //!    refusal is the step's own result (D15:3166, 3168).
+//! 7. that each Handoff Vector reproduces its producer: the Resolver Case its
+//!    `producerCaseId` names is listed, and each of its expected outcomes is
+//!    checked and gives the vector's facts and bindings, the semantic groups
+//!    the facts name and the binding rows their values reference (D15:3330,
+//!    3348); and that each conditional obligation is inactive, as an
+//!    evaluated activation must compute from the Suite Index and the Profile
+//!    Specification, since an active one would need cases its row names,
+//!    which no revision-`"0"` manifest can name (D15:3371).
 //!
-//! Steps 5 and 6 go entry by entry: an entry's body, its manifest and
+//! Steps 5 to 7 go entry by entry: an entry's body, its manifest and
 //! fixture, and an input admission case's construction are checked before
 //! the next entry's body is read.
 //!
@@ -78,9 +86,11 @@ use super::admission;
 use super::case::{self, input_fixture, ManifestKind, RelationKind};
 use super::construction::{self, Constructed};
 use super::fixture::{references, Bodies};
+use super::handoff_vectors::produced;
 use super::index::{
     Member, SCHEMA_DIGEST, SCHEMA_IDENTITY, SCHEMA_PATH, SCHEMA_REVISION, SUITE_REVISION,
 };
+use super::obligations;
 use super::resolution::{self, Resolved, Unrunnable};
 
 /// Why a suite does not open: a Conformance harness failure (D15:2858).
@@ -116,6 +126,15 @@ pub enum HarnessFailure {
     /// entry's inputs are not admitted as its fixtures give them (D15:3158,
     /// 3162, 3219, 3252).
     InvalidCase(String),
+    /// The Handoff Vector with this ID does not reproduce its producer: its
+    /// `producerCaseId` names no listed Resolver Case, or an expected outcome
+    /// of that case is not checked or gives other facts or bindings than the
+    /// vector holds (D15:3330, 3348).
+    UnreproducedVector(String),
+    /// The conditional obligation with this ID is not in the state the
+    /// harness finds: it is active, or its evaluated activation holds
+    /// (D15:3371).
+    UnmetObligation(String),
 }
 
 impl fmt::Display for HarnessFailure {
@@ -138,6 +157,15 @@ impl fmt::Display for HarnessFailure {
                 member.name()
             ),
             Self::InvalidCase(id) => write!(formatter, "case {id} cannot run"),
+            Self::UnreproducedVector(id) => {
+                write!(
+                    formatter,
+                    "handoff vector {id} does not reproduce its producer"
+                )
+            }
+            Self::UnmetObligation(id) => {
+                write!(formatter, "conditional obligation {id} is not inactive")
+            }
         }
     }
 }
@@ -401,6 +429,8 @@ pub fn open(index: &Path) -> Result<Opened, HarnessFailure> {
     listed_once(&value)?;
     let mut closure = Closure {
         root,
+        index: &value,
+        profile: None,
         verified: vec![(SCHEMA_PATH.to_owned(), SCHEMA_DIGEST.to_owned())],
         bodies: Bodies::new(),
         case_schema: None,
@@ -657,6 +687,10 @@ fn canonical(member: Member) -> Value {
 /// read from it, and the cases listed so far.
 struct Closure<'a> {
     root: &'a Path,
+    /// The index, from which the harness computes an evaluated activation.
+    index: &'a Value,
+    /// The Profile Specification's body, once it is verified.
+    profile: Option<Value>,
     verified: Vec<(String, String)>,
     bodies: Bodies,
     case_schema: Option<(Schema, Value)>,
@@ -683,6 +717,7 @@ impl Closure<'_> {
             let bytes = self.body(path, text(&entry["digest"]))?;
             if member == Member::ProfileSpecification {
                 semantic(path, &bytes, text(&entry["semanticDigest"]))?;
+                self.profile = strict_json(&bytes);
             } else if member == Member::CaseSchema {
                 let document = strict_json(&bytes).expect("a pinned schema is strict JSON");
                 self.case_schema = Some((compile(&bytes), document));
@@ -789,7 +824,51 @@ impl Closure<'_> {
         if kind == ManifestKind::Resolver {
             self.resolver_case(&manifest)?;
         }
+        if kind == ManifestKind::HandoffVector {
+            self.handoff_vector(&manifest)?;
+        }
+        if kind == ManifestKind::ConditionalObligation {
+            let id = text(&manifest["id"]);
+            let profile = self
+                .profile
+                .as_ref()
+                .expect("the Profile Specification is verified before the manifests");
+            let active = manifest["activationState"] == "active";
+            if !obligations::met(id, active, self.index, profile) {
+                return Err(HarnessFailure::UnmetObligation(id.to_owned()));
+            }
+        }
         Ok(())
+    }
+
+    /// Check that a Handoff Vector reproduces its producer: the Resolver
+    /// Case its `producerCaseId` names is listed, and each of its expected
+    /// outcomes gives the vector's facts and bindings (D15:3330, 3348). The
+    /// Resolver Cases precede the vectors in the index.
+    fn handoff_vector(&self, manifest: &Value) -> Result<(), HarnessFailure> {
+        let facts = manifest["producerProfileFacts"]
+            .as_object()
+            .expect("the Case Schema makes the facts an object");
+        let held = Some((
+            manifest["producerProfileFacts"].clone(),
+            manifest["producerArtifactBindings"].clone(),
+        ));
+        let reproduced = self
+            .resolver
+            .iter()
+            .find(|case| case.id == text(&manifest["producerCaseId"]))
+            .is_some_and(|case| {
+                case.entries.iter().all(|entry| {
+                    produced(&entry.expected, facts.keys().map(String::as_str)) == held
+                })
+            });
+        if reproduced {
+            Ok(())
+        } else {
+            Err(HarnessFailure::UnreproducedVector(
+                text(&manifest["id"]).to_owned(),
+            ))
+        }
     }
 
     /// List a Resolver Case with its fixtures, once the construction case it
@@ -971,7 +1050,7 @@ mod tests {
     use super::*;
     use crate::conformance::construction_cases::{self, CONSTRUCTED};
     use crate::conformance::index::PATH;
-    use crate::conformance::{admission_cases, resolver_cases};
+    use crate::conformance::{admission_cases, handoff_vectors, resolver_cases};
     use crate::construction::generate;
 
     /// Every body the committed suite holds, in the order the runner verifies
@@ -1394,15 +1473,20 @@ mod tests {
     /// The committed fixture of the constructing case.
     const FIXTURE: &str = "fixtures/construction/015-construction-revision-0.json";
 
-    /// The paths of the files the committed cases add to the suite.
+    /// The paths of the files the committed cases, vectors, and
+    /// obligations add to the suite.
     fn written_cases() -> BTreeSet<String> {
         let construction = construction_cases::cases().unwrap().files;
         let admission = admission_cases::cases().unwrap().files;
-        let resolver = resolver_cases::cases().unwrap().files;
+        let resolver = resolver_cases::cases().unwrap();
+        let handoff = handoff_vectors::cases(&resolver).unwrap().files;
+        let obligations = obligations::cases().unwrap().files;
         construction
             .into_iter()
             .chain(admission)
-            .chain(resolver)
+            .chain(resolver.files)
+            .chain(handoff)
+            .chain(obligations)
             .map(|file| file.path)
             .collect()
     }
@@ -1465,7 +1549,9 @@ mod tests {
         /// Write each manifest's bytes below `cases/` and list it in the
         /// member's array, in the order given. Listing construction cases
         /// lists no input admission case and no Resolver Case, since each
-        /// committed one names a committed construction case.
+        /// committed one names a committed construction case, and listing
+        /// either lists no Handoff Vector, since each committed one names a
+        /// committed Resolver Case.
         fn list(&self, member: Member, manifests: &[(&str, Vec<u8>)]) {
             let entries = manifests
                 .iter()
@@ -1480,6 +1566,12 @@ mod tests {
                 if member == Member::ResolverConstructionCases {
                     index[Member::ResolverInputAdmissionCases.name()] = json!([]);
                     index[Member::ResolverCases.name()] = json!([]);
+                }
+                if matches!(
+                    member,
+                    Member::ResolverConstructionCases | Member::ResolverCases
+                ) {
+                    index[Member::HandoffVectors.name()] = json!([]);
                 }
             });
         }
@@ -1792,6 +1884,14 @@ mod tests {
             (
                 HarnessFailure::InvalidCase("015-a".to_owned()),
                 "case 015-a cannot run",
+            ),
+            (
+                HarnessFailure::UnreproducedVector("015-a".to_owned()),
+                "handoff vector 015-a does not reproduce its producer",
+            ),
+            (
+                HarnessFailure::UnmetObligation("015-XV-001".to_owned()),
+                "conditional obligation 015-XV-001 is not inactive",
             ),
         ] {
             assert_eq!(failure.to_string(), message);
@@ -2505,5 +2605,125 @@ mod tests {
             .find(|outcome| outcome.id == "015-b")
             .unwrap();
         assert!(step.passed(), "{}", step.actual);
+    }
+
+    /// The committed suite with the manifest `id` of `member` changed by
+    /// `change`, which may write fixtures below the suite root, and its new
+    /// digest declared.
+    fn changed_manifest(
+        member: Member,
+        id: &str,
+        change: impl FnOnce(&Suite, &mut Value),
+    ) -> Suite {
+        let suite = Suite::new();
+        let index: Value = serde_json::from_slice(&suite.read(PATH)).unwrap();
+        let entries = index[member.name()].as_array().unwrap();
+        let at = entries.iter().position(|entry| entry["id"] == id).unwrap();
+        let path = entries[at]["path"].as_str().unwrap().to_owned();
+        let mut manifest: Value = serde_json::from_slice(&suite.read(&path)).unwrap();
+        change(&suite, &mut manifest);
+        let pointer = format!("/{}/{at}/digest", member.name());
+        suite.replace(&path, &bytes(&manifest), &pointer);
+        suite
+    }
+
+    /// The first vector by ID, which the storefront produces.
+    const VECTOR: &str = "015-handoff-group-selection-one-group-group-id";
+
+    /// A change to a vector, beside its producer's expected outcome, which
+    /// it may copy from.
+    type Change = fn(&mut Value, &Value);
+
+    /// A Handoff Vector reproduces its producer: the facts are whole groups
+    /// of each expected outcome of a listed checked Resolver Case, and the
+    /// bindings exactly the rows they reference, in the outcome's order
+    /// (D15:3330, 3348).
+    #[test]
+    fn a_handoff_vector_reproduces_its_producer() {
+        let vectors = Member::HandoffVectors;
+        let unreproduced = Err(HarnessFailure::UnreproducedVector(VECTOR.to_owned()));
+        let expected: Value = serde_json::from_slice(
+            &std::fs::read(committed().join(resolver_cases::expected_path(STOREFRONT, "file")))
+                .unwrap(),
+        )
+        .unwrap();
+        // Another group, with the rows it references, is reproduced too.
+        let suite = changed_manifest(vectors, VECTOR, |_, vector| {
+            let facts = &mut vector["producerProfileFacts"];
+            facts["requiredPolicies"] = expected["profile"]["requiredPolicies"].clone();
+            let groups = facts
+                .as_object()
+                .unwrap()
+                .keys()
+                .cloned()
+                .collect::<Vec<_>>();
+            let (_, bindings) = produced(&expected, groups.iter().map(String::as_str)).unwrap();
+            vector["producerArtifactBindings"] = bindings;
+        });
+        assert!(suite.open().is_ok());
+        let changes: [(&str, Change); 7] = [
+            ("a member out of order", |vector, _| {
+                vector["producerProfileFacts"]["deploymentGroups"]["web"]["members"] =
+                    json!(["server", "browser"]);
+            }),
+            ("a group without its rows", |vector, expected| {
+                vector["producerProfileFacts"]["requiredPolicies"] =
+                    expected["profile"]["requiredPolicies"].clone();
+            }),
+            ("a row missing", |vector, _| {
+                vector["producerArtifactBindings"]
+                    .as_array_mut()
+                    .unwrap()
+                    .pop();
+            }),
+            ("the rows out of order", |vector, _| {
+                vector["producerArtifactBindings"]
+                    .as_array_mut()
+                    .unwrap()
+                    .reverse();
+            }),
+            ("a blocked producer", |vector, _| {
+                vector["producerCaseId"] = json!("015-locale-default-not-in-project");
+            }),
+            ("another checked producer", |vector, _| {
+                vector["producerCaseId"] = json!(resolver_cases::TWO_GROUPS);
+            }),
+            ("an unlisted producer", |vector, _| {
+                vector["producerCaseId"] = json!("015-unlisted");
+            }),
+        ];
+        for (change, apply) in changes {
+            let suite = changed_manifest(vectors, VECTOR, |_, vector| apply(vector, &expected));
+            assert_eq!(suite.open(), unreproduced, "{change}");
+        }
+        // Each expected outcome must reproduce it, the programmatic one too.
+        let suite = changed_manifest(Member::ResolverCases, STOREFRONT, |suite, manifest| {
+            let pointer = "/entries/programmatic/expectedOutcomeFixture";
+            change_fixture(suite, manifest, pointer, |outcome| {
+                outcome["profile"]["targets"]["browser"]["requestedLocales"] = json!(["ja"]);
+            });
+        });
+        assert_eq!(suite.open(), unreproduced);
+    }
+
+    /// A conditional obligation is inactive: an active one, evaluated or
+    /// declared, would need cases its row names, which no revision-"0"
+    /// manifest can name (D15:3371).
+    #[test]
+    fn a_conditional_obligation_is_inactive_while_nothing_activates_it() {
+        for id in ["015-XV-001", "015-XV-002", "015-AD-001", "015-HV-013"] {
+            let suite = changed_manifest(Member::ConditionalObligations, id, |_, obligation| {
+                obligation["activationState"] = json!("active");
+                obligation
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("notApplicableReason");
+            });
+            assert_eq!(
+                suite.open(),
+                Err(HarnessFailure::UnmetObligation(id.to_owned())),
+                "{id}"
+            );
+        }
     }
 }

@@ -1,0 +1,16 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "conditional-obligation",
+  "id": "015-XV-002",
+  "activation": "extension-admitting-canonicalization-specification-revision",
+  "activationState": "inactive",
+  "notApplicableReason": "no-extension-admitting-canonicalization-specification-revision",
+  "verificationOwner": "intlify_config",
+  "traceability": {
+    "decisionIds": [
+      "015-212"
+    ],
+    "ruleIds": [],
+    "checkIds": []
+  }
+}

@@ -23,9 +23,12 @@
 //!
 //! This crate checks in its suite below `conformance/`, with the index at
 //! `suite-index-v0.json`, and writes its construction cases
-//! ([`construction_cases`]) and input admission cases
-//! ([`admission_cases`]). The runner reads files, so like the benchmark it is
-//! no part of a resolution: only tests and the developer examples build it.
+//! ([`construction_cases`]), input admission cases ([`admission_cases`]),
+//! Resolver Cases ([`resolver_cases`]), Handoff Vectors
+//! ([`handoff_vectors`]), and conditional obligations ([`obligations`]); the
+//! runner verifies the last two when it opens the suite, and runs neither.
+//! The runner reads files, so like the benchmark it is no part of a
+//! resolution: only tests and the developer examples build it.
 
 pub(crate) mod admission;
 pub(crate) mod admission_cases;
@@ -33,7 +36,9 @@ pub(crate) mod case;
 pub(crate) mod construction;
 pub(crate) mod construction_cases;
 pub(crate) mod fixture;
+pub(crate) mod handoff_vectors;
 pub(crate) mod index;
+pub(crate) mod obligations;
 pub(crate) mod resolution;
 pub(crate) mod resolver_cases;
 pub(crate) mod runner;

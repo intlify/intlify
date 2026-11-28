@@ -1,0 +1,16 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "conditional-obligation",
+  "id": "015-HV-010",
+  "activation": "025-handoff-consumer-form",
+  "activationState": "inactive",
+  "notApplicableReason": "no-025-handoff-consumer-form",
+  "verificationOwner": "025",
+  "traceability": {
+    "decisionIds": [
+      "015-217"
+    ],
+    "ruleIds": [],
+    "checkIds": []
+  }
+}
