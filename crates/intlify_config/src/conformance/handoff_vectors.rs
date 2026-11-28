@@ -31,8 +31,10 @@
 //! target's supported subset and effective default with the negotiation
 //! profile and expect what the portable lookup concludes ([`negotiation`]);
 //! the seven source-locale vectors for 016 and the five fallback vectors for
-//! 020 ([`sources`]); and the twelve coverage vectors for 020
-//! ([`coverage`]).
+//! 020 ([`sources`]); the twelve coverage vectors for 020 ([`coverage`]);
+//! and the thirteen binding-subset vectors, which hand each consumer of
+//! 015's table the minimum projection of the bindings it receives
+//! ([`bindings`]).
 
 use serde_json::{json, Map, Value};
 
@@ -45,6 +47,7 @@ use super::construction_cases::Cases;
 use super::index::SuiteFile;
 use super::resolver_cases::{expected_path, FALLBACK, NEGOTIATION, STOREFRONT, TWO_GROUPS};
 
+mod bindings;
 mod coverage;
 mod negotiation;
 mod sources;
@@ -83,6 +86,16 @@ const COVERAGE_GROUPS: [SemanticGroup; 4] = [
     SemanticGroup::Coverage,
     SemanticGroup::MessageFallback,
     SemanticGroup::ProjectLocales,
+    SemanticGroup::Targets,
+];
+
+/// The semantic groups a binding-subset vector hands over: the policy
+/// references, each target's Target Profile reference, and the groups that
+/// select targets, so its bindings are the complete set (D15:2714).
+const BINDING_GROUPS: [SemanticGroup; 4] = [
+    SemanticGroup::DeploymentGroups,
+    SemanticGroup::OptionalPolicies,
+    SemanticGroup::RequiredPolicies,
     SemanticGroup::Targets,
 ];
 
@@ -272,7 +285,8 @@ struct Written {
 /// IDs, each produced from the expected outcome of the Resolver Case it
 /// names among the cases `resolver` writes: the Group ID selection vectors
 /// for 020, the negotiation vectors for 027, the source-locale vectors for
-/// 016, the fallback vectors for 020, and the coverage vectors for 020.
+/// 016, the fallback vectors for 020, the coverage vectors for 020, and the
+/// binding-subset vectors for each consumer of 015's table.
 ///
 /// # Errors
 ///
@@ -386,6 +400,28 @@ pub(crate) fn cases(resolver: &Cases) -> Result<Cases, serde_json::Error> {
             relationship,
             owner: "020",
             decisions: &coverage::DECISIONS,
+        });
+    }
+    let groups = BINDING_GROUPS.map(SemanticGroup::id);
+    let on_storefront =
+        produced(&storefront, groups).expect("the storefront is checked with every group");
+    let on_two_groups =
+        produced(&two, groups).expect("the two-group storefront is checked with every group");
+    for vector in &bindings::VECTORS {
+        let (producer, (facts, bindings)) = if vector.two_groups {
+            (TWO_GROUPS, &on_two_groups)
+        } else {
+            (STOREFRONT, &on_storefront)
+        };
+        let (inputs, relationship) = bindings::relationship(vector, facts, bindings);
+        written.push(Written {
+            id: format!("015-handoff-binding-subset-{}", vector.name),
+            producer,
+            produced: (facts.clone(), bindings.clone()),
+            inputs,
+            relationship,
+            owner: vector.consumer.owner(),
+            decisions: &bindings::DECISIONS,
         });
     }
     let mut files = Vec::new();
@@ -736,6 +772,7 @@ mod tests {
                 + sources::SOURCE_VECTORS.len()
                 + sources::FALLBACK_VECTORS.len()
                 + coverage::VECTORS.len()
+                + bindings::VECTORS.len()
         );
         let paths = vectors
             .files
@@ -752,6 +789,7 @@ mod tests {
                     "015-handoff-source-locale-",
                     "015-handoff-fallback-",
                     "015-handoff-coverage-",
+                    "015-handoff-binding-subset-",
                 ]
                 .iter()
                 .any(|family| id.starts_with(family)),
