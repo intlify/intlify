@@ -62,6 +62,9 @@ pub(crate) const STOREFRONT: &str = "015-storefront-checked";
 /// The storefront with a second group.
 pub(crate) const TWO_GROUPS: &str = "015-storefront-two-groups";
 
+/// The storefront whose targets negotiate among more locales.
+pub(crate) const NEGOTIATION: &str = "015-storefront-negotiation";
+
 /// Where the suite holds the committed canonicalization data, below its
 /// root.
 pub(crate) const DATA: &str = "fixtures/resolver/locale-data";
@@ -129,6 +132,16 @@ const TARGETS: [(&str, &str, &str); 2] = [
 /// The second group a storefront may have: its Group ID, and its one
 /// member's Target ID and Target Profile identity.
 const JOBS: (&str, &str, &str) = ("jobs", "worker", "storefront-worker");
+
+/// The locales the negotiation storefront requests, its browser and server
+/// supporting each: a language with a script beside it, a region, and the
+/// storefront's two.
+const NEGOTIATED: [&str; 6] = ["de", "en", "fr-FR", "ja", "zh", "zh-Hant"];
+
+/// The negotiation storefront's aliases (D15:1478): a region to a supported
+/// locale of another language, the language `fr` to its supported region,
+/// and a supported locale itself to another, which an exact match precedes.
+const ALIASES: [(&str, &str); 3] = [("en-AU", "fr-FR"), ("fr", "fr-FR"), ("fr-FR", "en")];
 
 /// The Verification Input trusted setup supplies, by identity and revision.
 const VERIFICATION: (&str, &str) = ("intlify-conformance-verification-input", "0");
@@ -313,19 +326,63 @@ impl Storefront {
     /// requests `ja` alone, by default, under a Target Profile without a
     /// hydration role.
     fn two_groups() -> Self {
-        let (group, target, identity) = JOBS;
         let mut storefront = Self::new();
+        storefront.add_worker(&["ja"]);
+        storefront
+    }
+
+    /// Add the second group, `jobs`, whose one member `worker` requests
+    /// `requested`, `ja` by default, under a Target Profile without a
+    /// hydration role.
+    fn add_worker(&mut self, requested: &[&str]) {
+        let (group, target, identity) = JOBS;
         let mut content = sample(ArtifactKind::TargetProfile);
         content["hydration"]["roles"] = json!([]);
         let member = envelope_of(ArtifactKind::TargetProfile, identity, "1", content);
-        let app = &mut storefront.config["profiles"][SELECTED];
+        let app = &mut self.config["profiles"][SELECTED];
         app["targetProfiles"][target] = json!({
             "profile": reference_value(&tuple_of(&member)),
-            "requestedLocales": ["ja"],
+            "requestedLocales": requested,
             "defaultRequestedLocale": "ja",
         });
         app["deploymentGroups"][group] = json!({ "members": [target], "hydrationRelations": [] });
-        storefront.members.push(member);
+        self.members.push(member);
+    }
+
+    /// The storefront whose project, browser, and server request the six
+    /// negotiated locales, with the negotiation aliases, and whose second
+    /// group's `worker` requests `en` and `ja`, `ja` by default: two
+    /// supported subsets the same preferences negotiate differently from.
+    /// The browser's and the server's Target Profiles give each of the six a
+    /// direction.
+    fn negotiation() -> Self {
+        let mut storefront = Self::new();
+        let directions = NEGOTIATED
+            .map(|locale| json!({ "locale": locale, "direction": "LTR" }))
+            .to_vec();
+        let app = &mut storefront.config["profiles"][SELECTED];
+        app["requestedLocales"] = json!(NEGOTIATED);
+        app["localeNegotiation"]["aliases"] = ALIASES
+            .iter()
+            .map(|(key, destination)| ((*key).to_owned(), json!(destination)))
+            .collect::<Map<_, _>>()
+            .into();
+        for (target, identity, role) in TARGETS {
+            let mut content = sample(ArtifactKind::TargetProfile);
+            content["hydration"]["roles"] = json!([role]);
+            content["locale"]["directions"] = json!(directions);
+            let member = envelope_of(ArtifactKind::TargetProfile, identity, "1", content);
+            let app = &mut storefront.config["profiles"][SELECTED];
+            app["targetProfiles"][target]["requestedLocales"] = json!(NEGOTIATED);
+            app["targetProfiles"][target]["profile"] = reference_value(&tuple_of(&member));
+            let at = storefront
+                .members
+                .iter()
+                .position(|held| tuple_of(held).identity.as_str() == identity)
+                .expect("the storefront holds each target's Target Profile");
+            storefront.members[at] = member;
+        }
+        storefront.add_worker(&["en", "ja"]);
         storefront
     }
 
@@ -589,8 +646,9 @@ impl Case {
 /// requested locales, blocked with Shared evidence; a requested locale
 /// added, a mutation; its bytes unclosed, a file-only case without Shared
 /// evidence; and each diagnostic domain exhausting, Entry before any Shared
-/// evidence and Shared beside a complete Entry; and the storefront with a
-/// second group, checked. Each relation compares its case with the
+/// evidence and Shared beside a complete Entry; the storefront negotiating
+/// among six locales, with aliases and a second group, checked; and the
+/// storefront with a second group, checked. Each relation compares its case with the
 /// storefront (D15:3305).
 fn all(constructed: &ConstructedResolver) -> Vec<Case> {
     use RelationKind as Kind;
@@ -606,6 +664,7 @@ fn all(constructed: &ConstructedResolver) -> Vec<Case> {
         .expect("the collection lists its members")
         .reverse();
     let two = Storefront::two_groups();
+    let negotiation = Storefront::negotiation();
     let mut added = Storefront::new();
     added.config["profiles"][SELECTED]["requestedLocales"] = json!(["ja", "en", "fr"]);
     let changed = [Kind::InvocationStale, Kind::MaterializedInputChanged];
@@ -687,6 +746,15 @@ fn all(constructed: &ConstructedResolver) -> Vec<Case> {
             file: Side::Paired(storefront.file()),
             programmatic: Side::Paired(storefront.programmatic()),
             decisions: &["015-037", "015-060", "015-064", "015-066"],
+            checks: &[],
+            relations: Vec::new(),
+        },
+        Case {
+            id: NEGOTIATION,
+            common: negotiation.common(constructed),
+            file: Side::Paired(negotiation.file()),
+            programmatic: Side::Paired(negotiation.programmatic()),
+            decisions: &["015-029", "015-055", "015-063"],
             checks: &[],
             relations: Vec::new(),
         },
