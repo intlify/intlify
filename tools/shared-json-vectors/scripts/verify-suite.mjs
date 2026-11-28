@@ -38,7 +38,9 @@
  * portable lookup concludes from its preferences, each source-locale vector
  * the source locale 015's rules give its Intent, each fallback vector the
  * complete fallback order, and each coverage vector what 015's coverage
- * rules conclude for its requirement. Each row of the obligation table is one
+ * rules conclude for its requirement; each vector belongs to one of those
+ * families and its consumer inputs have the members and forms the family
+ * gives them. Each row of the obligation table is one
  * inactive manifest, and nothing activates an evaluated row. It does not read
  * the design document.
  */
@@ -1983,6 +1985,111 @@ function coverageOutcome(facts, inputs) {
   return { ...head, outcome: 'blocked', blockingCause: inputs?.direct }
 }
 
+/**
+ * Whether a value is a non-empty string.
+ *
+ * @param value - The value.
+ * @returns Whether it is.
+ */
+function isText(value) {
+  return typeof value === 'string' && value.length > 0
+}
+
+/**
+ * Whether a value is a list of non-empty strings.
+ *
+ * @param value - The value.
+ * @returns Whether it is.
+ */
+function isTextList(value) {
+  return Array.isArray(value) && value.every(isText)
+}
+
+/** The states of a definition a Store offers a coverage requirement. */
+const DEFINITION_STATES = ['eligible', 'missing', 'stale', 'invalid', 'unapproved']
+
+/**
+ * Whether a value is an object whose members are exactly some of `allowed`
+ * and all of `required`.
+ *
+ * @param value - The value.
+ * @param required - The members it must hold.
+ * @param allowed - The members it may hold besides.
+ * @returns Whether it is.
+ */
+function holdsMembers(value, required, allowed = []) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return false
+  }
+  const names = Object.keys(value)
+  return (
+    required.every(name => names.includes(name)) &&
+    names.every(name => required.includes(name) || allowed.includes(name))
+  )
+}
+
+/**
+ * Whether a vector's consumer inputs have the members and forms its family
+ * gives them, so no missing or misspelled input can stand for an absent one.
+ *
+ * @param id - The vector's ID.
+ * @param inputs - Its consumer inputs.
+ * @returns Whether they do, or undefined for an ID in no family.
+ */
+function inputsHaveTheirForm(id, inputs) {
+  if (id.startsWith(SELECTION)) {
+    return (
+      holdsMembers(inputs, ['groupIdSelectors', 'targetIdSelectors']) &&
+      isTextList(inputs.groupIdSelectors) &&
+      (inputs.targetIdSelectors === null || isTextList(inputs.targetIdSelectors))
+    )
+  }
+  if (id.startsWith(NEGOTIATION)) {
+    return (
+      (holdsMembers(inputs, ['targetId', 'preferences']) &&
+        isText(inputs.targetId) &&
+        isTextList(inputs.preferences)) ||
+      (holdsMembers(inputs, ['targetId', 'direct']) &&
+        isText(inputs.targetId) &&
+        isText(inputs.direct))
+    )
+  }
+  if (id.startsWith(SOURCE_LOCALE)) {
+    const intent = inputs?.intent
+    const own = { application: 'sourceLocale', library: 'publishedSourceLocale' }[intent?.owner]
+    return (
+      holdsMembers(inputs, ['intent']) &&
+      own !== undefined &&
+      holdsMembers(intent, ['owner'], [own]) &&
+      (intent[own] === undefined || isText(intent[own]))
+    )
+  }
+  if (id.startsWith(FALLBACK)) {
+    return (
+      holdsMembers(inputs, ['requestedLocale', 'intentSourceLocale']) &&
+      isText(inputs.requestedLocale) &&
+      isText(inputs.intentSourceLocale)
+    )
+  }
+  if (id.startsWith(COVERAGE)) {
+    const required = ['targetId', 'requestedLocale', 'intentSurfaceClass', 'intentSourceLocale']
+    const offered = inputs?.fallbackDefinitions
+    return (
+      holdsMembers(inputs, required, ['direct', 'fallbackDefinitions']) &&
+      required.every(name => isText(inputs[name])) &&
+      (inputs.direct === undefined || DEFINITION_STATES.includes(inputs.direct)) &&
+      (offered === undefined ||
+        (offered !== null &&
+          typeof offered === 'object' &&
+          !Array.isArray(offered) &&
+          Object.entries(offered).every(
+            ([locale, state]) => isText(locale) && DEFINITION_STATES.includes(state)
+          )))
+    )
+  }
+  return undefined
+}
+
 // Each Handoff Vector names a listed Resolver Case whose every expected
 // outcome is checked, holds whole semantic groups of each such outcome's
 // profile as its facts, and as its bindings exactly the outcome's rows whose
@@ -2031,6 +2138,12 @@ for (const entry of index.value.handoffVectors ?? []) {
     fail(
       `${entry.path}: does not hold the groups and bindings its producer's expected outcomes give`
     )
+  }
+  const formed = inputsHaveTheirForm(entry.id, vector.consumerInputs?.json)
+  if (formed === undefined) {
+    fail(`${entry.path}: belongs to no vector family this checker knows`)
+  } else if (!formed) {
+    fail(`${entry.path}: its consumer inputs do not have its family's form`)
   }
   if (
     entry.id.startsWith(SELECTION) &&
