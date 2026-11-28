@@ -763,6 +763,64 @@ mod tests {
         );
     }
 
+    /// A suite of these manifests and files alone.
+    fn suite_of(manifests: Vec<(&'static str, Value)>, files: &[(&str, &str)]) -> Suite {
+        Suite {
+            manifests,
+            files: files
+                .iter()
+                .map(|(path, text)| ((*path).to_owned(), text.as_bytes().to_vec()))
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn a_boundary_kind_needs_an_admitted_and_a_rejected_case() {
+        let (kind, _) = BOUNDARIES[0];
+        let case = |id: &str, admitted: bool| {
+            (
+                "resolverInputAdmissionCases",
+                json!({ "id": id, "boundaryKind": kind, "expected": { "admitted": admitted } }),
+            )
+        };
+        let traced_kind = |manifests| {
+            let mut traced = Vec::new();
+            admission(&suite_of(manifests, &[]), &mut traced);
+            traced
+                .into_iter()
+                .find(|subject| subject.kind == "boundary-kind" && subject.id == kind)
+                .unwrap()
+                .record
+        };
+        assert!(traced_kind(vec![case("only-rejected", false)]).is_none());
+        assert!(traced_kind(vec![case("only-admitted", true)]).is_none());
+        let both = traced_kind(vec![case("admitted", true), case("rejected", false)]).unwrap();
+        assert_eq!(both["evidence"], json!(["admitted", "rejected"]));
+    }
+
+    #[test]
+    fn a_safe_origin_kind_is_found_only_as_a_whole_json_string() {
+        let kind = SafeOriginKind::ALL[0].id();
+        let traced_kind = |text: String| {
+            let manifests = vec![(
+                "resolverCases",
+                json!({ "id": "case", "fixture": { "path": "fixture.json" } }),
+            )];
+            let mut traced = Vec::new();
+            origins(
+                &suite_of(manifests, &[("fixture.json", &text)]),
+                &mut traced,
+            );
+            traced
+                .into_iter()
+                .find(|subject| subject.kind == "safe-origin-kind" && subject.id == kind)
+                .unwrap()
+                .record
+        };
+        assert!(traced_kind(format!("{{\"origin\":\"not-{kind}\"}}")).is_none());
+        assert!(traced_kind(format!("{{\"origin\":\"{kind}\"}}")).is_some());
+    }
+
     #[test]
     fn the_inventories_hold_every_decision_and_coverage_item_of_015() {
         let inventory = Inventory::read(&design());
