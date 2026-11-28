@@ -1926,7 +1926,8 @@ function sourceLocale(locales, inputs) {
  */
 function fallbackOrder(fallback, inputs) {
   const requested = inputs?.requestedLocale
-  const configured = fallback?.mappings?.[requested] ?? []
+  const mappings = fallback?.mappings ?? {}
+  const configured = Object.hasOwn(mappings, requested) ? mappings[requested] : []
   return {
     candidates: [
       { locale: requested, kind: 'requested' },
@@ -2029,14 +2030,38 @@ function holdsMembers(value, required, allowed = []) {
 }
 
 /**
+ * Whether a vector's facts hold a target of their own under an ID, so neither
+ * an unknown ID nor an inherited member such as `constructor` names one.
+ *
+ * @param facts - The vector's facts.
+ * @param id - The ID.
+ * @returns Whether they do.
+ */
+function namesATarget(facts, id) {
+  const targets = facts?.targets
+  return (
+    isText(id) &&
+    targets !== null &&
+    typeof targets === 'object' &&
+    !Array.isArray(targets) &&
+    Object.hasOwn(targets, id)
+  )
+}
+
+/** The member that holds an Intent's source locale under each owner. */
+const OWNED_SOURCE_LOCALES = { application: 'sourceLocale', library: 'publishedSourceLocale' }
+
+/**
  * Whether a vector's consumer inputs have the members and forms its family
- * gives them, so no missing or misspelled input can stand for an absent one.
+ * gives them, so no missing or misspelled input can stand for an absent one,
+ * and name only targets its facts hold.
  *
  * @param id - The vector's ID.
  * @param inputs - Its consumer inputs.
+ * @param facts - Its facts.
  * @returns Whether they do, or undefined for an ID in no family.
  */
-function inputsHaveTheirForm(id, inputs) {
+function inputsHaveTheirForm(id, inputs, facts) {
   if (id.startsWith(SELECTION)) {
     return (
       holdsMembers(inputs, ['groupIdSelectors', 'targetIdSelectors']) &&
@@ -2047,16 +2072,18 @@ function inputsHaveTheirForm(id, inputs) {
   if (id.startsWith(NEGOTIATION)) {
     return (
       (holdsMembers(inputs, ['targetId', 'preferences']) &&
-        isText(inputs.targetId) &&
+        namesATarget(facts, inputs.targetId) &&
         isTextList(inputs.preferences)) ||
       (holdsMembers(inputs, ['targetId', 'direct']) &&
-        isText(inputs.targetId) &&
+        namesATarget(facts, inputs.targetId) &&
         isText(inputs.direct))
     )
   }
   if (id.startsWith(SOURCE_LOCALE)) {
     const intent = inputs?.intent
-    const own = { application: 'sourceLocale', library: 'publishedSourceLocale' }[intent?.owner]
+    const own = Object.hasOwn(OWNED_SOURCE_LOCALES, intent?.owner)
+      ? OWNED_SOURCE_LOCALES[intent.owner]
+      : undefined
     return (
       holdsMembers(inputs, ['intent']) &&
       own !== undefined &&
@@ -2077,6 +2104,7 @@ function inputsHaveTheirForm(id, inputs) {
     return (
       holdsMembers(inputs, required, ['direct', 'fallbackDefinitions']) &&
       required.every(name => isText(inputs[name])) &&
+      namesATarget(facts, inputs.targetId) &&
       (inputs.direct === undefined || DEFINITION_STATES.includes(inputs.direct)) &&
       (offered === undefined ||
         (offered !== null &&
@@ -2139,7 +2167,7 @@ for (const entry of index.value.handoffVectors ?? []) {
       `${entry.path}: does not hold the groups and bindings its producer's expected outcomes give`
     )
   }
-  const formed = inputsHaveTheirForm(entry.id, vector.consumerInputs?.json)
+  const formed = inputsHaveTheirForm(entry.id, vector.consumerInputs?.json, facts)
   if (formed === undefined) {
     fail(`${entry.path}: belongs to no vector family this checker knows`)
   } else if (!formed) {
