@@ -22,12 +22,19 @@
 //! read before anything is written or removed, and a symbolic link there,
 //! which the suite never holds, stops the generator: following it could write
 //! or remove a file outside the suite.
+//!
+//! It also writes the traceability report beside the Suite Index, from the
+//! suite it writes and the ID inventories of design 015, which it reads from
+//! this repository's `design` directory.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 const ROOT: &str = "conformance";
+
+/// Design 015, relative to this crate's directory.
+const DESIGN: &str = "../../design/015-intlify-project-profile-and-locale-policy-design.md";
 
 fn main() -> ExitCode {
     let args = std::env::args_os().skip(1).collect::<Vec<_>>();
@@ -39,10 +46,21 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let design = match std::fs::read_to_string(manifest_dir.join(DESIGN)) {
+        Ok(design) => design,
+        Err(error) => {
+            eprintln!("could not read design 015: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
     let support = (|| {
         use intlify_config::conformance_support as support;
+        let mut artifacts = support::artifacts()?;
+        let report = support::traceability(&artifacts, &design)?;
+        artifacts.push(report);
         Ok::<_, serde_json::Error>((
-            support::artifacts()?,
+            artifacts,
             support::schema_digest()?,
             support::case_schema_digest()?,
         ))
@@ -54,7 +72,7 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(ROOT);
+    let root = manifest_dir.join(ROOT);
     let mut held = Vec::new();
     for directory in intlify_config::conformance_support::WRITTEN_DIRECTORIES {
         let top = root.join(directory);

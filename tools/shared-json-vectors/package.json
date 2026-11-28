@@ -18,6 +18,7 @@
     "check:registries": "node scripts/verify-registries.mjs",
     "check:snapshot": "node scripts/verify-snapshot.mjs",
     "check:suite": "node scripts/verify-suite.mjs",
+    "check:traceability": "node scripts/verify-traceability.mjs",
     "check:validator-schemas": "node scripts/verify-validator-schemas.mjs",
     "check:validator-values": "node scripts/verify-validator-values.mjs",
     "check:verification": "node scripts/verify-verification.mjs",

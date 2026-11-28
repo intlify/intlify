@@ -937,7 +937,7 @@ fn rows(kind: &str) -> &'static [(&'static str, &'static str)] {
 }
 
 /// A pair's pre-invocation rule ID (D15:2174).
-fn rule(kind: &str, reason: &str) -> String {
+pub(super) fn rule(kind: &str, reason: &str) -> String {
     format!("015.input-admission.{kind}.{reason}")
 }
 

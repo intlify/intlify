@@ -394,7 +394,7 @@ fn spelled(row: PrecedenceRow) -> Result<(String, String), serde_json::Error> {
 }
 
 /// A row's construction rule ID (D15:2174).
-fn rule(row: PrecedenceRow) -> Result<String, serde_json::Error> {
+pub(super) fn rule(row: PrecedenceRow) -> Result<String, serde_json::Error> {
     let (component, check) = spelled(row)?;
     Ok(format!("015.construction.{component}.{check}"))
 }

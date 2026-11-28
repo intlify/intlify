@@ -42,6 +42,7 @@ pub(crate) mod obligations;
 pub(crate) mod resolution;
 pub(crate) mod resolver_cases;
 pub(crate) mod runner;
+pub(crate) mod traceability;
 
 /// The developer entry points: write the committed suite, and open a suite at
 /// an explicit Suite Index path and run its cases.
@@ -50,4 +51,5 @@ pub mod support {
     pub use super::case::schema_digest as case_schema_digest;
     pub use super::index::{artifacts, schema_digest, Member, SuiteFile, WRITTEN_DIRECTORIES};
     pub use super::runner::{open, HarnessFailure, Opened, Outcome};
+    pub use super::traceability::{report as traceability, PATH as TRACEABILITY_PATH};
 }
