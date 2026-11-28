@@ -2696,14 +2696,31 @@ mod tests {
             let suite = changed_manifest(vectors, VECTOR, |_, vector| apply(vector, &expected));
             assert_eq!(suite.open(), unreproduced, "{change}");
         }
-        // Each expected outcome must reproduce it, the programmatic one too.
+        // Each expected outcome must reproduce it, the programmatic one too:
+        // the first vector the storefront produces, by ID, stops the suite.
         let suite = changed_manifest(Member::ResolverCases, STOREFRONT, |suite, manifest| {
             let pointer = "/entries/programmatic/expectedOutcomeFixture";
             change_fixture(suite, manifest, pointer, |outcome| {
                 outcome["profile"]["targets"]["browser"]["requestedLocales"] = json!(["ja"]);
             });
         });
-        assert_eq!(suite.open(), unreproduced);
+        let index: Value = serde_json::from_slice(&suite.read(PATH)).unwrap();
+        let first = index[vectors.name()]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|entry| {
+                let manifest: Value =
+                    serde_json::from_slice(&suite.read(entry["path"].as_str().unwrap())).unwrap();
+                manifest["producerCaseId"] == STOREFRONT
+            })
+            .unwrap();
+        assert_eq!(
+            suite.open(),
+            Err(HarnessFailure::UnreproducedVector(
+                first["id"].as_str().unwrap().to_owned()
+            ))
+        );
     }
 
     /// A conditional obligation is inactive: an active one, evaluated or

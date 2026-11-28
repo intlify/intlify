@@ -36,8 +36,9 @@
  * bindings, each Group ID selection vector concludes what 015's selection
  * rules conclude from its selectors, each negotiation vector what 015's
  * portable lookup concludes from its preferences, each source-locale vector
- * the source locale 015's rules give its Intent, and each fallback vector
- * the complete fallback order. Each row of the obligation table is one
+ * the source locale 015's rules give its Intent, each fallback vector the
+ * complete fallback order, and each coverage vector what 015's coverage
+ * rules conclude for its requirement. Each row of the obligation table is one
  * inactive manifest, and nothing activates an evaluated row. It does not read
  * the design document.
  */
@@ -1936,6 +1937,52 @@ function fallbackOrder(fallback, inputs) {
   }
 }
 
+/**
+ * What 015's coverage rules conclude for one requirement: none off the
+ * target's subset; otherwise the cell's mode and whether the requested
+ * locale is the Intent's source locale, with Provider demand unless it is,
+ * fulfilled by the source, by an eligible direct definition, by the first
+ * eligible candidate of the fallback order when the mode is
+ * fallback-allowed, with a coverage debt, or else blocked by the direct
+ * state.
+ *
+ * @param facts - The vector's facts.
+ * @param inputs - Its consumer inputs.
+ * @returns The relationship.
+ */
+function coverageOutcome(facts, inputs) {
+  const requested = inputs?.requestedLocale
+  const source = inputs?.intentSourceLocale
+  const subset = facts?.targets?.[inputs?.targetId]?.requestedLocales ?? []
+  if (!subset.includes(requested)) {
+    return { requirement: 'absent' }
+  }
+  const mode = facts?.coverage?.decisions?.[requested]?.[inputs?.intentSurfaceClass]
+  const sourceEqual = requested === source
+  const head = { requirement: 'present', mode, sourceEqual, providerDemand: !sourceEqual }
+  if (sourceEqual) {
+    return { ...head, outcome: 'source', definitionLocale: source }
+  }
+  if (inputs?.direct === 'eligible') {
+    return { ...head, outcome: 'direct', definitionLocale: requested }
+  }
+  if (mode === 'fallback-allowed') {
+    const order = (facts?.messageFallback?.mappings?.[requested] ?? []).map(candidate =>
+      typeof candidate === 'string' ? candidate : source
+    )
+    const selected = order.find(locale => inputs?.fallbackDefinitions?.[locale] === 'eligible')
+    if (selected !== undefined) {
+      return {
+        ...head,
+        outcome: 'fallback',
+        definitionLocale: selected,
+        coverageDebt: { cause: inputs.direct, definitionLocale: selected }
+      }
+    }
+  }
+  return { ...head, outcome: 'blocked', blockingCause: inputs?.direct }
+}
+
 // Each Handoff Vector names a listed Resolver Case whose every expected
 // outcome is checked, holds whole semantic groups of each such outcome's
 // profile as its facts, and as its bindings exactly the outcome's rows whose
@@ -1948,12 +1995,16 @@ function fallbackOrder(fallback, inputs) {
 // source-locale vector hands over the project's locales and expects the
 // source locale 016 resolves the Intent to, or the block (D15:1369-1375); a
 // fallback vector hands over the fallback policy and the project's locales
-// and expects the complete, non-recursive candidate order (D15:1503-1522).
+// and expects the complete, non-recursive candidate order (D15:1503-1522). A
+// coverage vector hands over the decision table, the fallback policy, the
+// project's locales, and the targets, and expects what 015's coverage rules
+// conclude for its requirement (D15:1552-1629).
 let vectors = 0
 const SELECTION = '015-handoff-group-selection-'
 const NEGOTIATION = '015-handoff-negotiation-'
 const SOURCE_LOCALE = '015-handoff-source-locale-'
 const FALLBACK = '015-handoff-fallback-'
+const COVERAGE = '015-handoff-coverage-'
 for (const entry of index.value.handoffVectors ?? []) {
   const vector = named(entry)
   if (vector === undefined) {
@@ -2028,6 +2079,22 @@ for (const entry of index.value.handoffVectors ?? []) {
       ))
   ) {
     fail(`${entry.path}: does not expect the complete fallback order 015's rules give`)
+  }
+  if (
+    entry.id.startsWith(COVERAGE) &&
+    (!isDeepStrictEqual(Object.keys(facts), [
+      'coverage',
+      'messageFallback',
+      'projectLocales',
+      'targets'
+    ]) ||
+      vector.verificationOwner !== '020' ||
+      !isDeepStrictEqual(
+        vector.expectedRelationship?.json,
+        coverageOutcome(facts, vector.consumerInputs?.json)
+      ))
+  ) {
+    fail(`${entry.path}: does not expect what 015's coverage rules conclude`)
   }
 }
 
