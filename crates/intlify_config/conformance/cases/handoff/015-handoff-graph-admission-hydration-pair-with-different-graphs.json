@@ -1,0 +1,143 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "handoff-vector",
+  "id": "015-handoff-graph-admission-hydration-pair-with-different-graphs",
+  "producerCaseId": "015-storefront-checked",
+  "producerProfileFacts": {
+    "delivery": {
+      "graph": {
+        "identity": "intlify-delivery-graph",
+        "revision": "0"
+      },
+      "placement": {
+        "identity": "intlify-delivery-placement",
+        "revision": "0"
+      },
+      "mode": "duplicate"
+    },
+    "deploymentGroups": {
+      "web": {
+        "members": [
+          "browser",
+          "server"
+        ],
+        "hydrationRelations": [
+          {
+            "server": "server",
+            "client": "browser"
+          }
+        ]
+      }
+    }
+  },
+  "producerArtifactBindings": [],
+  "consumerInputs": {
+    "json": {
+      "selectedGroupId": "web",
+      "graphs": [
+        {
+          "identity": "storefront-browser",
+          "targets": [
+            "browser"
+          ],
+          "units": [
+            {
+              "id": [
+                "app"
+              ]
+            },
+            {
+              "id": [
+                "app",
+                "checkout"
+              ]
+            }
+          ],
+          "edges": [
+            {
+              "from": 0,
+              "to": 1
+            }
+          ],
+          "bindings": [
+            {
+              "reference": "cart-title",
+              "unit": 0
+            },
+            {
+              "reference": "checkout-title",
+              "unit": 1
+            }
+          ]
+        },
+        {
+          "identity": "storefront-server",
+          "targets": [
+            "server"
+          ],
+          "units": [
+            {
+              "id": [
+                "main"
+              ]
+            }
+          ],
+          "edges": [],
+          "bindings": [
+            {
+              "reference": "checkout-title",
+              "unit": 0
+            }
+          ]
+        }
+      ],
+      "references": {
+        "browser": [
+          "cart-title",
+          "checkout-title"
+        ],
+        "server": [
+          "checkout-title"
+        ]
+      }
+    }
+  },
+  "expectedRelationship": {
+    "json": {
+      "outcome": "admitted",
+      "graphs": [
+        {
+          "identity": "storefront-browser",
+          "targets": [
+            "browser"
+          ],
+          "roots": [
+            [
+              "app"
+            ]
+          ]
+        },
+        {
+          "identity": "storefront-server",
+          "targets": [
+            "server"
+          ],
+          "roots": [
+            [
+              "main"
+            ]
+          ]
+        }
+      ]
+    }
+  },
+  "verificationOwner": "020",
+  "traceability": {
+    "decisionIds": [
+      "015-033",
+      "015-034"
+    ],
+    "ruleIds": [],
+    "checkIds": []
+  }
+}

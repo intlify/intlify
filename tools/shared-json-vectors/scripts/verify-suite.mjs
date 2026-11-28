@@ -2094,6 +2094,109 @@ function bindingSubset(facts, bindings, inputs) {
 }
 
 /**
+ * Compares two unit IDs, token sequences, token by token in unsigned byte
+ * order, a shorter prefix first.
+ *
+ * @param left - One ID.
+ * @param right - The other.
+ * @returns Their order.
+ */
+function compareUnitIds(left, right) {
+  for (let at = 0; at < Math.min(left.length, right.length); at++) {
+    const order = byBytes(left[at], right[at])
+    if (order !== 0) {
+      return order
+    }
+  }
+  return left.length - right.length
+}
+
+/**
+ * What 015's graph admission concludes for a selected group's graphs: the
+ * one rule they break, or each graph's targets and roots, the units no edge
+ * enters, in canonical order (D15:2055-2063).
+ *
+ * @param facts - The vector's facts.
+ * @param inputs - Its consumer inputs, of their family's form.
+ * @returns The relationship.
+ */
+function graphAdmission(facts, inputs) {
+  const rejected = rule => ({ outcome: 'rejected', rule })
+  const members = facts.deploymentGroups[inputs.selectedGroupId].members
+  const graphs = inputs.graphs
+  if (graphs.length === 0) {
+    return rejected('no-graph')
+  }
+  if (graphs.some(graph => graph.targets.length === 0)) {
+    return rejected('empty-applicability')
+  }
+  const covered = new Map()
+  for (const target of graphs.flatMap(graph => graph.targets)) {
+    if (!members.includes(target)) {
+      return rejected('target-outside-group')
+    }
+    covered.set(target, (covered.get(target) ?? 0) + 1)
+  }
+  if ([...covered.values()].some(count => count > 1)) {
+    return rejected('overlapping-applicability')
+  }
+  if (members.some(member => !covered.has(member))) {
+    return rejected('uncovered-target')
+  }
+  const admitted = []
+  for (const graph of graphs) {
+    const units = graph.units.length
+    if (new Set(graph.units.map(unit => JSON.stringify(unit.id))).size !== units) {
+      return rejected('duplicate-node')
+    }
+    if (graph.edges.some(edge => edge.from >= units || edge.to >= units)) {
+      return rejected('unknown-endpoint')
+    }
+    if (graph.edges.some(edge => edge.from === edge.to)) {
+      return rejected('self-edge')
+    }
+    if (new Set(graph.edges.map(edge => `${edge.from}>${edge.to}`)).size !== graph.edges.length) {
+      return rejected('duplicate-edge')
+    }
+    // Peel units no remaining edge enters; a cycle leaves some behind.
+    const remaining = new Set(graph.units.keys())
+    for (let peeled = true; peeled;) {
+      peeled = false
+      for (const unit of remaining) {
+        if (!graph.edges.some(edge => edge.to === unit && remaining.has(edge.from))) {
+          remaining.delete(unit)
+          peeled = true
+        }
+      }
+    }
+    if (remaining.size > 0) {
+      return rejected('cycle')
+    }
+    if (graph.bindings.some(binding => binding.unit >= units)) {
+      return rejected('unknown-unit')
+    }
+    const applicable = new Set(graph.targets.flatMap(target => inputs.references[target] ?? []))
+    for (const reference of applicable) {
+      const bound = graph.bindings.filter(binding => binding.reference === reference).length
+      if (bound === 0) {
+        return rejected('unbound-reference')
+      }
+      if (bound > 1) {
+        return rejected('multiply-bound-reference')
+      }
+    }
+    const entered = new Set(graph.edges.map(edge => edge.to))
+    const roots = graph.units
+      .filter((_, unit) => !entered.has(unit))
+      .map(unit => unit.id)
+      .sort(compareUnitIds)
+    admitted.push({ identity: graph.identity, targets: graph.targets, roots })
+  }
+  admitted.sort((left, right) => byBytes(left.identity, right.identity))
+  return { outcome: 'admitted', graphs: admitted }
+}
+
+/**
  * Whether a value is a non-empty string.
  *
  * @param value - The value.
@@ -2205,6 +2308,47 @@ function inputsHaveTheirForm(id, inputs, facts) {
       isText(inputs.intentSourceLocale)
     )
   }
+  if (id.startsWith(GRAPH_ADMISSION)) {
+    const groups = facts?.deploymentGroups
+    if (
+      !holdsMembers(inputs, ['selectedGroupId', 'graphs', 'references']) ||
+      !isText(inputs.selectedGroupId) ||
+      groups === null ||
+      typeof groups !== 'object' ||
+      !Object.hasOwn(groups, inputs.selectedGroupId) ||
+      !isTextList(groups[inputs.selectedGroupId]?.members)
+    ) {
+      return false
+    }
+    const ordinal = value => Number.isSafeInteger(value) && value >= 0
+    const references = inputs.references
+    return (
+      Array.isArray(inputs.graphs) &&
+      inputs.graphs.every(
+        graph =>
+          holdsMembers(graph, ['identity', 'targets', 'units', 'edges', 'bindings']) &&
+          isText(graph.identity) &&
+          isTextList(graph.targets) &&
+          Array.isArray(graph.units) &&
+          graph.units.every(
+            unit => holdsMembers(unit, ['id']) && isTextList(unit.id) && unit.id.length > 0
+          ) &&
+          Array.isArray(graph.edges) &&
+          graph.edges.every(
+            edge => holdsMembers(edge, ['from', 'to']) && ordinal(edge.from) && ordinal(edge.to)
+          ) &&
+          Array.isArray(graph.bindings) &&
+          graph.bindings.every(
+            binding =>
+              holdsMembers(binding, ['reference', 'unit']) &&
+              isText(binding.reference) &&
+              ordinal(binding.unit)
+          )
+      ) &&
+      holdsMembers(references, groups[inputs.selectedGroupId].members) &&
+      Object.values(references).every(isTextList)
+    )
+  }
   if (id.startsWith(BINDING_SUBSET)) {
     const consumer = CONSUMERS.get(inputs?.consumer)
     const groups = facts?.deploymentGroups
@@ -2269,7 +2413,10 @@ function inputsHaveTheirForm(id, inputs, facts) {
 // conclude for its requirement (D15:1552-1629). A binding-subset vector
 // hands over the policy references, the targets, and the groups, so its
 // bindings are the complete set, and expects the subset 015's consumer table
-// gives its consumer, owned by that consumer's design (D15:2718-2726).
+// gives its consumer, owned by that consumer's design (D15:2718-2726). A
+// graph-admission vector hands over the delivery specifications and the
+// groups, and expects the one rule a selected group's graphs break or each
+// graph's roots (D15:2055-2063).
 let vectors = 0
 const SELECTION = '015-handoff-group-selection-'
 const NEGOTIATION = '015-handoff-negotiation-'
@@ -2277,6 +2424,7 @@ const SOURCE_LOCALE = '015-handoff-source-locale-'
 const FALLBACK = '015-handoff-fallback-'
 const COVERAGE = '015-handoff-coverage-'
 const BINDING_SUBSET = '015-handoff-binding-subset-'
+const GRAPH_ADMISSION = '015-handoff-graph-admission-'
 for (const entry of index.value.handoffVectors ?? []) {
   const vector = named(entry)
   if (vector === undefined) {
@@ -2389,6 +2537,18 @@ for (const entry of index.value.handoffVectors ?? []) {
       ))
   ) {
     fail(`${entry.path}: does not expect the binding subset 015's consumer table gives`)
+  }
+  if (
+    entry.id.startsWith(GRAPH_ADMISSION) &&
+    (!isDeepStrictEqual(Object.keys(facts), ['delivery', 'deploymentGroups']) ||
+      vector.verificationOwner !== '020' ||
+      (formed &&
+        !isDeepStrictEqual(
+          vector.expectedRelationship?.json,
+          graphAdmission(facts, vector.consumerInputs.json)
+        )))
+  ) {
+    fail(`${entry.path}: does not expect what 015's graph admission rules conclude`)
   }
 }
 

@@ -1142,6 +1142,96 @@
       "digest": "sha256:e127992c2b65255c81bececd1513cc3bd3d327da234900892fb6e3af4975e24d"
     },
     {
+      "id": "015-handoff-graph-admission-cycle",
+      "path": "cases/handoff/015-handoff-graph-admission-cycle.json",
+      "digest": "sha256:ddbd2f7a5e17d5afc03bfeb1f305bae2c5aa9d0fc4458e26d51cba402db7a9cf"
+    },
+    {
+      "id": "015-handoff-graph-admission-duplicate-edge",
+      "path": "cases/handoff/015-handoff-graph-admission-duplicate-edge.json",
+      "digest": "sha256:fef35c9156a859dd056218bac16a88aca369843609b8f19e342c1284ecf476a4"
+    },
+    {
+      "id": "015-handoff-graph-admission-duplicate-node",
+      "path": "cases/handoff/015-handoff-graph-admission-duplicate-node.json",
+      "digest": "sha256:ddf2bd0549b680cb776e37a778486d4b8aa888b31cb38c83fb98363cf249a3fd"
+    },
+    {
+      "id": "015-handoff-graph-admission-empty-applicability",
+      "path": "cases/handoff/015-handoff-graph-admission-empty-applicability.json",
+      "digest": "sha256:707c39001f42d35d6c858ddb28b7ad6fa31fb4e8d8f43193f776bf6002f20b20"
+    },
+    {
+      "id": "015-handoff-graph-admission-hydration-pair-with-different-graphs",
+      "path": "cases/handoff/015-handoff-graph-admission-hydration-pair-with-different-graphs.json",
+      "digest": "sha256:227a3b0998c7c5c7aff13c9a57ed496fba20fc1d70f84fb460a0aaaced9dd6c3"
+    },
+    {
+      "id": "015-handoff-graph-admission-jobs-differently-grouped-target",
+      "path": "cases/handoff/015-handoff-graph-admission-jobs-differently-grouped-target.json",
+      "digest": "sha256:d68304d1ffacf6e6aab5e68c9025a5727edc2605d940d5b9203062b5c82b95be"
+    },
+    {
+      "id": "015-handoff-graph-admission-jobs-whole-program-graph",
+      "path": "cases/handoff/015-handoff-graph-admission-jobs-whole-program-graph.json",
+      "digest": "sha256:58b0363c46ee2611be3c9c8f588139c4c4d1acaf5142970ff2978eb0076671b3"
+    },
+    {
+      "id": "015-handoff-graph-admission-multiply-bound-reference",
+      "path": "cases/handoff/015-handoff-graph-admission-multiply-bound-reference.json",
+      "digest": "sha256:41012cc4ae64c2fb28d1c1ca9440e7036ccb6a0b16fa612b5510e0488754ef4d"
+    },
+    {
+      "id": "015-handoff-graph-admission-no-graph",
+      "path": "cases/handoff/015-handoff-graph-admission-no-graph.json",
+      "digest": "sha256:cfbf9550013b62f2cc5067645701e9c92df571936ed70ad6ffa1d3445bfb2e10"
+    },
+    {
+      "id": "015-handoff-graph-admission-one-graph-for-the-group",
+      "path": "cases/handoff/015-handoff-graph-admission-one-graph-for-the-group.json",
+      "digest": "sha256:b1c525662fb6052179cbb283349dabb1162bdb8aee6d12f5e6276f86c9ea2a08"
+    },
+    {
+      "id": "015-handoff-graph-admission-overlapping-applicability",
+      "path": "cases/handoff/015-handoff-graph-admission-overlapping-applicability.json",
+      "digest": "sha256:cc4baae845f950596c1e941b97057e6bbe8a9e5117bf0550147ce20b98bc9482"
+    },
+    {
+      "id": "015-handoff-graph-admission-self-edge",
+      "path": "cases/handoff/015-handoff-graph-admission-self-edge.json",
+      "digest": "sha256:03c4c0262792eee37ac61c805e1d6805fd00cae6da9c97df568af5a402dca286"
+    },
+    {
+      "id": "015-handoff-graph-admission-several-roots-and-components",
+      "path": "cases/handoff/015-handoff-graph-admission-several-roots-and-components.json",
+      "digest": "sha256:2f36b8aa442a8daf800dd3cf9184a13a5beed6d9400eb6fad7f5dea96c4d3f3b"
+    },
+    {
+      "id": "015-handoff-graph-admission-unbound-reference",
+      "path": "cases/handoff/015-handoff-graph-admission-unbound-reference.json",
+      "digest": "sha256:b2fa2b3096c9268b110aff77d313826a12242a1f20335cd9f56c66508227d984"
+    },
+    {
+      "id": "015-handoff-graph-admission-uncovered-target",
+      "path": "cases/handoff/015-handoff-graph-admission-uncovered-target.json",
+      "digest": "sha256:3438110d0e80f073ee310282ebcf78698d08a6f89cd2ce3d8936b75e4e744646"
+    },
+    {
+      "id": "015-handoff-graph-admission-unknown-endpoint",
+      "path": "cases/handoff/015-handoff-graph-admission-unknown-endpoint.json",
+      "digest": "sha256:d723b2861be395c4c14c4785985a2509ea9afbea3725289bf43c75b0862807c5"
+    },
+    {
+      "id": "015-handoff-graph-admission-unknown-target",
+      "path": "cases/handoff/015-handoff-graph-admission-unknown-target.json",
+      "digest": "sha256:10b6a65c9b64ed09ef9c09094e38993e2610c7567594cfed3a9556b7c397d423"
+    },
+    {
+      "id": "015-handoff-graph-admission-unknown-unit",
+      "path": "cases/handoff/015-handoff-graph-admission-unknown-unit.json",
+      "digest": "sha256:d25b69194830a7bf3d33a52744a206652e120db7c9c49f76723b480e40dc2605"
+    },
+    {
       "id": "015-handoff-group-selection-one-group-group-id",
       "path": "cases/handoff/015-handoff-group-selection-one-group-group-id.json",
       "digest": "sha256:35ccbbbedc88ead5d0b8c626420081506acba2e26678aa3be111af0755243bc8"
