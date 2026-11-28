@@ -1,0 +1,243 @@
+{
+  "assertion": {
+    "identity": "intlify-conformance-verification-input",
+    "revision": "0",
+    "semanticDigest": "sha256:dce0e60793901596dcf9ebdb7bfa93f4cdca124b0533b0a493bc7c0656a74086"
+  },
+  "profile-resolution-specification-input": {
+    "candidate": "profile-resolution-specification-input",
+    "input": {
+      "path": "fixtures/resolver/015-storefront-checked/profile-resolution-specification-input.input.json",
+      "digest": "sha256:29efa9cd6918d41a8c406026d6969fa32d62916a3b4ff74a6a6a53c97e462031"
+    }
+  },
+  "intent-surface-class-vocabulary": {
+    "candidate": "intent-surface-class-vocabulary",
+    "input": {
+      "path": "fixtures/resolver/015-storefront-checked/intent-surface-class-vocabulary.input.json",
+      "digest": "sha256:51504cd3920b5c7491873d30843ea8c38357b5aa6efb047d55d99861fc921922"
+    }
+  },
+  "locale-canonicalization-data": {
+    "candidate": "locale-canonicalization-data",
+    "input": {
+      "manifest": {
+        "path": "fixtures/resolver/locale-data/manifest.json",
+        "digest": "sha256:d5a8d88b0aa7a911e3eac58d61c553129296f2d5742ad2b8114c67e08d90f480"
+      },
+      "payloads": {
+        "conformance.json": {
+          "path": "fixtures/resolver/locale-data/conformance.json",
+          "digest": "sha256:a8c6b80fce762fee8b2f27e8c5c9600cc45dddaba65f98c1c1b987dfc0ff5a8a"
+        },
+        "markers.postcard": {
+          "path": "fixtures/resolver/locale-data/markers.postcard",
+          "digest": "sha256:01fbc3009dc32371704d621e48acc484b2fa47f1b2b076701667acbaeb3b1f0b"
+        }
+      }
+    }
+  },
+  "profile-resolution-artifact-collection": {
+    "candidate": "profile-resolution-artifact-collection",
+    "input": {
+      "members": [
+        {
+          "path": "fixtures/resolver/015-storefront-checked/profile-resolution-artifact-collection.input.members.0.json",
+          "digest": "sha256:c5002913cb5ffbc231c24fb57b62e35aa10ff58328f088adfad2c3d4bdd95efd"
+        },
+        {
+          "path": "fixtures/resolver/015-storefront-checked/profile-resolution-artifact-collection.input.members.1.json",
+          "digest": "sha256:29947d60624dc77d10ac39ddb6c3b0880a0f33000b65b1091cf332fd82cc8b07"
+        },
+        {
+          "path": "fixtures/resolver/015-storefront-checked/profile-resolution-artifact-collection.input.members.2.json",
+          "digest": "sha256:3f45f418ac8f7662fbc58dc291dbdfc604896e550f4cb919d4e0c120a782c196"
+        },
+        {
+          "path": "fixtures/resolver/015-storefront-checked/profile-resolution-artifact-collection.input.members.3.json",
+          "digest": "sha256:8de280cf9ced57e2234ee6a2bd9d4396f62c210d1be9a00f285083f66e9585c9"
+        },
+        {
+          "path": "fixtures/resolver/015-storefront-checked/profile-resolution-artifact-collection.input.members.4.json",
+          "digest": "sha256:24a47a577ace4aa92cd418ed9a682300458282cb7cf0586f3d17b44150f897d1"
+        },
+        {
+          "path": "fixtures/resolver/015-storefront-checked/profile-resolution-artifact-collection.input.members.5.json",
+          "digest": "sha256:b7cf7251ab6187284e6903d5ef9e799909198f9ea34e642343913444f3dbc8cd"
+        },
+        {
+          "path": "fixtures/resolver/015-storefront-checked/profile-resolution-artifact-collection.input.members.6.json",
+          "digest": "sha256:77ed7cfe132ae9dd7bb0a97e894f631292645f91e5425443f919fe109559bb97"
+        },
+        {
+          "path": "fixtures/resolver/015-storefront-negotiation/profile-resolution-artifact-collection.input.members.7.json",
+          "digest": "sha256:60d88cdea8df461413c473506135a8972d15f16fd1c6fb1c48e2104819c7946e"
+        },
+        {
+          "path": "fixtures/resolver/015-storefront-negotiation/profile-resolution-artifact-collection.input.members.8.json",
+          "digest": "sha256:4815c29d767d4506f3ed6bd08f1311376af86b4fc0096dddcfd25c0d91380e2d"
+        },
+        {
+          "path": "fixtures/resolver/015-storefront-negotiation/profile-resolution-artifact-collection.input.members.9.json",
+          "digest": "sha256:4e5a42bdc16007f317e793fc7ad39fa4928ba27b72f6081bd046f1eb731c090e"
+        }
+      ]
+    }
+  },
+  "resource-limit-policy-verification": {
+    "candidate": "resource-limit-policy-verification",
+    "input": {
+      "path": "fixtures/resolver/015-storefront-checked/resource-limit-policy-verification.input.json",
+      "digest": "sha256:9f3cf769035c73792733d38b11a25f623cf0d94a0ca775922a25526ddc396fc4"
+    }
+  },
+  "implementation-capability": {
+    "candidate": "implementation-capability",
+    "input": {
+      "json": {
+        "specification": {
+          "identity": "intlify-project-profile-resolver-capability",
+          "revision": "0"
+        },
+        "policyComparable": {
+          "configurationInput": {
+            "maxNodes": "10000",
+            "maxDepth": "10001",
+            "maxCollectionEntries": "10002",
+            "maxTotalStringBytes": "10003",
+            "maxSingleStringBytes": "10004",
+            "maxProfiles": "10005",
+            "maxProfileIdBytes": "10006",
+            "maxStructuralAnalysisUnits": "10007"
+          },
+          "localeResolution": {
+            "maxLocaleIdentifierBytes": "10008",
+            "maxLocaleOccurrences": "10009",
+            "maxRequestedLocales": "10010",
+            "maxNegotiationAliases": "10011",
+            "maxFallbackSources": "10012",
+            "maxFallbackCandidatesPerSource": "10013",
+            "maxCoverageRules": "10014",
+            "maxCoverageLocaleSelectorOccurrences": "10015",
+            "maxCoverageSurfaceSelectorOccurrences": "10016",
+            "maxCoverageDecisionCells": "10017",
+            "maxCoverageRuleCellComparisons": "10018"
+          },
+          "artifactAdmission": {
+            "maxArtifacts": "1073741824",
+            "maxPolicyArtifacts": "1073741824",
+            "maxTargetProfileArtifacts": "1073741824",
+            "maxArtifactReferences": "1073741824",
+            "maxSingleArtifactCanonicalBytes": "1073741824",
+            "maxTotalArtifactCanonicalBytes": "1073741824",
+            "maxSingleReferenceCanonicalBytes": "1073741824",
+            "maxTotalReferenceCanonicalBytes": "1073741824"
+          },
+          "targetGrouping": {
+            "maxTargetProfiles": "10027",
+            "maxTargetIdBytes": "10028",
+            "maxDeploymentGroups": "10029",
+            "maxGroupIdBytes": "10030",
+            "maxMembersPerGroup": "10031",
+            "maxMembershipOccurrences": "10032",
+            "maxHydrationRelations": "10033"
+          },
+          "diagnostics": {
+            "entry": {
+              "maxFindingOccurrences": "1073741824",
+              "maxFindings": "1073741824",
+              "maxRelatedEvidencePerOccurrenceGroup": "1073741824",
+              "maxRelatedEvidenceOccurrences": "1073741824",
+              "maxSingleEvidenceBytes": "1073741824",
+              "maxTotalEvidenceBytes": "1073741824",
+              "maxEvaluationStatusEntries": "1073741824",
+              "maxSuppressionCausesPerStatus": "1073741824",
+              "maxSuppressionCauseOccurrences": "1073741824",
+              "maxRecords": "1073741824",
+              "maxTotalCanonicalBytes": "1073741824"
+            },
+            "shared": {
+              "maxFindingOccurrences": "1073741824",
+              "maxFindings": "1073741824",
+              "maxEvaluationStatusEntries": "1073741824",
+              "maxSuppressionCausesPerStatus": "1073741824",
+              "maxSuppressionCauseOccurrences": "1073741824",
+              "maxRecords": "1073741824",
+              "maxTotalCanonicalBytes": "1073741824"
+            }
+          }
+        },
+        "bootstrapOnly": {
+          "rawInput": {
+            "maxFileBytes": "1048576",
+            "maxParserTokens": "1048576"
+          },
+          "snapshot": {
+            "maxNodes": "1048576",
+            "maxDepth": "1048576",
+            "maxCollectionEntries": "1048576",
+            "maxTotalStringBytes": "1048576",
+            "maxSingleStringBytes": "1048576",
+            "maxRejectedMarkers": "1048576",
+            "maxEnvelopeCanonicalBytes": "1048576",
+            "maxSingleMarkerCanonicalBytes": "1048576",
+            "maxTraversalUnits": "1048576"
+          },
+          "inputBoundary": {
+            "maxDepth": "1048576",
+            "maxSpecificationInputBytes": "1048576",
+            "maxVocabularyBytes": "1048576",
+            "maxVocabularyMembers": "1048576",
+            "maxVocabularyMemberBytes": "1048576",
+            "maxVocabularyTotalMemberBytes": "1048576",
+            "maxLocaleDataManifestBytes": "1048576",
+            "maxCollectionMemberBytes": "1048576",
+            "maxCollectionTotalBytes": "1048576",
+            "maxVerificationInputBytes": "1048576",
+            "maxVerificationPins": "1048576"
+          },
+          "artifactBootstrap": {
+            "maxEnvelopeDepth": "1048576",
+            "maxDecodedAllocationBytes": "1048576",
+            "maxMetadataScanUnits": "1048576",
+            "maxValidationWorkUnits": "1048576"
+          },
+          "localeData": {
+            "maxPayloads": "1048576",
+            "maxPayloadBytes": "1048576",
+            "maxMarkerBytes": "1048576",
+            "maxValidityGroups": "1048576",
+            "maxCodes": "1048576",
+            "maxExtensionKeys": "1048576",
+            "maxTypes": "1048576",
+            "maxCorrections": "1048576",
+            "maxValidationWorkUnits": "1048576"
+          },
+          "evidenceMetadata": {
+            "maxSourceIdentityBytes": "1048576",
+            "maxSourceRevisionBytes": "1048576",
+            "maxLocatorBytes": "1048576",
+            "maxCallSiteSourceBytes": "1048576",
+            "maxCallSiteMappings": "1048576",
+            "maxLogicalPathSegments": "1048576",
+            "maxLogicalPathCanonicalBytes": "1048576",
+            "maxSubjectOccurrences": "1048576",
+            "maxTokenInputs": "1048576",
+            "maxCollisionComparisons": "1048576",
+            "maxMetadataWorkUnits": "1048576"
+          },
+          "mandatoryReserve": {
+            "maxOutcomeEnvelopeSlots": "1048576",
+            "maxConstructionIdentitySlots": "1048576",
+            "maxEntryTerminalFindingSlots": "1048576",
+            "maxEntryTerminalStatusSlots": "1048576",
+            "maxSharedTerminalFindingSlots": "1048576",
+            "maxSharedTerminalStatusSlots": "1048576",
+            "maxSharedUnavailableCauseSlots": "1048576",
+            "maxCanonicalBytes": "1048576"
+          }
+        }
+      }
+    }
+  }
+}

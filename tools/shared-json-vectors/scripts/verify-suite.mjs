@@ -33,8 +33,9 @@
  * report under the check's rule, and that its paired entries agree where 015
  * makes them agree. Each Handoff Vector names a listed Resolver Case whose
  * every expected outcome is checked and gives the vector's facts and
- * bindings, and each Group ID selection vector concludes what 015's selection
- * rules conclude from its selectors. Each row of the obligation table is one
+ * bindings, each Group ID selection vector concludes what 015's selection
+ * rules conclude from its selectors, and each negotiation vector what 015's
+ * portable lookup concludes from its preferences. Each row of the obligation table is one
  * inactive manifest, and nothing activates an evaluated row. It does not read
  * the design document.
  */
@@ -1784,14 +1785,116 @@ function selection(facts, inputs) {
   return { outcome: 'selected-group', groupId: group, plannedTargetIds: groups[group]?.members }
 }
 
+/**
+ * A canonical locale's structure: its language, script, region, variants,
+ * and extensions other than private use, canonical casing included.
+ */
+const CANONICAL_LOCALE =
+  /^([a-z]{2,3}|[a-z]{5,8})(?:-([A-Z][a-z]{3}))?(?:-([A-Z]{2}|\d{3}))?((?:-(?:[\da-z]{5,8}|\d[\da-z]{3}))*)((?:-[\da-wyz](?:-[\da-z]{2,8})+)*)$/
+
+/**
+ * The portable lookup candidates of a canonical locale: the complete
+ * locale, then without its rightmost extension while one remains, its
+ * rightmost variant while one remains, its region, and its script.
+ *
+ * @param locale - The locale.
+ * @returns The candidates, or undefined for a spelling outside the domain.
+ */
+function lookupCandidates(locale) {
+  const match = CANONICAL_LOCALE.exec(String(locale))
+  if (match === null) {
+    return undefined
+  }
+  let [, language, script, region, variantText, extensionText] = match
+  const variants = variantText.split('-').filter(Boolean)
+  const extensions = [...extensionText.matchAll(/-([\da-wyz](?:-[\da-z]{2,8})+)/g)].map(
+    found => found[1]
+  )
+  const text = () =>
+    [language, script, region, ...variants, ...extensions].filter(Boolean).join('-')
+  const sequence = [text()]
+  while (extensions.length > 0) {
+    extensions.pop()
+    sequence.push(text())
+  }
+  while (variants.length > 0) {
+    variants.pop()
+    sequence.push(text())
+  }
+  if (region !== undefined) {
+    region = undefined
+    sequence.push(text())
+  }
+  if (script !== undefined) {
+    script = undefined
+    sequence.push(text())
+  }
+  return sequence
+}
+
+/**
+ * What 015's portable lookup, or a direct selection, concludes for a
+ * negotiation vector's inputs from the targets and the negotiation profile
+ * it hands over: at each candidate an exact member, else an alias whose
+ * destination is a member, else the next candidate; the effective default
+ * when nothing matches; an invalid preference failing the invocation; and a
+ * direct selection outside the subset failing it.
+ *
+ * @param facts - The vector's facts.
+ * @param inputs - Its consumer inputs.
+ * @returns The relationship.
+ */
+function negotiate(facts, inputs) {
+  const target = facts?.targets?.[inputs?.targetId]
+  const supported = Array.isArray(target?.requestedLocales) ? target.requestedLocales : []
+  const held = locale => supported.includes(locale)
+  if (typeof inputs?.direct === 'string') {
+    return held(inputs.direct)
+      ? { outcome: 'selected', locale: inputs.direct }
+      : { outcome: 'failure', reason: 'unsupported-direct-selection' }
+  }
+  const aliases = facts?.localeNegotiation?.aliases ?? {}
+  const preferences = Array.isArray(inputs?.preferences) ? inputs.preferences : []
+  const invalid = preferences.findIndex(preference => lookupCandidates(preference) === undefined)
+  if (invalid >= 0) {
+    return { outcome: 'failure', reason: 'invalid-preference', preference: invalid }
+  }
+  const trace = []
+  for (const preference of preferences) {
+    const probes = []
+    trace.push({ preference, probes })
+    for (const candidate of lookupCandidates(preference)) {
+      const destination = Object.hasOwn(aliases, candidate) ? aliases[candidate] : undefined
+      if (held(candidate)) {
+        probes.push({ candidate, result: 'exact' })
+        return { outcome: 'selected', locale: candidate, trace }
+      }
+      if (destination !== undefined && held(destination)) {
+        probes.push({ candidate, result: 'alias', destination })
+        return { outcome: 'selected', locale: destination, trace }
+      }
+      probes.push(
+        destination === undefined
+          ? { candidate, result: 'no-match' }
+          : { candidate, result: 'alias-inapplicable', destination }
+      )
+    }
+  }
+  return { outcome: 'default', locale: target?.effectiveDefaultRequestedLocale, trace }
+}
+
 // Each Handoff Vector names a listed Resolver Case whose every expected
 // outcome is checked, holds whole semantic groups of each such outcome's
 // profile as its facts, and as its bindings exactly the outcome's rows whose
 // key a fact holds, in the outcome's order (D15:3330, 3348). A Group ID
 // selection vector hands over the groups and the targets, and expects what
-// 015's selection rules conclude from its selectors (D15:2085).
+// 015's selection rules conclude from its selectors (D15:2085). A
+// negotiation vector hands over the canonicalization specification, the
+// negotiation profile, and the targets, and expects what 015's portable
+// lookup or direct selection concludes from its inputs (D15:1416-1484).
 let vectors = 0
 const SELECTION = '015-handoff-group-selection-'
+const NEGOTIATION = '015-handoff-negotiation-'
 for (const entry of index.value.handoffVectors ?? []) {
   const vector = named(entry)
   if (vector === undefined) {
@@ -1829,6 +1932,21 @@ for (const entry of index.value.handoffVectors ?? []) {
       ))
   ) {
     fail(`${entry.path}: does not expect what 015's Group ID selection rules conclude`)
+  }
+  if (
+    entry.id.startsWith(NEGOTIATION) &&
+    (!isDeepStrictEqual(Object.keys(facts), [
+      'localeCanonicalization',
+      'localeNegotiation',
+      'targets'
+    ]) ||
+      vector.verificationOwner !== '027' ||
+      !isDeepStrictEqual(
+        vector.expectedRelationship?.json,
+        negotiate(facts, vector.consumerInputs?.json)
+      ))
+  ) {
+    fail(`${entry.path}: does not expect what 015's portable lookup concludes`)
   }
 }
 

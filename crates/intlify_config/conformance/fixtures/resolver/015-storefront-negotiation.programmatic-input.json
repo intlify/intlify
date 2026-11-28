@@ -1,0 +1,819 @@
+{
+  "configuration-programmatic": {
+    "candidate": "configuration-programmatic",
+    "input": {
+      "snapshot": {
+        "snapshot": {
+          "object": [
+            [
+              "$schema",
+              {
+                "string": "https://invalid.example/editor-only-schema"
+              }
+            ],
+            [
+              "profiles",
+              {
+                "object": [
+                  [
+                    "app",
+                    {
+                      "object": [
+                        [
+                          "coverage",
+                          {
+                            "object": [
+                              [
+                                "defaultMode",
+                                {
+                                  "string": "direct-required"
+                                }
+                              ],
+                              [
+                                "rules",
+                                {
+                                  "array": [
+                                    {
+                                      "object": [
+                                        [
+                                          "mode",
+                                          {
+                                            "string": "fallback-allowed"
+                                          }
+                                        ],
+                                        [
+                                          "requestedLocales",
+                                          {
+                                            "array": [
+                                              {
+                                                "string": "ja"
+                                              }
+                                            ]
+                                          }
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "object": [
+                                        [
+                                          "intentSurfaceClasses",
+                                          {
+                                            "array": [
+                                              {
+                                                "string": "checkout"
+                                              }
+                                            ]
+                                          }
+                                        ],
+                                        [
+                                          "mode",
+                                          {
+                                            "string": "direct-required"
+                                          }
+                                        ]
+                                      ]
+                                    },
+                                    {
+                                      "object": [
+                                        [
+                                          "intentSurfaceClasses",
+                                          {
+                                            "array": [
+                                              {
+                                                "string": "checkout"
+                                              }
+                                            ]
+                                          }
+                                        ],
+                                        [
+                                          "mode",
+                                          {
+                                            "string": "fallback-allowed"
+                                          }
+                                        ],
+                                        [
+                                          "requestedLocales",
+                                          {
+                                            "array": [
+                                              {
+                                                "string": "ja"
+                                              }
+                                            ]
+                                          }
+                                        ]
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            ]
+                          }
+                        ],
+                        [
+                          "defaultRequestedLocale",
+                          {
+                            "string": "en"
+                          }
+                        ],
+                        [
+                          "defaultSourceLocale",
+                          {
+                            "string": "en"
+                          }
+                        ],
+                        [
+                          "delivery",
+                          {
+                            "object": [
+                              [
+                                "placement",
+                                {
+                                  "string": "duplicate"
+                                }
+                              ]
+                            ]
+                          }
+                        ],
+                        [
+                          "deploymentGroups",
+                          {
+                            "object": [
+                              [
+                                "jobs",
+                                {
+                                  "object": [
+                                    [
+                                      "hydrationRelations",
+                                      {
+                                        "array": []
+                                      }
+                                    ],
+                                    [
+                                      "members",
+                                      {
+                                        "array": [
+                                          {
+                                            "string": "worker"
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ],
+                              [
+                                "web",
+                                {
+                                  "object": [
+                                    [
+                                      "hydrationRelations",
+                                      {
+                                        "array": [
+                                          {
+                                            "object": [
+                                              [
+                                                "client",
+                                                {
+                                                  "string": "browser"
+                                                }
+                                              ],
+                                              [
+                                                "server",
+                                                {
+                                                  "string": "server"
+                                                }
+                                              ]
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    ],
+                                    [
+                                      "members",
+                                      {
+                                        "array": [
+                                          {
+                                            "string": "browser"
+                                          },
+                                          {
+                                            "string": "server"
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ]
+                            ]
+                          }
+                        ],
+                        [
+                          "localeNegotiation",
+                          {
+                            "object": [
+                              [
+                                "aliases",
+                                {
+                                  "object": [
+                                    [
+                                      "en-AU",
+                                      {
+                                        "string": "fr-FR"
+                                      }
+                                    ],
+                                    [
+                                      "fr",
+                                      {
+                                        "string": "fr-FR"
+                                      }
+                                    ],
+                                    [
+                                      "fr-FR",
+                                      {
+                                        "string": "en"
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ]
+                            ]
+                          }
+                        ],
+                        [
+                          "messageFallback",
+                          {
+                            "object": [
+                              [
+                                "ja",
+                                {
+                                  "array": [
+                                    {
+                                      "string": "en"
+                                    },
+                                    {
+                                      "object": [
+                                        [
+                                          "kind",
+                                          {
+                                            "string": "intent-source-locale"
+                                          }
+                                        ]
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            ]
+                          }
+                        ],
+                        [
+                          "policies",
+                          {
+                            "object": [
+                              [
+                                "approval",
+                                {
+                                  "object": [
+                                    [
+                                      "identity",
+                                      {
+                                        "string": "storefront-approval"
+                                      }
+                                    ],
+                                    [
+                                      "kind",
+                                      {
+                                        "string": "approval-policy"
+                                      }
+                                    ],
+                                    [
+                                      "revision",
+                                      {
+                                        "string": "1"
+                                      }
+                                    ],
+                                    [
+                                      "semanticDigest",
+                                      {
+                                        "string": "sha256:8f68e2d21a8227fceefad9b796a081352fe119965733775adddad71e1f660107"
+                                      }
+                                    ],
+                                    [
+                                      "specificationRevision",
+                                      {
+                                        "string": "0"
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ],
+                              [
+                                "glossarySet",
+                                {
+                                  "object": [
+                                    [
+                                      "identity",
+                                      {
+                                        "string": "storefront-glossary"
+                                      }
+                                    ],
+                                    [
+                                      "kind",
+                                      {
+                                        "string": "glossary-set"
+                                      }
+                                    ],
+                                    [
+                                      "revision",
+                                      {
+                                        "string": "1"
+                                      }
+                                    ],
+                                    [
+                                      "semanticDigest",
+                                      {
+                                        "string": "sha256:b06d726976c649c0a3738b991b1bd9740789d29f850e7ec56158994a74031dd4"
+                                      }
+                                    ],
+                                    [
+                                      "specificationRevision",
+                                      {
+                                        "string": "0"
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ],
+                              [
+                                "providerRouting",
+                                {
+                                  "object": [
+                                    [
+                                      "identity",
+                                      {
+                                        "string": "storefront-routing"
+                                      }
+                                    ],
+                                    [
+                                      "kind",
+                                      {
+                                        "string": "provider-routing-policy"
+                                      }
+                                    ],
+                                    [
+                                      "revision",
+                                      {
+                                        "string": "1"
+                                      }
+                                    ],
+                                    [
+                                      "semanticDigest",
+                                      {
+                                        "string": "sha256:aff8acbb9d527ee19a96ebceeeec0961b16d279d87305b7b3481cf65efcc68ff"
+                                      }
+                                    ],
+                                    [
+                                      "specificationRevision",
+                                      {
+                                        "string": "0"
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ],
+                              [
+                                "resourceLimits",
+                                {
+                                  "object": [
+                                    [
+                                      "identity",
+                                      {
+                                        "string": "storefront-limits"
+                                      }
+                                    ],
+                                    [
+                                      "kind",
+                                      {
+                                        "string": "resource-limit-policy"
+                                      }
+                                    ],
+                                    [
+                                      "revision",
+                                      {
+                                        "string": "1"
+                                      }
+                                    ],
+                                    [
+                                      "semanticDigest",
+                                      {
+                                        "string": "sha256:75a72c6f0753636f3e5d31431fcd17e4c7793a1b01e2913f9aa9fc8745ed84b6"
+                                      }
+                                    ],
+                                    [
+                                      "specificationRevision",
+                                      {
+                                        "string": "0"
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ],
+                              [
+                                "selection",
+                                {
+                                  "object": [
+                                    [
+                                      "identity",
+                                      {
+                                        "string": "storefront-selection"
+                                      }
+                                    ],
+                                    [
+                                      "kind",
+                                      {
+                                        "string": "selection-policy"
+                                      }
+                                    ],
+                                    [
+                                      "revision",
+                                      {
+                                        "string": "1"
+                                      }
+                                    ],
+                                    [
+                                      "semanticDigest",
+                                      {
+                                        "string": "sha256:29563e4b67b6e74c5b310ec93d8978a0cafb9e1fd1201926724606ce042528f0"
+                                      }
+                                    ],
+                                    [
+                                      "specificationRevision",
+                                      {
+                                        "string": "0"
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ],
+                              [
+                                "sourceAdmission",
+                                {
+                                  "object": [
+                                    [
+                                      "identity",
+                                      {
+                                        "string": "storefront-source"
+                                      }
+                                    ],
+                                    [
+                                      "kind",
+                                      {
+                                        "string": "source-admission-policy"
+                                      }
+                                    ],
+                                    [
+                                      "revision",
+                                      {
+                                        "string": "1"
+                                      }
+                                    ],
+                                    [
+                                      "semanticDigest",
+                                      {
+                                        "string": "sha256:d6480b62bff394301869975b4a1bf8f983e0eaf17b6af5bd1a38e740301c2ec8"
+                                      }
+                                    ],
+                                    [
+                                      "specificationRevision",
+                                      {
+                                        "string": "0"
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ],
+                              [
+                                "trust",
+                                {
+                                  "object": [
+                                    [
+                                      "identity",
+                                      {
+                                        "string": "storefront-trust"
+                                      }
+                                    ],
+                                    [
+                                      "kind",
+                                      {
+                                        "string": "trust-policy"
+                                      }
+                                    ],
+                                    [
+                                      "revision",
+                                      {
+                                        "string": "1"
+                                      }
+                                    ],
+                                    [
+                                      "semanticDigest",
+                                      {
+                                        "string": "sha256:84cbcd61a2d9b3a5e4b346ccc884ec36524dc7b7b927d0d752fdc1d103a57d4c"
+                                      }
+                                    ],
+                                    [
+                                      "specificationRevision",
+                                      {
+                                        "string": "0"
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ]
+                            ]
+                          }
+                        ],
+                        [
+                          "projectId",
+                          {
+                            "string": "storefront"
+                          }
+                        ],
+                        [
+                          "requestedLocales",
+                          {
+                            "array": [
+                              {
+                                "string": "de"
+                              },
+                              {
+                                "string": "en"
+                              },
+                              {
+                                "string": "fr-FR"
+                              },
+                              {
+                                "string": "ja"
+                              },
+                              {
+                                "string": "zh"
+                              },
+                              {
+                                "string": "zh-Hant"
+                              }
+                            ]
+                          }
+                        ],
+                        [
+                          "selectionScope",
+                          {
+                            "string": "storefront.production"
+                          }
+                        ],
+                        [
+                          "targetProfiles",
+                          {
+                            "object": [
+                              [
+                                "browser",
+                                {
+                                  "object": [
+                                    [
+                                      "defaultRequestedLocale",
+                                      {
+                                        "string": "en"
+                                      }
+                                    ],
+                                    [
+                                      "profile",
+                                      {
+                                        "object": [
+                                          [
+                                            "identity",
+                                            {
+                                              "string": "storefront-browser"
+                                            }
+                                          ],
+                                          [
+                                            "kind",
+                                            {
+                                              "string": "target-profile"
+                                            }
+                                          ],
+                                          [
+                                            "revision",
+                                            {
+                                              "string": "1"
+                                            }
+                                          ],
+                                          [
+                                            "semanticDigest",
+                                            {
+                                              "string": "sha256:9e769d671b662ba6deee32b68cc01185ba07b0eebf013d4b48a75c26f9c05aed"
+                                            }
+                                          ],
+                                          [
+                                            "specificationRevision",
+                                            {
+                                              "string": "0"
+                                            }
+                                          ]
+                                        ]
+                                      }
+                                    ],
+                                    [
+                                      "requestedLocales",
+                                      {
+                                        "array": [
+                                          {
+                                            "string": "de"
+                                          },
+                                          {
+                                            "string": "en"
+                                          },
+                                          {
+                                            "string": "fr-FR"
+                                          },
+                                          {
+                                            "string": "ja"
+                                          },
+                                          {
+                                            "string": "zh"
+                                          },
+                                          {
+                                            "string": "zh-Hant"
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ],
+                              [
+                                "server",
+                                {
+                                  "object": [
+                                    [
+                                      "profile",
+                                      {
+                                        "object": [
+                                          [
+                                            "identity",
+                                            {
+                                              "string": "storefront-server"
+                                            }
+                                          ],
+                                          [
+                                            "kind",
+                                            {
+                                              "string": "target-profile"
+                                            }
+                                          ],
+                                          [
+                                            "revision",
+                                            {
+                                              "string": "1"
+                                            }
+                                          ],
+                                          [
+                                            "semanticDigest",
+                                            {
+                                              "string": "sha256:ee17cd17103ee60aa680a7d33db247a2c220a97b81c955b739e7e335eecad40f"
+                                            }
+                                          ],
+                                          [
+                                            "specificationRevision",
+                                            {
+                                              "string": "0"
+                                            }
+                                          ]
+                                        ]
+                                      }
+                                    ],
+                                    [
+                                      "requestedLocales",
+                                      {
+                                        "array": [
+                                          {
+                                            "string": "de"
+                                          },
+                                          {
+                                            "string": "en"
+                                          },
+                                          {
+                                            "string": "fr-FR"
+                                          },
+                                          {
+                                            "string": "ja"
+                                          },
+                                          {
+                                            "string": "zh"
+                                          },
+                                          {
+                                            "string": "zh-Hant"
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ],
+                              [
+                                "worker",
+                                {
+                                  "object": [
+                                    [
+                                      "defaultRequestedLocale",
+                                      {
+                                        "string": "ja"
+                                      }
+                                    ],
+                                    [
+                                      "profile",
+                                      {
+                                        "object": [
+                                          [
+                                            "identity",
+                                            {
+                                              "string": "storefront-worker"
+                                            }
+                                          ],
+                                          [
+                                            "kind",
+                                            {
+                                              "string": "target-profile"
+                                            }
+                                          ],
+                                          [
+                                            "revision",
+                                            {
+                                              "string": "1"
+                                            }
+                                          ],
+                                          [
+                                            "semanticDigest",
+                                            {
+                                              "string": "sha256:e86a606f3b0a3bcd08106fb1654a2452e093ebb7b307be86a5c5b44f52d2e431"
+                                            }
+                                          ],
+                                          [
+                                            "specificationRevision",
+                                            {
+                                              "string": "0"
+                                            }
+                                          ]
+                                        ]
+                                      }
+                                    ],
+                                    [
+                                      "requestedLocales",
+                                      {
+                                        "array": [
+                                          {
+                                            "string": "en"
+                                          },
+                                          {
+                                            "string": "ja"
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  ]
+                                }
+                              ]
+                            ]
+                          }
+                        ]
+                      ]
+                    }
+                  ]
+                ]
+              }
+            ],
+            [
+              "schemaVersion",
+              {
+                "string": "0"
+              }
+            ]
+          ]
+        },
+        "digest": "sha256:f1dfc6be2d3ad2efc858311a7f0d236e0b03ab0a142a9f25973acd7f1c6168df"
+      },
+      "identity": "intlify-programmatic-entry.v0:storefront",
+      "nonSecret": true,
+      "revision": "sha256:f1dfc6be2d3ad2efc858311a7f0d236e0b03ab0a142a9f25973acd7f1c6168df",
+      "locator": {
+        "variant": "safe-label",
+        "payload": "storefront",
+        "nonSecret": true
+      }
+    }
+  },
+  "profile-selector-programmatic": {
+    "candidate": "profile-selector-programmatic",
+    "input": {
+      "report": "string",
+      "value": "app"
+    }
+  }
+}

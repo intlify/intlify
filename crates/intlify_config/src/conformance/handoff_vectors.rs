@@ -26,6 +26,10 @@
 //! `unknown-group-id`, `multiple-selectors`, `target-id-selector`, or
 //! `group-subset`. 020 owns the form of both (D15:3330), which these spell in
 //! 015's words until 020 defines it.
+//!
+//! It also writes the twenty negotiation vectors for 027, which hand over a
+//! target's supported subset and effective default with the negotiation
+//! profile and expect what the portable lookup concludes ([`negotiation`]).
 
 use serde_json::{json, Map, Value};
 
@@ -36,7 +40,9 @@ use crate::resolver::dependency::SemanticGroup;
 use super::case::{ManifestKind, REVISION};
 use super::construction_cases::Cases;
 use super::index::SuiteFile;
-use super::resolver_cases::{expected_path, STOREFRONT, TWO_GROUPS};
+use super::resolver_cases::{expected_path, NEGOTIATION, STOREFRONT, TWO_GROUPS};
+
+mod negotiation;
 
 /// Where the suite holds the vectors' manifests.
 const CASES: &str = "cases/handoff";
@@ -44,6 +50,15 @@ const CASES: &str = "cases/handoff";
 /// The semantic groups a Group ID selection vector hands over: every group
 /// with its members, and each member's locale facts and Target Profile.
 const GROUPS: [SemanticGroup; 2] = [SemanticGroup::DeploymentGroups, SemanticGroup::Targets];
+
+/// The semantic groups a negotiation vector hands over: the specification
+/// preferences are canonicalized under, the negotiation profile, and each
+/// target's supported subset and effective default (D15:1416-1422).
+const NEGOTIATION_GROUPS: [SemanticGroup; 3] = [
+    SemanticGroup::LocaleCanonicalization,
+    SemanticGroup::LocaleNegotiation,
+    SemanticGroup::Targets,
+];
 
 /// The decisions every Group ID selection vector rests on: one complete
 /// group per transaction, 015's selection vectors beside 020's selector
@@ -214,20 +229,33 @@ fn expected(resolver: &Cases, id: &str) -> Value {
     serde_json::from_slice(&file.bytes).expect("an expected outcome is JSON")
 }
 
+/// One vector before it is written: its ID, its producer, the facts and
+/// bindings the producer gives, the consumer inputs and the relationship,
+/// its owner, and the decisions it rests on.
+struct Written {
+    id: String,
+    producer: &'static str,
+    produced: (Value, Value),
+    inputs: Value,
+    relationship: Value,
+    owner: &'static str,
+    decisions: &'static [&'static str],
+}
+
 /// The suite's Handoff Vectors, in ascending unsigned byte order of their
 /// IDs, each produced from the expected outcome of the Resolver Case it
-/// names among the cases `resolver` writes.
+/// names among the cases `resolver` writes: the Group ID selection vectors
+/// for 020 and the negotiation vectors for 027.
 ///
 /// # Errors
 ///
 /// Returns the serialization failure of a manifest, which their values rule
 /// out.
 pub(crate) fn cases(resolver: &Cases) -> Result<Cases, serde_json::Error> {
+    let mut written = Vec::new();
     let groups = GROUPS.map(SemanticGroup::id);
     let one = expected(resolver, STOREFRONT);
     let two = expected(resolver, TWO_GROUPS);
-    let mut files = Vec::new();
-    let mut listing = Vec::new();
     for vector in &VECTORS {
         let (producer, outcome) = if vector.two_groups {
             (TWO_GROUPS, &two)
@@ -244,27 +272,54 @@ pub(crate) fn cases(resolver: &Cases) -> Result<Cases, serde_json::Error> {
             }),
             Relationship::Rejected(rule) => json!({ "outcome": "rejected", "rule": rule }),
         };
-        let id = format!("015-handoff-group-selection-{}", vector.name);
+        written.push(Written {
+            id: format!("015-handoff-group-selection-{}", vector.name),
+            producer,
+            produced: (facts, bindings),
+            inputs: json!({
+                "groupIdSelectors": vector.group_ids,
+                "targetIdSelectors": vector.target_ids,
+            }),
+            relationship,
+            owner: "020",
+            decisions: &DECISIONS,
+        });
+    }
+    let groups = NEGOTIATION_GROUPS.map(SemanticGroup::id);
+    let (facts, bindings) = produced(&expected(resolver, NEGOTIATION), groups)
+        .expect("the negotiation case is checked with every group");
+    for vector in &negotiation::VECTORS {
+        let (inputs, relationship) =
+            negotiation::relationship(vector, &facts["targets"], &facts["localeNegotiation"]);
+        written.push(Written {
+            id: format!("015-handoff-negotiation-{}", vector.name),
+            producer: NEGOTIATION,
+            produced: (facts.clone(), bindings.clone()),
+            inputs,
+            relationship,
+            owner: "027",
+            decisions: &negotiation::DECISIONS,
+        });
+    }
+    let mut files = Vec::new();
+    let mut listing = Vec::new();
+    for vector in written {
+        let (facts, bindings) = vector.produced;
         let manifest = generate::write(&json!({
             "suiteRevision": REVISION,
             "manifestKind": ManifestKind::HandoffVector.name(),
-            "id": id,
-            "producerCaseId": producer,
+            "id": vector.id,
+            "producerCaseId": vector.producer,
             "producerProfileFacts": facts,
             "producerArtifactBindings": bindings,
-            "consumerInputs": {
-                "json": {
-                    "groupIdSelectors": vector.group_ids,
-                    "targetIdSelectors": vector.target_ids,
-                },
-            },
-            "expectedRelationship": { "json": relationship },
-            "verificationOwner": "020",
-            "traceability": { "decisionIds": DECISIONS, "ruleIds": [], "checkIds": [] },
+            "consumerInputs": { "json": vector.inputs },
+            "expectedRelationship": { "json": vector.relationship },
+            "verificationOwner": vector.owner,
+            "traceability": { "decisionIds": vector.decisions, "ruleIds": [], "checkIds": [] },
         }))?;
-        let path = format!("{CASES}/{id}.json");
+        let path = format!("{CASES}/{}.json", vector.id);
         listing.push(json!({
-            "id": id,
+            "id": vector.id,
             "path": path,
             "digest": file_digest(&manifest).as_str(),
         }));
@@ -286,7 +341,7 @@ mod tests {
     use crate::conformance::resolver_cases;
 
     /// The Resolver Cases and the vectors this crate writes, written once.
-    fn written() -> &'static (Cases, Cases) {
+    pub(super) fn written() -> &'static (Cases, Cases) {
         static WRITTEN: OnceLock<(Cases, Cases)> = OnceLock::new();
         WRITTEN.get_or_init(|| {
             let resolver = resolver_cases::cases().unwrap();
@@ -295,12 +350,19 @@ mod tests {
         })
     }
 
-    fn manifests(vectors: &Cases) -> Vec<Value> {
+    /// The written manifests whose IDs start with `family`.
+    fn manifests_of(vectors: &Cases, family: &str) -> Vec<Value> {
         vectors
             .files
             .iter()
-            .map(|file| serde_json::from_slice(&file.bytes).unwrap())
+            .map(|file| serde_json::from_slice::<Value>(&file.bytes).unwrap())
+            .filter(|manifest| manifest["id"].as_str().unwrap().starts_with(family))
             .collect()
+    }
+
+    /// The Group ID selection vectors.
+    fn manifests(vectors: &Cases) -> Vec<Value> {
+        manifests_of(vectors, "015-handoff-group-selection-")
     }
 
     /// Group selection as 015 states it (D15:2085), from the groups a vector
@@ -382,7 +444,7 @@ mod tests {
     #[test]
     fn each_vector_hands_over_its_producer_s_groups_and_their_bindings() {
         let (resolver, vectors) = written();
-        for manifest in manifests(vectors) {
+        for manifest in manifests_of(vectors, "015-handoff-") {
             let producer = manifest["producerCaseId"].as_str().unwrap();
             for side in ["file", "programmatic"] {
                 let path = expected_path(producer, side);
@@ -539,7 +601,7 @@ mod tests {
         sorted.sort_unstable();
         sorted.dedup();
         assert_eq!(ids, sorted);
-        assert_eq!(ids.len(), VECTORS.len());
+        assert_eq!(ids.len(), VECTORS.len() + negotiation::VECTORS.len());
         let paths = vectors
             .files
             .iter()
@@ -548,7 +610,10 @@ mod tests {
         assert_eq!(paths.len(), ids.len());
         for entry in &vectors.listing {
             let id = entry["id"].as_str().unwrap();
-            assert!(id.starts_with("015-handoff-group-selection-"));
+            assert!(
+                id.starts_with("015-handoff-group-selection-")
+                    || id.starts_with("015-handoff-negotiation-")
+            );
             assert_eq!(entry["path"], format!("{CASES}/{id}.json"));
             assert!(paths.contains(entry["path"].as_str().unwrap()));
         }

@@ -1,0 +1,44 @@
+{
+  "suiteRevision": "0",
+  "manifestKind": "resolver",
+  "id": "015-storefront-negotiation",
+  "resolverConstruction": {
+    "caseId": "015-construction-revision-0",
+    "identityReference": "rci0_VvxD1FtsupupkcCK-xmGDIf15oEAa4n-ivAFI-Jvids"
+  },
+  "commonInvocationInputFixture": {
+    "path": "fixtures/resolver/015-storefront-negotiation.common.json",
+    "digest": "sha256:15ffcfba8765485e29ec38fb2eb443360061d9a02b2edddf66baaaab2e126718"
+  },
+  "entries": {
+    "file": {
+      "entryAdmissionInputFixture": {
+        "path": "fixtures/resolver/015-storefront-negotiation.file-input.json",
+        "digest": "sha256:37c2468edf092692ad8da1d94c54e57409d744e48d084d4bdeb1e8850e68c534"
+      },
+      "expectedOutcomeFixture": {
+        "path": "fixtures/resolver/015-storefront-negotiation.file-expected.json",
+        "digest": "sha256:4e4f9b7cbd372595068343af8fcf106fbc94ebb208a84d8f77f0afb8c9f4ff77"
+      }
+    },
+    "programmatic": {
+      "entryAdmissionInputFixture": {
+        "path": "fixtures/resolver/015-storefront-negotiation.programmatic-input.json",
+        "digest": "sha256:a595557fbb065f1e57946f4b577f528f87c5414b9823012e6d758ed4e6fe634e"
+      },
+      "expectedOutcomeFixture": {
+        "path": "fixtures/resolver/015-storefront-negotiation.programmatic-expected.json",
+        "digest": "sha256:ae54bc521d78eedafa175a59d5276f58a0615c56a2c0c19751d473e8d120fd11"
+      }
+    }
+  },
+  "traceability": {
+    "decisionIds": [
+      "015-029",
+      "015-055",
+      "015-063"
+    ],
+    "ruleIds": [],
+    "checkIds": []
+  }
+}

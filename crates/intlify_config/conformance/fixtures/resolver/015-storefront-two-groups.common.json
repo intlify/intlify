@@ -78,7 +78,7 @@
           "digest": "sha256:40ea3903c97a032201653732612de7ca1e8be0def2a322a9e6b629a9bf074b94"
         },
         {
-          "path": "fixtures/resolver/015-storefront-two-groups/profile-resolution-artifact-collection.input.members.9.json",
+          "path": "fixtures/resolver/015-storefront-negotiation/profile-resolution-artifact-collection.input.members.9.json",
           "digest": "sha256:4e5a42bdc16007f317e793fc7ad39fa4928ba27b72f6081bd046f1eb731c090e"
         }
       ]

@@ -975,9 +975,14 @@
       "digest": "sha256:642a0ae743301d84aa593c261b3f46be5cd33acef9bc26b589e80fcf9c43cd28"
     },
     {
+      "id": "015-storefront-negotiation",
+      "path": "cases/resolver/015-storefront-negotiation.json",
+      "digest": "sha256:d354539be10b9702cc2433c944adbd4f8816a5cdb06185570c3c2446274fcd87"
+    },
+    {
       "id": "015-storefront-two-groups",
       "path": "cases/resolver/015-storefront-two-groups.json",
-      "digest": "sha256:f8eb0c6cf6877f2b86b78006470581da3318ff8ab46c25dd3e79302774a5944a"
+      "digest": "sha256:109e0d494b5aaae2203c8c4e55acb4538da4b4fd6f71721273a6d4efc226aada"
     }
   ],
   "handoffVectors": [
@@ -1040,6 +1045,106 @@
       "id": "015-handoff-group-selection-two-groups-unknown-group-id",
       "path": "cases/handoff/015-handoff-group-selection-two-groups-unknown-group-id.json",
       "digest": "sha256:254ae4f7ef67a60b8ee4ff5a3a642bccf922f76e8701e35ecc1a2945b46b277e"
+    },
+    {
+      "id": "015-handoff-negotiation-browser-alias",
+      "path": "cases/handoff/015-handoff-negotiation-browser-alias.json",
+      "digest": "sha256:0025410f294d50dba42057bc4bbfbdea5ba21d3052604bd1f040a5f715c5ca95"
+    },
+    {
+      "id": "015-handoff-negotiation-browser-direct",
+      "path": "cases/handoff/015-handoff-negotiation-browser-direct.json",
+      "digest": "sha256:d8be73555f785dc9f568baf87e461f95cccbab1b8fc8d2678dc75fb9018c5cc9"
+    },
+    {
+      "id": "015-handoff-negotiation-browser-empty",
+      "path": "cases/handoff/015-handoff-negotiation-browser-empty.json",
+      "digest": "sha256:4ae742dcab66b176ba9194ce22ce1bbfd0d14186a678f7f83c405565caab3fc1"
+    },
+    {
+      "id": "015-handoff-negotiation-browser-exact-before-alias",
+      "path": "cases/handoff/015-handoff-negotiation-browser-exact-before-alias.json",
+      "digest": "sha256:9aa66d0207651b5215de3cc06a2adb1e172313333a08f7dabf9984238b4a4510"
+    },
+    {
+      "id": "015-handoff-negotiation-browser-invalid-preference",
+      "path": "cases/handoff/015-handoff-negotiation-browser-invalid-preference.json",
+      "digest": "sha256:5c458af2dfb6c0d932750fabbfeba513d3719ffbccf2e9527588cee7ac03978a"
+    },
+    {
+      "id": "015-handoff-negotiation-browser-no-likely-subtag",
+      "path": "cases/handoff/015-handoff-negotiation-browser-no-likely-subtag.json",
+      "digest": "sha256:f5264d8f1f879a140e0798f7709a313629ef6de90afb653a6c02a8486fed02da"
+    },
+    {
+      "id": "015-handoff-negotiation-browser-preference-order",
+      "path": "cases/handoff/015-handoff-negotiation-browser-preference-order.json",
+      "digest": "sha256:b3e3aa45fcc894648f6b9c5d11b46eaa9c085f76fc5dd3611e964f5382777d52"
+    },
+    {
+      "id": "015-handoff-negotiation-browser-region-alias",
+      "path": "cases/handoff/015-handoff-negotiation-browser-region-alias.json",
+      "digest": "sha256:fbe1eb1d48d76f482e275fc02c19e10695ebfdd7702a6e03c10f722863ebb6f8"
+    },
+    {
+      "id": "015-handoff-negotiation-browser-transformed-extension",
+      "path": "cases/handoff/015-handoff-negotiation-browser-transformed-extension.json",
+      "digest": "sha256:c2fa1bb8313ba96d1b439fdabbf22a9935c1f5e249199e778773a8f791575207"
+    },
+    {
+      "id": "015-handoff-negotiation-browser-und",
+      "path": "cases/handoff/015-handoff-negotiation-browser-und.json",
+      "digest": "sha256:f45cd0033eca49951dc5541d4af8e409da9d7f0e7ea943ae5fd8027c2ae7e1f9"
+    },
+    {
+      "id": "015-handoff-negotiation-browser-unicode-extension",
+      "path": "cases/handoff/015-handoff-negotiation-browser-unicode-extension.json",
+      "digest": "sha256:b1d8e768b3a98ff9f5e0d5035d6dafd22a7befb722e70c67d77e3339b05cf4fb"
+    },
+    {
+      "id": "015-handoff-negotiation-browser-variants",
+      "path": "cases/handoff/015-handoff-negotiation-browser-variants.json",
+      "digest": "sha256:f27334fcabfc7ef97104c3152c4efe5f75f10fbf3e177c1b96c95f1ac13b1b14"
+    },
+    {
+      "id": "015-handoff-negotiation-server-alias",
+      "path": "cases/handoff/015-handoff-negotiation-server-alias.json",
+      "digest": "sha256:2eb7fbb8de62fb49353be9b563c133f1fed8867ede3c00e09b2a767d79e15b2e"
+    },
+    {
+      "id": "015-handoff-negotiation-worker-alias-inapplicable",
+      "path": "cases/handoff/015-handoff-negotiation-worker-alias-inapplicable.json",
+      "digest": "sha256:32ce31addcc54f8096d4b912dad0524443b3e8832bd37f7468c2498d7ef30628"
+    },
+    {
+      "id": "015-handoff-negotiation-worker-alias-of-an-unsupported-locale",
+      "path": "cases/handoff/015-handoff-negotiation-worker-alias-of-an-unsupported-locale.json",
+      "digest": "sha256:df09b6a19999ac35e9b36513fc9cab114702cbaf137e6c718c668090312a8121"
+    },
+    {
+      "id": "015-handoff-negotiation-worker-direct-unsupported",
+      "path": "cases/handoff/015-handoff-negotiation-worker-direct-unsupported.json",
+      "digest": "sha256:ad2d707ca519dfea86645dc9a634be282ea437d3ee4532b28233c44fcc704534"
+    },
+    {
+      "id": "015-handoff-negotiation-worker-exhausted",
+      "path": "cases/handoff/015-handoff-negotiation-worker-exhausted.json",
+      "digest": "sha256:ba2353e2bd09e7349ad0649b8472ed158e45b3383fba1c3a8b89513e73ee680e"
+    },
+    {
+      "id": "015-handoff-negotiation-worker-repeated-preference",
+      "path": "cases/handoff/015-handoff-negotiation-worker-repeated-preference.json",
+      "digest": "sha256:a5788dbdbc09d595d33289bc52ca3d08078d31f74583d4c0096ebf8922e541a5"
+    },
+    {
+      "id": "015-handoff-negotiation-worker-truncation-after-an-inapplicable-alias",
+      "path": "cases/handoff/015-handoff-negotiation-worker-truncation-after-an-inapplicable-alias.json",
+      "digest": "sha256:36fefe1fc47f94eb9c76db68f510a421e17198f6403165079003fd0927310f6d"
+    },
+    {
+      "id": "015-handoff-negotiation-worker-whole-extension",
+      "path": "cases/handoff/015-handoff-negotiation-worker-whole-extension.json",
+      "digest": "sha256:25383d8ba81ac5e30580a87125e0f8e1453daff6fedf286c304005a00fa169d3"
     }
   ],
   "conditionalObligations": [
